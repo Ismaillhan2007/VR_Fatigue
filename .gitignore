@@ -1,0 +1,34 @@
+# Secrets and local Python environments
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Generated Unity data (case variants cover typical project layouts)
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Bb]uild/
+[Bb]uilds/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+*.csproj
+*.sln
+*.suo
+*.user
+
+# Private local sessions; commit only synthetic fixtures under fixtures/
+session-data/
+private-reports/
+
+# Editor / OS files
+.idea/
+.vs/
+.DS_Store
