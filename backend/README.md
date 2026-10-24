@@ -57,6 +57,22 @@ Unity sends the same JSON with `UnityWebRequest` and `Content-Type: application/
 
 Unity owns capture, baseline/metrics/indicator calculation, and deterministic reconciliation. This service does not recompute eye movements or decide whether a person is fatigued. It preserves the supplied reconciliation, validates unavailable-data combinations, and may raise an explicit discomfort notice through simple local keyword rules. These English keyword rules are a demo safeguard, not a comprehensive assessment.
 
+An observation requires both a non-null measurement and its non-null deviation for a supported metric. Missing values are never treated as zero. If no supported pairs exist, even with `quality.status: usable`, the backend returns HTTP 200 with `data_quality_limited` and a local report/scene, without a Gemini call, attempt reservation, or cache entry. Partial comparisons describe only available pairs. Supplied quality, provenance, and reconciliation remain unchanged; callers must still use an unavailable indicator/reconciliation when required by the request's semantic rules. A missing or short baseline retains the more specific `no_baseline` observation.
+
+## Compatibility with the planned app
+
+The backend follows the v1 HTTP/JSON boundary in [the project plan](../docs/PROJECT_PLAN.md). This missing-data fix changes report selection and wording (`local-0.2`), not schema fields, enums, endpoints, or the request envelope. Existing v1 consumers do not need a DTO change.
+
+| App part | Current backend boundary | Verification / remaining dependency |
+| --- | --- | --- |
+| Capture and metrics | Accepts aggregate `SessionSummary`; leaves measurements, quality and reconciliation under Unity ownership. | Synthetic fixtures and nullable/partial measurements tested; actual producer unavailable. |
+| Report UI | Returns approved observations, narrative, limitations, safety notice and independent data/AI source labels. | Responses checked against the shared JSON Schema; UI rendering untested. Keep the original summary for numeric values and join by `session_id`. |
+| Forest engine | Returns bounded `SceneConfig`; reapplies mute, animal-free and motion-free restrictions. | Config validated through the response schema and API tests; Unity asset application unavailable. |
+| Gemini | Optional synthetic-only enhancement; real and recorded inputs stay on the local path. | SDK and failure behavior mocked; model compatibility and live token accounting unverified. |
+| Runtime | Separate local Python service with in-memory cache/counters. | Quest Pro LAN reachability and the client's own network-failure fallback remain untested. |
+
+Compatibility is verified at the backend/contract level, not end to end. The analysis-request envelope is documented here and in OpenAPI but has no standalone shared JSON Schema yet. Pydantic adds semantic checks beyond the draft schemas (for example, baseline/probe requirements and duration totals), so schema-valid inputs may still receive 422. Shared-contract review, matching C# DTOs, client-side validation/fallback, and headset checks remain integration work when those app parts are available. No authentication or durable multi-worker spending limit is implemented for public hosting.
+
 ## Connect other teammates and the headset
 
 - Same laptop: Unity calls `http://127.0.0.1:8000`.

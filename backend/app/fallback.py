@@ -17,7 +17,7 @@ OBSERVATION_TEXT = {
     "probe_less_accurate": "Target-following error increased from your baseline.",
     "probe_more_misses": "More targets were missed than in your baseline.",
     "head_more_active": "Head movement increased from your baseline.",
-    "within_baseline": "The reported measurements were close to your baseline.",
+    "within_baseline": "The available measurements were close to your baseline.",
     "no_baseline": "No usable personal baseline was supplied.",
     "data_quality_limited": "Eye measurements are insufficient for a baseline comparison.",
 }
@@ -31,6 +31,7 @@ def observations_for(request: AnalysisRequest) -> list[Observation]:
         return [Observation(code="no_baseline", metric=None)]
     # Initial experimental display threshold; not a clinical or fatigue threshold.
     result = []
+    has_comparison = False
     for metric, code, directional in (
         ("probe_latency_ms", "probe_slower", True),
         ("probe_rms_error_deg", "probe_less_accurate", True),
@@ -40,8 +41,15 @@ def observations_for(request: AnalysisRequest) -> list[Observation]:
         ("head_speed_deg_s", "head_more_active", True),
     ):
         value = getattr(session.deviations, metric)
-        if value is not None and (value >= 1 if directional else abs(value) >= 1):
+        # A deviation alone cannot substantiate a claim about a missing measurement.
+        if getattr(session.metrics, metric) is None or value is None:
+            continue
+        has_comparison = True
+        changed = value >= 1 if directional else abs(value) >= 1
+        if changed:
             result.append(Observation(code=code, metric=metric))
+    if not has_comparison:
+        return [Observation(code="data_quality_limited", metric=None)]
     return result or [Observation(code="within_baseline", metric=None)]
 
 
@@ -172,5 +180,5 @@ def local_response(request: AnalysisRequest) -> AnalysisResponse:
         scene_config=scene,
         ai_source="fallback",
         model_id=None,
-        prompt_version="local-0.1",
+        prompt_version="local-0.2",
     )

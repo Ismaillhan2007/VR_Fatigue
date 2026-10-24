@@ -22,6 +22,17 @@ def fixture(name):
     return json.loads((ROOT / "fixtures" / name).read_text())
 
 
+@pytest.fixture(scope="module")
+def response_validator():
+    registry = Registry()
+    documents = {}
+    for path in (ROOT / "contracts/v1").glob("*.schema.json"):
+        doc = json.loads(path.read_text())
+        documents[path.stem] = doc
+        registry = registry.with_resource(doc["$id"], Resource.from_contents(doc))
+    return Draft202012Validator(documents["analysis_response.schema"], registry=registry)
+
+
 @pytest.fixture
 def body():
     return {
@@ -72,6 +83,8 @@ class FakeAdapter:
         codes = [item.code for item in observations]
         if self.behavior == "invented_observation":
             codes = ["within_baseline"]
+        elif self.behavior == "missing_measurement":
+            codes = ["probe_slower"]
         # Deliberately propose noisy settings: the service must reapply restrictions.
         scene = local_scene(request).model_copy(deep=True)
         scene.sound = "forest"
@@ -94,7 +107,7 @@ def test_health_and_openapi_without_key():
         assert "SessionSummary" in schema["components"]["schemas"]
 
 
-def test_offline_response_matches_shared_contract_and_preferences(body):
+def test_offline_response_matches_shared_contract_and_preferences(body, response_validator):
     with client_for() as client:
         response = client.post("/api/v1/analyze", json=body)
     assert response.status_code == 200, response.text
@@ -104,13 +117,113 @@ def test_offline_response_matches_shared_contract_and_preferences(body):
     assert result["scene_config"]["sound"] == "silent"
     assert result["scene_config"]["animals_enabled"] is False
     assert result["scene_config"]["motion_speed"] == 0
-    registry = Registry()
-    documents = {}
-    for path in (ROOT / "contracts/v1").glob("*.schema.json"):
-        doc = json.loads(path.read_text())
-        documents[path.stem] = doc
-        registry = registry.with_resource(doc["$id"], Resource.from_contents(doc))
-    Draft202012Validator(documents["analysis_response.schema"], registry=registry).validate(result)
+    response_validator.validate(result)
+
+
+@pytest.mark.parametrize("missing", ["both", "metrics", "deviations", "disjoint"])
+def test_no_comparable_metrics_returns_local_report_without_cloud(
+    body, response_validator, missing
+):
+    session = body["session_summary"]
+    if missing in {"both", "metrics", "disjoint"}:
+        session["metrics"] = dict.fromkeys(session["metrics"])
+    if missing in {"both", "deviations", "disjoint"}:
+        session["deviations"] = dict.fromkeys(session["deviations"])
+    if missing == "disjoint":
+        session["metrics"]["gaze_dispersion_deg"] = 6.1
+        session["deviations"]["probe_latency_ms"] = 1.6
+    session["strain_indicator"].update(level="unavailable", value=None)
+    body["reconciliation"] = "unavailable"
+    adapter = FakeAdapter()
+    with client_for(live_settings(), adapter) as client:
+        response = client.post("/api/v1/analyze", json=body)
+        service = client.app.state.analysis_service
+        assert service.attempts == 0
+        assert not service.cache
+    assert response.status_code == 200, response.text
+    result = response.json()
+    response_validator.validate(result)
+    assert result["observations"] == [{"code": "data_quality_limited", "metric": None}]
+    assert "close to your baseline" not in result["narrative"]
+    assert result["session_id"] == session["session_id"]
+    assert result["data_source"] == session["data_source"]
+    assert result["replay_origin"] == session["replay_origin"]
+    assert result["quality"] == session["quality"]
+    assert result["reconciliation"] == "unavailable"
+    assert result["ai_source"] == "fallback" and result["model_id"] is None
+    assert result["scene_config"] == local_scene(AnalysisRequest.model_validate(body)).model_dump()
+    assert adapter.calls == 0
+
+
+@pytest.mark.parametrize("metric", ["probe_latency_ms", "gaze_speed_p95_deg_s"])
+@pytest.mark.parametrize("missing", ["metrics", "deviations"])
+def test_partial_comparisons_do_not_infer_missing_measurements(
+    body, response_validator, metric, missing
+):
+    session = body["session_summary"]
+    session["deviations"] = dict.fromkeys(session["deviations"], 0.0)
+    session["deviations"][metric] = 2.0
+    session[missing][metric] = None
+    session["strain_indicator"].update(level="unavailable", value=None)
+    body["reconciliation"] = "unavailable"
+    with client_for() as client:
+        response = client.post("/api/v1/analyze", json=body)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    response_validator.validate(result)
+    assert result["observations"] == [{"code": "within_baseline", "metric": None}]
+    assert "available measurements" in result["narrative"]
+
+
+def test_zero_measurements_and_deviations_are_valid_comparisons(body, response_validator):
+    session = body["session_summary"]
+    session["metrics"] = dict.fromkeys(session["metrics"], 0.0)
+    session["deviations"] = dict.fromkeys(session["deviations"], 0.0)
+    session["strain_indicator"].update(level="low", value=0.0)
+    body["reconciliation"] = "words_only"
+    with client_for() as client:
+        response = client.post("/api/v1/analyze", json=body)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    response_validator.validate(result)
+    assert result["observations"] == [{"code": "within_baseline", "metric": None}]
+
+
+@pytest.mark.parametrize(
+    "behavior,ai_source", [("valid", "live"), ("missing_measurement", "fallback")]
+)
+def test_model_cannot_restore_an_observation_for_a_missing_measurement(
+    body, response_validator, behavior, ai_source
+):
+    session = body["session_summary"]
+    session["metrics"]["probe_latency_ms"] = None
+    session["strain_indicator"].update(level="unavailable", value=None)
+    body["reconciliation"] = "unavailable"
+    adapter = FakeAdapter(behavior)
+    with client_for(live_settings(), adapter) as client:
+        response = client.post("/api/v1/analyze", json=body)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    response_validator.validate(result)
+    assert result["ai_source"] == ai_source
+    assert result["observations"] == [
+        {"code": "probe_less_accurate", "metric": "probe_rms_error_deg"},
+        {"code": "probe_more_misses", "metric": "probe_miss_fraction"},
+    ]
+    assert adapter.calls == 1
+
+
+@pytest.mark.parametrize("state,windows", [("absent", 0), ("present", 5)])
+def test_missing_baseline_keeps_its_specific_observation(body, state, windows):
+    session = body["session_summary"]
+    session["baseline"].update(state=state, windows=windows)
+    session["deviations"] = dict.fromkeys(session["deviations"])
+    session["strain_indicator"].update(level="unavailable", value=None)
+    body["reconciliation"] = "unavailable"
+    with client_for() as client:
+        response = client.post("/api/v1/analyze", json=body)
+    assert response.status_code == 200, response.text
+    assert response.json()["observations"] == [{"code": "no_baseline", "metric": None}]
 
 
 def test_insufficient_data_has_usable_local_result(body):

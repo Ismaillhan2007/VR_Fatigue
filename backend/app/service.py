@@ -56,7 +56,8 @@ class AnalysisService:
             not synthetic
             or not self.settings.live_ready
             or fallback.safety_notice == "stop_session"
-            or session.quality.status == "insufficient_data"
+            # Usable capture quality does not guarantee any comparable measurements.
+            or any(item.code == "data_quality_limited" for item in fallback.observations)
         ):
             return fallback
 
