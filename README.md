@@ -9,11 +9,3 @@ Development has not been scaffolded yet; this repository currently contains proj
 - [Short shared agent rules](AGENTS.md)
 
 The prototype is experimental and does not provide medical diagnosis or validated fatigue detection.
-
----
-
-Hello Misha
-
-Саня крутой
-
-россия путин победа
