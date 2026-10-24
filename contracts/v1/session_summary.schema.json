@@ -1,0 +1,479 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/vr-fatigue/contracts/v1/session_summary.schema.json",
+  "title": "SessionSummary",
+  "description": "Aggregates for one finished session. No raw samples, no identity, no eye imagery.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "description": "Random UUIDv4 generated per session. Never derived from a person, device or account."
+    },
+    "data_source": {
+      "enum": [
+        "live",
+        "replay",
+        "synthetic"
+      ]
+    },
+    "replay_origin": {
+      "enum": [
+        "recorded",
+        "synthetic",
+        null
+      ]
+    },
+    "duration_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "metric_version": {
+      "type": "string",
+      "maxLength": 32
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "gaze_pose": {
+          "type": "boolean"
+        },
+        "native_eye_gaze": {
+          "type": "boolean",
+          "description": "True only for per-eye gaze from the headset. Head gaze, controller ray or synthetic gaze are false."
+        },
+        "openness": {
+          "type": "boolean"
+        },
+        "pupil": {
+          "type": "boolean"
+        },
+        "confidence_informative": {
+          "type": "boolean",
+          "description": "False when the runtime reports a constant confidence (observed on Quest Pro). Never filter on it then."
+        }
+      },
+      "required": [
+        "gaze_pose",
+        "native_eye_gaze",
+        "openness",
+        "pupil",
+        "confidence_informative"
+      ],
+      "description": "What the active provider really offers. Unsupported signals stay false and their metrics null."
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "usable",
+            "insufficient_data"
+          ]
+        },
+        "valid_coverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Valid unique-sample time / session time."
+        },
+        "valid_duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "gap_duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_gap_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "repeated_sample_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Rows with a repeated sensor timestamp (dropped before metrics)."
+        },
+        "median_dt_ms": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "unavailable": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "signal": {
+                "enum": [
+                  "openness",
+                  "pupil",
+                  "blink",
+                  "gaze",
+                  "probe",
+                  "head_pose"
+                ]
+              },
+              "reason": {
+                "enum": [
+                  "not_exposed_by_runtime",
+                  "permission_denied",
+                  "tracking_lost",
+                  "calibration_missing",
+                  "not_collected"
+                ]
+              }
+            },
+            "required": [
+              "signal",
+              "reason"
+            ]
+          }
+        },
+        "policy_version": {
+          "type": "string",
+          "maxLength": 32
+        }
+      },
+      "required": [
+        "status",
+        "valid_coverage",
+        "valid_duration_ms",
+        "gap_duration_ms",
+        "max_gap_ms",
+        "repeated_sample_fraction",
+        "median_dt_ms",
+        "unavailable",
+        "policy_version"
+      ],
+      "description": "Deterministic data-quality verdict. `insufficient_data` suppresses the strain indicator."
+    },
+    "baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": [
+            "absent",
+            "present"
+          ]
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "windows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "low_confidence": {
+          "type": "boolean",
+          "description": "True if the baseline looks unreliable (self-reported tired at baseline, too few windows, poor quality)."
+        },
+        "low_confidence_reason": {
+          "enum": [
+            null,
+            "self_reported_tired",
+            "too_short",
+            "poor_quality"
+          ]
+        }
+      },
+      "required": [
+        "state",
+        "duration_ms",
+        "windows",
+        "low_confidence",
+        "low_confidence_reason"
+      ],
+      "description": "How trustworthy the personal reference is. Without it the app reports raw metrics only."
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "gaze_speed_median_deg_s": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "gaze_speed_p95_deg_s": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "gaze_dispersion_deg": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "probe_latency_ms": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "probe_rms_error_deg": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "probe_miss_fraction": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "head_speed_deg_s": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      },
+      "required": [
+        "gaze_speed_median_deg_s",
+        "gaze_speed_p95_deg_s",
+        "gaze_dispersion_deg",
+        "probe_latency_ms",
+        "probe_rms_error_deg",
+        "probe_miss_fraction",
+        "head_speed_deg_s"
+      ],
+      "description": "Unit-named aggregates over valid time. Null means unavailable, never zero."
+    },
+    "deviations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "gaze_speed_median_deg_s": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -4,
+          "maximum": 4
+        },
+        "gaze_speed_p95_deg_s": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -4,
+          "maximum": 4
+        },
+        "gaze_dispersion_deg": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -4,
+          "maximum": 4
+        },
+        "probe_latency_ms": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -4,
+          "maximum": 4
+        },
+        "probe_rms_error_deg": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -4,
+          "maximum": 4
+        },
+        "probe_miss_fraction": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -4,
+          "maximum": 4
+        },
+        "head_speed_deg_s": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -4,
+          "maximum": 4
+        }
+      },
+      "required": [
+        "gaze_speed_median_deg_s",
+        "gaze_speed_p95_deg_s",
+        "gaze_dispersion_deg",
+        "probe_latency_ms",
+        "probe_rms_error_deg",
+        "probe_miss_fraction",
+        "head_speed_deg_s"
+      ],
+      "description": "Robust z-score of each metric versus the personal baseline, clamped to +/-4. Null if no baseline or no metric."
+    },
+    "strain_indicator": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "experimental_baseline_deviation"
+        },
+        "level": {
+          "enum": [
+            "low",
+            "moderate",
+            "high",
+            "unavailable"
+          ]
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "method_version": {
+          "type": "string",
+          "maxLength": 32
+        }
+      },
+      "required": [
+        "kind",
+        "level",
+        "value",
+        "method_version"
+      ],
+      "description": "Heuristic combination of per-metric deviations from the personal baseline. NOT a validated fatigue measure and NOT a diagnosis. Must be labelled 'experimental' wherever shown."
+    },
+    "self_report": {
+      "oneOf": [
+        {
+          "$ref": "self_report.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "session_id",
+    "data_source",
+    "replay_origin",
+    "duration_ms",
+    "metric_version",
+    "capabilities",
+    "quality",
+    "baseline",
+    "metrics",
+    "deviations",
+    "strain_indicator",
+    "self_report"
+  ],
+  "allOf": [
+    {
+      "description": "Replay origin is only meaningful for replay data.",
+      "if": {
+        "properties": {
+          "data_source": {
+            "const": "replay"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "replay_origin": {
+            "enum": [
+              "recorded",
+              "synthetic"
+            ]
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "replay_origin": {
+            "const": null
+          }
+        }
+      }
+    },
+    {
+      "description": "Insufficient data suppresses the indicator.",
+      "if": {
+        "properties": {
+          "quality": {
+            "properties": {
+              "status": {
+                "const": "insufficient_data"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "strain_indicator": {
+            "properties": {
+              "level": {
+                "const": "unavailable"
+              },
+              "value": {
+                "const": null
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Synthetic data can never claim native eye gaze.",
+      "if": {
+        "properties": {
+          "data_source": {
+            "const": "synthetic"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "capabilities": {
+            "properties": {
+              "native_eye_gaze": {
+                "const": false
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

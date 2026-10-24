@@ -1,0 +1,78 @@
+{
+  "schema_version": "1.0",
+  "session_id": "00000000-0000-4000-8000-000000000001",
+  "data_source": "synthetic",
+  "replay_origin": null,
+  "quality": {
+    "status": "usable",
+    "valid_coverage": 0.93,
+    "valid_duration_ms": 279000,
+    "gap_duration_ms": 21000,
+    "max_gap_ms": 640,
+    "repeated_sample_fraction": 0.021,
+    "median_dt_ms": 11.1,
+    "unavailable": [
+      {
+        "signal": "openness",
+        "reason": "not_exposed_by_runtime"
+      },
+      {
+        "signal": "pupil",
+        "reason": "not_exposed_by_runtime"
+      },
+      {
+        "signal": "blink",
+        "reason": "not_exposed_by_runtime"
+      }
+    ],
+    "policy_version": "quality-0.1"
+  },
+  "reconciliation": "agree_high",
+  "observations": [
+    {
+      "code": "probe_slower",
+      "metric": "probe_latency_ms"
+    },
+    {
+      "code": "probe_more_misses",
+      "metric": "probe_miss_fraction"
+    }
+  ],
+  "narrative": "Compared with your own baseline, target-following was somewhat slower and missed more targets, and you reported tired eyes. This is an experimental wellness summary based on synthetic data.",
+  "limitations": [
+    "Experimental heuristic; not a medical assessment and not validated fatigue detection.",
+    "Based on a short session and a short personal baseline.",
+    "Pupil size and blinks are not available on this headset."
+  ],
+  "safety_notice": "none",
+  "scene_rationale": "Dim, warm, quiet forest with a slow breathing orb because you reported tired eyes and wanting quiet.",
+  "scene_config": {
+    "schema_version": "1.0",
+    "scene_id": "forest_v1",
+    "animals_enabled": true,
+    "time_of_day": "sunset",
+    "light_warmth": 0.7,
+    "brightness": 0.8,
+    "fog_density": 0.25,
+    "sound": "forest",
+    "master_volume": 0.6,
+    "sound_layers": {
+      "wind": 0.2,
+      "birds": 0.3,
+      "water": 0.4,
+      "pad": 0.3
+    },
+    "motion": "gentle",
+    "motion_speed": 0.2,
+    "particles": [
+      "fireflies"
+    ],
+    "orb": {
+      "enabled": true,
+      "breath_seconds": 5.5
+    }
+  },
+  "ai_source": "fallback",
+  "model_id": null,
+  "prompt_version": "none"
+}
