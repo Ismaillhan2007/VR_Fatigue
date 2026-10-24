@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "phase": "post_task",
+  "eye_strain": 5,
+  "mental_fatigue": 5,
+  "chips": [
+    "tired_eyes",
+    "overstimulated",
+    "want_quiet"
+  ],
+  "free_text": "My eyes feel dry and I want something calm."
+}

@@ -1,0 +1,256 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/vr-fatigue/contracts/v1/analysis_response.schema.json",
+  "title": "AnalysisResponse",
+  "description": "Bounded explanation plus validated scene settings. Provenance of data and of AI output are independent fields.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "description": "Random UUIDv4 generated per session. Never derived from a person, device or account."
+    },
+    "data_source": {
+      "enum": [
+        "live",
+        "replay",
+        "synthetic"
+      ]
+    },
+    "replay_origin": {
+      "enum": [
+        "recorded",
+        "synthetic",
+        null
+      ]
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "usable",
+            "insufficient_data"
+          ]
+        },
+        "valid_coverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Valid unique-sample time / session time."
+        },
+        "valid_duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "gap_duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_gap_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "repeated_sample_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Rows with a repeated sensor timestamp (dropped before metrics)."
+        },
+        "median_dt_ms": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "unavailable": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "signal": {
+                "enum": [
+                  "openness",
+                  "pupil",
+                  "blink",
+                  "gaze",
+                  "probe",
+                  "head_pose"
+                ]
+              },
+              "reason": {
+                "enum": [
+                  "not_exposed_by_runtime",
+                  "permission_denied",
+                  "tracking_lost",
+                  "calibration_missing",
+                  "not_collected"
+                ]
+              }
+            },
+            "required": [
+              "signal",
+              "reason"
+            ]
+          }
+        },
+        "policy_version": {
+          "type": "string",
+          "maxLength": 32
+        }
+      },
+      "required": [
+        "status",
+        "valid_coverage",
+        "valid_duration_ms",
+        "gap_duration_ms",
+        "max_gap_ms",
+        "repeated_sample_fraction",
+        "median_dt_ms",
+        "unavailable",
+        "policy_version"
+      ],
+      "description": "Deterministic data-quality verdict. `insufficient_data` suppresses the strain indicator."
+    },
+    "reconciliation": {
+      "enum": [
+        "agree_high",
+        "agree_low",
+        "words_only",
+        "signals_only",
+        "unavailable"
+      ],
+      "description": "Computed deterministically by the app from self-report and indicator. Gemini may not change it."
+    },
+    "observations": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "gaze_speed_changed",
+              "gaze_spread_changed",
+              "probe_slower",
+              "probe_less_accurate",
+              "probe_more_misses",
+              "head_more_active",
+              "within_baseline",
+              "no_baseline",
+              "data_quality_limited"
+            ]
+          },
+          "metric": {
+            "enum": [
+              "gaze_speed_median_deg_s",
+              "gaze_speed_p95_deg_s",
+              "gaze_dispersion_deg",
+              "probe_latency_ms",
+              "probe_rms_error_deg",
+              "probe_miss_fraction",
+              "head_speed_deg_s",
+              null
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "metric"
+        ]
+      },
+      "description": "References to approved observation codes only; numbers stay in SessionSummary."
+    },
+    "narrative": {
+      "type": "string",
+      "maxLength": 600
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "items": {
+        "type": "string",
+        "maxLength": 200
+      }
+    },
+    "safety_notice": {
+      "enum": [
+        "none",
+        "take_break",
+        "stop_session"
+      ],
+      "description": "Set by deterministic app rules (e.g. discomfort chips); AI may only raise it."
+    },
+    "scene_rationale": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "scene_config": {
+      "$ref": "scene_config.schema.json"
+    },
+    "ai_source": {
+      "enum": [
+        "live",
+        "cached",
+        "fallback"
+      ]
+    },
+    "model_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 64
+    },
+    "prompt_version": {
+      "type": "string",
+      "maxLength": 32
+    }
+  },
+  "required": [
+    "schema_version",
+    "session_id",
+    "data_source",
+    "replay_origin",
+    "quality",
+    "reconciliation",
+    "observations",
+    "narrative",
+    "limitations",
+    "safety_notice",
+    "scene_rationale",
+    "scene_config",
+    "ai_source",
+    "model_id",
+    "prompt_version"
+  ],
+  "allOf": [
+    {
+      "description": "A fallback response never names a model.",
+      "if": {
+        "properties": {
+          "ai_source": {
+            "const": "fallback"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "model_id": {
+            "const": null
+          }
+        }
+      }
+    }
+  ]
+}

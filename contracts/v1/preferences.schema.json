@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/vr-fatigue/contracts/v1/preferences.schema.json",
+  "title": "Preferences",
+  "description": "Explicit participant choices. They always override AI suggestions (quiet and animal-free choices especially).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "theme": {
+      "enum": [
+        "forest"
+      ]
+    },
+    "animals_enabled": {
+      "type": "boolean"
+    },
+    "time_of_day": {
+      "enum": [
+        "day",
+        "sunset"
+      ]
+    },
+    "sound": {
+      "enum": [
+        "forest",
+        "silent"
+      ]
+    },
+    "motion": {
+      "enum": [
+        "none",
+        "gentle"
+      ]
+    },
+    "text": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 300
+    }
+  },
+  "required": [
+    "schema_version",
+    "theme",
+    "animals_enabled",
+    "time_of_day",
+    "sound",
+    "motion",
+    "text"
+  ]
+}
