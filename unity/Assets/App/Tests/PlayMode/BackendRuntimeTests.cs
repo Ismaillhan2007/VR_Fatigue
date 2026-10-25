@@ -85,6 +85,7 @@ namespace App.Tests
             {
                 yield return SceneManager.LoadSceneAsync("Assessment");
                 var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+                c.ShowPhaseInstructions = false; // flow and capture tests; PhaseInstructionTests cover the gate
                 var panel = UnityEngine.Object.FindAnyObjectByType<ConsentPanel>();
                 panel.OpenSettingsButton.onClick.Invoke();
                 Assert.IsTrue(panel.SettingsRoot.activeSelf);
@@ -144,6 +145,7 @@ namespace App.Tests
             {
                 yield return SceneManager.LoadSceneAsync("Assessment");
                 var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+                c.ShowPhaseInstructions = false; // flow and capture tests; PhaseInstructionTests cover the gate
                 c.ConfigureBackend(receiver.Url, "invented-runtime-token", true, true, true);
                 c.CheckBackendConnection();
                 yield return WaitFor(() => receiver.Received.Task.IsCompleted);
@@ -180,6 +182,7 @@ namespace App.Tests
         {
             yield return SceneManager.LoadSceneAsync("Assessment");
             var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+            c.ShowPhaseInstructions = false; // flow and capture tests; PhaseInstructionTests cover the gate
             c.ConfigureBackend("https://unreachable.invalid", "invented-token", false, false, false);
             c.EyeSource = EyeSourceMode.Synthetic;
             c.AcceptConsent(); c.EndCaptureEarly();

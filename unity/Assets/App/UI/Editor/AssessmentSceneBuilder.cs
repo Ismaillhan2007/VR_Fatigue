@@ -25,12 +25,13 @@ namespace App.UI.Editor
 
         static DefaultControls.Resources _res;
         static Font _font;
-        const float TextScale = 1.25f; // type and its row heights grow together
 
-        enum ButtonKind { Auto, Primary, Secondary, Accent }
+        // Canvas units: 1 unit is 1 mm on the Quest panel 2 m away (about 0.03 degrees). Body text of 40 units is
+        // roughly 1.1 degrees per em, readable in the headset; the previous 20-25 units were not.
+        public const int EyebrowSize = 28, TitleSize = 58, BodySize = 38, SmallSize = 30, ButtonSize = 38, NumberSize = 44;
+        const float ButtonHeight = 92, ButtonWidth = 360;
 
-        // Anything that goes back, skips, mutes, interrupts or leaves is secondary; the forward action is primary.
-        static readonly string[] SecondaryLabels = { "Skip", "Back", "Exit", "Pause", "Mute", "Try optional", "Finish" };
+        enum ButtonKind { Primary, Secondary, Accent }
 
         [MenuItem("App/Build Assessment Scene")]
         public static void BuildAll()
@@ -38,7 +39,6 @@ namespace App.UI.Editor
             InitializeWidgets();
             Directory.CreateDirectory(PrefabDir);
             Directory.CreateDirectory(Path.GetDirectoryName(ScenePath));
-            UiTheme.EnsureSprites();
 
             var prefabs = new GameObject[]
             {
@@ -66,6 +66,7 @@ namespace App.UI.Editor
                 dropdown = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/DropdownArrow.psd"),
                 mask = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UIMask.psd"),
             };
+            UiTheme.EnsureSprites();
         }
 
         [MenuItem("App/Update Backend Settings UI")]
@@ -95,38 +96,40 @@ namespace App.UI.Editor
         {
             var root = PanelRoot("ConsentPanel");
             var p = root.AddComponent<ConsentPanel>();
-            Label(root.transform, "Welcome", 30, 44);
-            p.Body = Label(root.transform, "", 20, flexible: true);
+            Eyebrow(root.transform, "WELCOME");
+            Title(root.transform, "Eye comfort check");
+            p.Body = Body(root.transform, flexible: true);
+            p.Body.fontSize = SmallSize + 4;
             var row = ButtonRow(root.transform);
-            p.OpenSettingsButton = MakeButton(row, "Optional backend settings");
+            p.OpenSettingsButton = MakeButton(row, "Backend settings", ButtonKind.Secondary);
             p.StartButton = MakeButton(row, "I agree, start");
 
             var settings = PanelRoot("BackendSettings", Vector2.zero, Vector2.one);
             settings.transform.SetParent(root.transform, false);
             settings.AddComponent<LayoutElement>().ignoreLayout = true;
-            settings.GetComponent<Image>().color = new Color(0.12f, 0.16f, 0.2f, 1);
+            settings.GetComponent<VerticalLayoutGroup>().spacing = 12;
             p.SettingsRoot = settings;
-            Label(settings.transform, "Optional backend (session only)", 26, 38);
-            Label(settings.transform, "Use HTTPS. The team demo token stays in memory and clears on Exit / New session. "
-                + "Checking sends only an invented test request. Upload permission below is separate from eye capture and Gemini.", 18, 72);
+            Title(settings.transform, "Optional backend (session only)").fontSize = 44;
+            Small(settings.transform, "Use HTTPS. The team demo token stays in memory and clears on Exit / New session. "
+                + "Checking sends only an invented test request. Upload permission below is separate from eye capture and Gemini.", 76);
             p.BackendUrl = MakeInput(settings.transform, "HTTPS backend origin");
             p.BackendUrl.gameObject.name = "BackendUrl";
             p.BackendUrl.lineType = InputField.LineType.SingleLine;
             p.BackendUrl.characterLimit = 2048;
-            p.BackendUrl.GetComponent<LayoutElement>().preferredHeight = 44;
+            p.BackendUrl.GetComponent<LayoutElement>().preferredHeight = 64;
             p.BackendToken = MakeInput(settings.transform, "Team demo token");
             p.BackendToken.gameObject.name = "BackendToken";
             p.BackendToken.lineType = InputField.LineType.SingleLine;
             p.BackendToken.contentType = InputField.ContentType.Password;
             p.BackendToken.characterLimit = 4096;
             p.BackendToken.shouldHideMobileInput = true;
-            p.BackendToken.GetComponent<LayoutElement>().preferredHeight = 44;
+            p.BackendToken.GetComponent<LayoutElement>().preferredHeight = 64;
             p.LocalDevelopment = MakeToggle(settings.transform, "Local development: allow loopback / private LAN HTTP");
             p.InventedDemo = MakeToggle(settings.transform, "This entire session uses invented eye data AND invented check-ins");
-            p.AllowUpload = MakeToggle(settings.transform, "Allow this session's invented aggregates and ratings to reach this server");
-            p.ConnectionStatus = Label(settings.transform, "", 18, flexible: true);
+            p.AllowUpload = MakeToggle(settings.transform, "Allow this session's invented data, ratings and words to reach this server");
+            p.ConnectionStatus = Small(settings.transform, "", flexible: true);
             var buttons = ButtonRow(settings.transform);
-            p.CheckConnectionButton = MakeButton(buttons, "Check with invented data");
+            p.CheckConnectionButton = MakeButton(buttons, "Check with invented data", ButtonKind.Secondary);
             p.SaveSettingsButton = MakeButton(buttons, "Save and back");
             settings.SetActive(false);
             return root;
@@ -136,15 +139,18 @@ namespace App.UI.Editor
         {
             var root = PanelRoot("BaselinePanel");
             var p = root.AddComponent<BaselinePanel>();
-            Label(root.transform, "Baseline", 30, 44);
-            p.Status = Label(root.transform, "", 20, 90);
+            Eyebrow(root.transform, "STEP 1 OF 4  ·  BASELINE");
+            p.Title = Title(root.transform, "Before we start");
+            p.Status = Body(root.transform, height: 330);
+            p.Countdown = Countdown(root.transform);
             p.RatingGroup = Group(root.transform, "Ratings");
+            Legend(p.RatingGroup.transform);
             p.EyeStrain = Rating(p.RatingGroup.transform, "Eye strain");
             p.MentalFatigue = Rating(p.RatingGroup.transform, "Mental fatigue");
-            Label(root.transform, "1 = not at all, 7 = extremely", 16, 28);
             Spacer(root.transform);
             var row = ButtonRow(root.transform);
-            p.SkipButton = MakeButton(row, "Skip (desktop)");
+            p.SkipButton = MakeButton(row, "Skip (desktop)", ButtonKind.Secondary);
+            p.StartButton = MakeButton(row, "I'm ready, start");
             p.ContinueButton = MakeButton(row, "Continue");
             return root;
         }
@@ -153,9 +159,14 @@ namespace App.UI.Editor
         {
             var root = PanelRoot("LoadTaskPanel");
             var p = root.AddComponent<LoadTaskPanel>();
-            Label(root.transform, "Task", 30, 44);
-            p.Status = Label(root.transform, "", 20, flexible: true);
-            p.SkipButton = MakeButton(ButtonRow(root.transform), "Skip (desktop)");
+            Eyebrow(root.transform, "STEP 2 OF 4  ·  TASK");
+            p.Title = Title(root.transform, "The task");
+            p.Status = Body(root.transform, height: 330);
+            p.Countdown = Countdown(root.transform);
+            Spacer(root.transform);
+            var row = ButtonRow(root.transform);
+            p.SkipButton = MakeButton(row, "Skip (desktop)", ButtonKind.Secondary);
+            p.StartButton = MakeButton(row, "Start task");
             return root;
         }
 
@@ -163,22 +174,44 @@ namespace App.UI.Editor
         {
             var root = PanelRoot("CheckInPanel");
             var p = root.AddComponent<CheckInPanel>();
-            Label(root.transform, "How do you feel?", 30, 44);
-            p.EyeStrain = Rating(root.transform, "Eye strain");
-            p.MentalFatigue = Rating(root.transform, "Mental fatigue");
-            Label(root.transform, "Pick up to 6:", 18, 28);
-            var grid = new GameObject("Chips", typeof(RectTransform), typeof(GridLayoutGroup), typeof(LayoutElement));
-            grid.transform.SetParent(root.transform, false);
-            var g = grid.GetComponent<GridLayoutGroup>();
-            g.cellSize = new Vector2(296, 52);
-            g.spacing = new Vector2(8, 8);
-            g.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-            g.constraintCount = 5;
-            grid.GetComponent<LayoutElement>().preferredHeight = 120;
-            foreach (Chip c in Enum.GetValues(typeof(Chip))) p.ChipToggles.Add(MakeToggle(grid.transform, ReportText.ChipLabel(c), layout: false));
-            p.FreeText = MakeInput(root.transform, "Optional: say how you feel (max 300 characters)");
-            p.Hint = Label(root.transform, "", 14, 24);
-            p.SubmitButton = MakeButton(ButtonRow(root.transform), "View report");
+            p.StepLabel = Eyebrow(root.transform, "STEP 3 OF 4  ·  CHECK-IN");
+
+            var ratings = Group(root.transform, "Step 1: ratings");
+            Title(ratings.transform, "How do you feel after the task?");
+            Legend(ratings.transform);
+            p.EyeStrain = Rating(ratings.transform, "Eye strain");
+            p.MentalFatigue = Rating(ratings.transform, "Mental fatigue");
+            p.Steps.Add(ratings);
+
+            var feelings = Group(root.transform, "Step 2: feelings");
+            Title(feelings.transform, "Anything else? Pick any that fit");
+            Small(feelings.transform, "Optional. Up to 6.", 40);
+            Small(feelings.transform, "I feel", 40).fontStyle = FontStyle.Bold;
+            var feel = ChipGrid(feelings.transform, "I feel", 2);
+            Small(feelings.transform, "I would like", 40).fontStyle = FontStyle.Bold;
+            var like = ChipGrid(feelings.transform, "I would like", 1);
+            foreach (Chip c in Enum.GetValues(typeof(Chip)))
+            {
+                var label = ReportText.ChipLabel(c);
+                label = char.ToUpperInvariant(label[0]) + label.Substring(1);
+                p.ChipToggles.Add(Pill(c >= Chip.WantQuiet ? like : feel, label, SmallSize + 2, 0, 0, layout: false));
+            }
+            p.Steps.Add(feelings);
+
+            var words = Group(root.transform, "Step 3: own words");
+            Title(words.transform, "In your own words (optional)");
+            Body(words.transform, "Point at the box and press the trigger: the headset keyboard opens. "
+                + "Press its microphone key to dictate, or type.", 100).fontSize = SmallSize + 2;
+            p.FreeText = MakeInput(words.transform, "For example: my eyes feel dry and I want somewhere quiet");
+            p.FreeText.GetComponent<LayoutElement>().preferredHeight = 170;
+            p.Hint = Small(words.transform, "", 80);
+            p.Steps.Add(words);
+
+            Spacer(root.transform);
+            var row = ButtonRow(root.transform);
+            p.BackButton = MakeButton(row, "Back", ButtonKind.Secondary);
+            p.NextButton = MakeButton(row, "Next");
+            p.SubmitButton = MakeButton(row, "View report");
             return root;
         }
 
@@ -186,14 +219,13 @@ namespace App.UI.Editor
         {
             var root = PanelRoot("SummaryPanel");
             var p = root.AddComponent<SummaryPanel>();
-            Label(root.transform, "Your experimental wellness summary", 28, 40);
-            p.Body = Label(root.transform, "", 16, flexible: true);
-            p.Body.resizeTextForBestFit = true;
-            p.Body.resizeTextMinSize = 10;
-            p.Body.resizeTextMaxSize = 16;
+            Eyebrow(root.transform, "STEP 4 OF 4  ·  SUMMARY");
+            Title(root.transform, "Your experimental wellness summary").fontSize = 50;
+            p.Body = Body(root.transform, flexible: true);
+            BestFit(p.Body);
             var row = ButtonRow(root.transform);
+            p.EnterSceneButton = MakeButton(row, "Try optional relaxation", ButtonKind.Secondary);
             p.FinishReportButton = MakeButton(row, "Finish with report");
-            p.EnterSceneButton = MakeButton(row, "Try optional relaxation");
             return root;
         }
 
@@ -201,16 +233,25 @@ namespace App.UI.Editor
         {
             var root = PanelRoot("RelaxationSetupPanel");
             var p = root.AddComponent<RelaxationSetupPanel>();
-            Label(root.transform, "Optional relaxation: preferences and preview", 26, 40);
-            p.Body = Label(root.transform, "", 20, flexible: true);
+            Eyebrow(root.transform, "OPTIONAL  ·  RELAXATION");
+            Title(root.transform, "A calm forest, if you like");
+            p.Body = Body(root.transform, flexible: true);
+            p.Body.fontSize = SmallSize + 2;
             p.ChooseSettings = MakeToggle(root.transform, "Choose settings myself");
-            p.PreferenceGroup = Group(root.transform, "Preferences");
-            p.Animals = MakeToggle(p.PreferenceGroup.transform, "Animals");
-            p.Silent = MakeToggle(p.PreferenceGroup.transform, "Silent");
-            p.Sunset = MakeToggle(p.PreferenceGroup.transform, "Sunset (off = day)");
-            p.GentleMotion = MakeToggle(p.PreferenceGroup.transform, "Gentle motion");
+            p.PreferenceGroup = new GameObject("Preferences", typeof(RectTransform), typeof(GridLayoutGroup), typeof(LayoutElement));
+            p.PreferenceGroup.transform.SetParent(root.transform, false);
+            var g = p.PreferenceGroup.GetComponent<GridLayoutGroup>();
+            g.cellSize = new Vector2(360, 76);
+            g.spacing = new Vector2(14, 14);
+            g.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            g.constraintCount = 4;
+            p.PreferenceGroup.GetComponent<LayoutElement>().preferredHeight = 76;
+            p.Animals = Pill(p.PreferenceGroup.transform, "Animals", SmallSize, 0, 0, layout: false);
+            p.Silent = Pill(p.PreferenceGroup.transform, "Silent", SmallSize, 0, 0, layout: false);
+            p.Sunset = Pill(p.PreferenceGroup.transform, "Sunset (off = day)", SmallSize, 0, 0, layout: false);
+            p.GentleMotion = Pill(p.PreferenceGroup.transform, "Gentle motion", SmallSize, 0, 0, layout: false);
             var row = ButtonRow(root.transform);
-            p.BackButton = MakeButton(row, "Back to report");
+            p.BackButton = MakeButton(row, "Back to report", ButtonKind.Secondary);
             p.EnterButton = MakeButton(row, "Enter optional forest");
             return root;
         }
@@ -218,13 +259,38 @@ namespace App.UI.Editor
         static GameObject SceneView()
         {
             var root = PanelRoot("ScenePanel", new Vector2(0.08f, 0.02f), new Vector2(0.92f, 0.3f));
-            root.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.94f);
+            root.GetComponent<Image>().color = new Color(UiTheme.Card.r, UiTheme.Card.g, UiTheme.Card.b, 0.92f);
             var p = root.AddComponent<ScenePanel>();
-            Label(root.transform, "Calming scene", 24, 32);
-            p.Body = Label(root.transform, "", 15, flexible: true);
-            var row = ButtonRow(root.transform);
-            p.MuteButton = MakeButton(row, "Mute");
+            p.Background = root.GetComponent<Image>();
+            p.Content = Group(root.transform, "Menu");
+            Title(p.Content.transform, "Calming forest").fontSize = 44;
+            p.Body = Small(p.Content.transform, "", flexible: true);
+            p.Content.GetComponent<LayoutElement>().flexibleHeight = 1;
+            var row = ButtonRow(p.Content.transform);
+            p.HideButton = MakeButton(row, "Hide menu", ButtonKind.Secondary);
+            p.MuteButton = MakeButton(row, "Mute", ButtonKind.Secondary);
             p.FinishButton = MakeButton(row, "Finish");
+
+            // Collapsed: one small button at the bottom edge plus the data/AI labels, so the forest is unobstructed.
+            p.ShowButton = MakeButton(root.transform, "Show menu", ButtonKind.Secondary);
+            var show = (RectTransform)p.ShowButton.transform;
+            p.ShowButton.GetComponent<LayoutElement>().ignoreLayout = true;
+            show.anchorMin = show.anchorMax = new Vector2(0.5f, 0);
+            show.pivot = new Vector2(0.5f, 0);
+            show.sizeDelta = new Vector2(ButtonWidth, ButtonHeight - 12);
+            show.anchoredPosition = new Vector2(0, 8);
+            p.HiddenLabel = Small(root.transform, "");
+            p.HiddenLabel.GetComponent<LayoutElement>().ignoreLayout = true;
+            p.HiddenLabel.alignment = TextAnchor.LowerCenter;
+            p.HiddenLabel.fontSize = 24;
+            var hidden = (RectTransform)p.HiddenLabel.transform;
+            hidden.anchorMin = new Vector2(0, 0);
+            hidden.anchorMax = new Vector2(1, 0);
+            hidden.pivot = new Vector2(0.5f, 0);
+            hidden.sizeDelta = new Vector2(0, 36);
+            hidden.anchoredPosition = new Vector2(0, ButtonHeight + 4);
+            p.ShowButton.gameObject.SetActive(false);
+            p.HiddenLabel.gameObject.SetActive(false);
             return root;
         }
 
@@ -232,14 +298,16 @@ namespace App.UI.Editor
         {
             var root = PanelRoot("ReRatingPanel");
             var p = root.AddComponent<ReRatingPanel>();
-            Label(root.transform, "How do you feel now?", 30, 44);
+            Eyebrow(root.transform, "OPTIONAL  ·  FEEDBACK");
+            Title(root.transform, "How do you feel now?");
+            Legend(root.transform);
             p.EyeStrain = Rating(root.transform, "Eye strain");
             p.MentalFatigue = Rating(root.transform, "Mental fatigue");
             Spacer(root.transform);
-            Label(root.transform, "Feedback is optional.", 20, 32);
+            Small(root.transform, "Feedback is optional.", 44);
             var row = ButtonRow(root.transform);
-            p.SkipButton = MakeButton(row, "Finish without feedback");
-            p.SubmitButton = MakeButton(row, "Submit feedback and finish");
+            p.SkipButton = MakeButton(row, "Finish without feedback", ButtonKind.Secondary);
+            p.SubmitButton = MakeButton(row, "Submit and finish");
             return root;
         }
 
@@ -247,11 +315,10 @@ namespace App.UI.Editor
         {
             var root = PanelRoot("DonePanel");
             var p = root.AddComponent<DonePanel>();
-            Label(root.transform, "Finished", 30, 44);
-            p.Body = Label(root.transform, "", 16, flexible: true);
-            p.Body.resizeTextForBestFit = true;
-            p.Body.resizeTextMinSize = 10;
-            p.Body.resizeTextMaxSize = 16;
+            Eyebrow(root.transform, "DONE");
+            Title(root.transform, "Thank you");
+            p.Body = Body(root.transform, flexible: true);
+            BestFit(p.Body);
             p.RestartButton = MakeButton(ButtonRow(root.transform), "New session");
             return root;
         }
@@ -260,42 +327,48 @@ namespace App.UI.Editor
         {
             var root = new GameObject("ProvenanceBar", typeof(RectTransform), typeof(Image), typeof(HorizontalLayoutGroup));
             var rt = (RectTransform)root.transform;
-            rt.anchorMin = new Vector2(0, 0.9f);
-            rt.anchorMax = Vector2.one;
+            rt.anchorMin = new Vector2(0.08f, 0.895f);
+            rt.anchorMax = new Vector2(0.92f, 0.995f);
             rt.offsetMin = rt.offsetMax = Vector2.zero;
             var barImage = root.GetComponent<Image>();
             barImage.sprite = UiTheme.Fill;
             barImage.type = Image.Type.Sliced;
-            barImage.color = UiTheme.Ink;
+            barImage.color = UiTheme.Bar;
             var h = root.GetComponent<HorizontalLayoutGroup>();
-            h.padding = new RectOffset(16, 16, 8, 8);
-            h.spacing = 16;
+            h.padding = new RectOffset(28, 14, 6, 6);
+            h.spacing = 14;
+            h.childAlignment = TextAnchor.MiddleLeft;
             h.childControlWidth = h.childControlHeight = true;
             h.childForceExpandWidth = false;
             var b = root.AddComponent<ProvenanceBar>();
             var labels = Group(root.transform, "Labels");
             labels.GetComponent<LayoutElement>().flexibleWidth = 1;
-            b.DataLabel = Label(labels.transform, "Data: -", 18, 26);
-            b.AiLabel = Label(labels.transform, "AI: -", 18, 26);
-            b.StateLabel = Label(labels.transform, "", 14, 20);
-            b.PauseButton = MakeButton(root.transform, "Pause / Resume");
-            b.ExitButton = MakeButton(root.transform, "Exit");
-            Recolor(root, UiTheme.Paper);
+            labels.GetComponent<VerticalLayoutGroup>().spacing = 0;
+            b.DataLabel = Label(labels.transform, "Data: -", 28, 36, FontStyle.Bold, UiTheme.Text);
+            b.AiLabel = Label(labels.transform, "AI: -", 26, 34, FontStyle.Bold, UiTheme.Accent);
+            b.StateLabel = Label(labels.transform, "", 20, 24, FontStyle.Normal, UiTheme.Muted);
+            b.PauseButton = MakeButton(root.transform, "Pause / Resume", ButtonKind.Secondary);
+            b.ExitButton = MakeButton(root.transform, "Exit", ButtonKind.Secondary);
+            foreach (var button in new[] { b.PauseButton, b.ExitButton })
+            {
+                var le = button.GetComponent<LayoutElement>();
+                le.preferredWidth = button == b.ExitButton ? 160 : 280;
+                le.preferredHeight = 72;
+                button.GetComponentInChildren<Text>().fontSize = SmallSize;
+            }
             return root;
         }
 
         static GameObject Pause()
         {
             var root = PanelRoot("PauseOverlay");
-            root.GetComponent<Image>().sprite = UiTheme.Fill;
-            root.GetComponent<Image>().color = new Color(UiTheme.Ink.r, UiTheme.Ink.g, UiTheme.Ink.b, 0.97f);
+            root.GetComponent<Image>().color = new Color(UiTheme.Bar.r, UiTheme.Bar.g, UiTheme.Bar.b, 0.97f);
             var p = root.AddComponent<PauseOverlay>();
-            Label(root.transform, "Paused", 36, 60);
-            Label(root.transform, "Take your time. Exit is always available.", 20, flexible: true);
+            Title(root.transform, "Paused").fontSize = 72;
+            Body(root.transform, "Take your time. Nothing is recorded while paused. Exit is always available.", flexible: true);
             var row = ButtonRow(root.transform);
+            p.ExitButton = MakeButton(row, "Exit", ButtonKind.Secondary);
             p.ResumeButton = MakeButton(row, "Resume", ButtonKind.Accent);
-            p.ExitButton = MakeButton(row, "Exit");
-            Recolor(root, UiTheme.Paper);
             return root;
         }
 
@@ -313,7 +386,7 @@ namespace App.UI.Editor
             rt.sizeDelta = new Vector2(26, 26);
             var image = dot.GetComponent<Image>();
             image.sprite = _res.knob;
-            image.color = new Color(1f, 0.85f, 0.2f);
+            image.color = new Color(1f, 0.85f, 0.2f); // measurement stimulus: unchanged by UI restyling
             image.raycastTarget = false;
             dot.SetActive(false);
             var runner = root.AddComponent<ProbeTaskRunner>();
@@ -374,12 +447,13 @@ namespace App.UI.Editor
             rt.anchorMax = anchorMax ?? new Vector2(0.92f, 0.88f);
             rt.offsetMin = rt.offsetMax = Vector2.zero;
             var card = go.GetComponent<Image>();
-            card.sprite = UiTheme.CardOutline;
+            card.sprite = UiTheme.Fill;
             card.type = Image.Type.Sliced;
-            card.color = new Color(1f, 1f, 1f, 0.97f);
+            card.pixelsPerUnitMultiplier = 0.5f; // 32-unit corners on the large cards
+            card.color = new Color(UiTheme.Card.r, UiTheme.Card.g, UiTheme.Card.b, 0.97f);
             var v = go.GetComponent<VerticalLayoutGroup>();
-            v.padding = new RectOffset(40, 40, 32, 32);
-            v.spacing = 14;
+            v.padding = new RectOffset(56, 56, 40, 36);
+            v.spacing = 16;
             v.childControlWidth = v.childControlHeight = true;
             v.childForceExpandWidth = true;
             v.childForceExpandHeight = false;
@@ -393,7 +467,7 @@ namespace App.UI.Editor
             HorizontalOrVerticalLayoutGroup g = horizontal
                 ? (HorizontalOrVerticalLayoutGroup)go.AddComponent<HorizontalLayoutGroup>()
                 : go.AddComponent<VerticalLayoutGroup>();
-            g.spacing = horizontal ? 16 : 8;
+            g.spacing = horizontal ? 16 : 14;
             g.childControlWidth = g.childControlHeight = true;
             g.childForceExpandWidth = horizontal;
             g.childForceExpandHeight = false;
@@ -405,7 +479,7 @@ namespace App.UI.Editor
             var row = Group(parent, "Buttons", horizontal: true);
             ((HorizontalLayoutGroup)row.GetComponent<HorizontalOrVerticalLayoutGroup>()).childAlignment = TextAnchor.MiddleRight;
             row.GetComponent<HorizontalOrVerticalLayoutGroup>().childForceExpandWidth = false;
-            row.GetComponent<LayoutElement>().preferredHeight = 84;
+            row.GetComponent<LayoutElement>().preferredHeight = ButtonHeight + 4;
             return row.transform;
         }
 
@@ -416,109 +490,137 @@ namespace App.UI.Editor
             go.GetComponent<LayoutElement>().flexibleHeight = 1;
         }
 
-        static Text Label(Transform parent, string text, int size, float height = 0, bool flexible = false)
+        static Text Label(Transform parent, string text, int size, float height, FontStyle style, Color color, bool flexible = false)
         {
             var go = DefaultControls.CreateText(_res);
             go.name = "Text";
             go.transform.SetParent(parent, false);
-            var t = Style(go.GetComponent<Text>(), Mathf.RoundToInt(size * TextScale));
-            t.text = text;
+            var t = go.GetComponent<Text>();
+            t.font = _font;
+            t.fontSize = size;
+            t.fontStyle = style;
+            t.color = color;
+            t.lineSpacing = 1.1f;
+            t.horizontalOverflow = HorizontalWrapMode.Wrap;
+            t.verticalOverflow = VerticalWrapMode.Truncate;
             t.alignment = TextAnchor.UpperLeft;
+            t.raycastTarget = false;
+            t.text = text;
             var le = go.AddComponent<LayoutElement>();
-            if (height > 0) le.preferredHeight = height * TextScale;
+            if (height > 0) le.preferredHeight = height;
             if (flexible) le.flexibleHeight = 1;
             return t;
         }
 
-        static Button MakeButton(Transform parent, string text, ButtonKind kind = ButtonKind.Auto)
+        static Text Eyebrow(Transform parent, string text) => Label(parent, text, EyebrowSize, 36, FontStyle.Bold, UiTheme.Accent);
+        static Text Title(Transform parent, string text) => Label(parent, text, TitleSize, 72, FontStyle.Bold, UiTheme.Text);
+        static Text Body(Transform parent, string text = "", float height = 0, bool flexible = false) =>
+            Label(parent, text, BodySize, height, FontStyle.Normal, UiTheme.Text, flexible);
+        static Text Small(Transform parent, string text, float height = 0, bool flexible = false) =>
+            Label(parent, text, SmallSize, height, FontStyle.Normal, UiTheme.Muted, flexible);
+
+        static Text Countdown(Transform parent)
         {
-            if (kind == ButtonKind.Auto)
-                kind = SecondaryLabels.Any(l => text.StartsWith(l)) && text != "Finish with report" ? ButtonKind.Secondary : ButtonKind.Primary;
-            var go = DefaultControls.CreateButton(_res);
-            go.name = text;
+            var t = Label(parent, "", 96, 120, FontStyle.Bold, UiTheme.Accent);
+            t.alignment = TextAnchor.MiddleCenter;
+            return t;
+        }
+
+        static void Legend(Transform parent) => Small(parent, "Choose a number:  1 = not at all   ·   7 = extremely", 44);
+
+        // Desktop only: the Quest presentation turns flexible bodies into scroll views at full size instead.
+        static void BestFit(Text t)
+        {
+            t.resizeTextForBestFit = true;
+            t.resizeTextMinSize = 18;
+            t.resizeTextMaxSize = BodySize;
+        }
+
+        static ColorBlock Tint()
+        {
+            var c = ColorBlock.defaultColorBlock;
+            // Hover brightens: the resting state is slightly dimmed so a ray over a control is visible.
+            c.normalColor = c.selectedColor = new Color(0.86f, 0.86f, 0.86f);
+            c.highlightedColor = Color.white;
+            c.pressedColor = new Color(0.66f, 0.66f, 0.66f);
+            c.disabledColor = new Color(0.6f, 0.6f, 0.6f, 0.35f);
+            c.fadeDuration = 0.08f;
+            return c;
+        }
+
+        static Button MakeButton(Transform parent, string text, ButtonKind kind = ButtonKind.Primary)
+        {
+            var go = new GameObject(text, typeof(RectTransform), typeof(Image), typeof(Button), typeof(LayoutElement));
             go.transform.SetParent(parent, false);
             var image = go.GetComponent<Image>();
+            image.sprite = UiTheme.Fill;
             image.type = Image.Type.Sliced;
+            image.color = kind == ButtonKind.Secondary ? UiTheme.Surface : UiTheme.Accent;
             var button = go.GetComponent<Button>();
-            var colors = button.colors;
-            colors.fadeDuration = 0.08f;
-            Color labelColor;
-            switch (kind)
-            {
-                case ButtonKind.Secondary:
-                    image.sprite = UiTheme.Outline;
-                    colors.normalColor = Color.white; colors.highlightedColor = UiTheme.PaperHover; colors.selectedColor = Color.white;
-                    colors.pressedColor = UiTheme.Border; colors.disabledColor = UiTheme.Disabled;
-                    labelColor = UiTheme.Ink;
-                    break;
-                case ButtonKind.Accent:
-                    image.sprite = UiTheme.Fill;
-                    colors.normalColor = UiTheme.Accent; colors.highlightedColor = UiTheme.AccentHover; colors.selectedColor = UiTheme.Accent;
-                    colors.pressedColor = UiTheme.Ink; colors.disabledColor = UiTheme.Disabled;
-                    labelColor = UiTheme.Paper;
-                    break;
-                default:
-                    image.sprite = UiTheme.Fill;
-                    colors.normalColor = UiTheme.Ink; colors.highlightedColor = UiTheme.InkHover; colors.selectedColor = UiTheme.Ink;
-                    colors.pressedColor = Color.black; colors.disabledColor = UiTheme.Disabled;
-                    labelColor = UiTheme.Paper;
-                    break;
-            }
-            image.color = Color.white;
-            button.colors = colors;
-            var label = go.GetComponentInChildren<Text>();
-            if (label != null)
-            {
-                label.text = text;
-                label.font = _font;
-                label.fontSize = 28;
-                label.fontStyle = FontStyle.Bold;
-                label.color = labelColor;
-                label.alignment = TextAnchor.MiddleCenter;
-                label.horizontalOverflow = HorizontalWrapMode.Wrap;
-            }
-            var le = go.AddComponent<LayoutElement>();
-            le.preferredWidth = 380;
-            le.preferredHeight = 76;
+            button.targetGraphic = image;
+            button.colors = Tint();
+            var label = Label(go.transform, text, ButtonSize, 0, FontStyle.Bold,
+                kind == ButtonKind.Secondary ? UiTheme.Text : UiTheme.AccentText);
+            label.alignment = TextAnchor.MiddleCenter;
+            label.verticalOverflow = VerticalWrapMode.Overflow;
+            Stretch((RectTransform)label.transform, 16);
+            var le = go.GetComponent<LayoutElement>();
+            le.preferredWidth = ButtonWidth;
+            le.preferredHeight = ButtonHeight;
             return button;
         }
 
-        static Toggle MakeToggle(Transform parent, string text, bool layout = true)
+        /// <summary>Selectable pill: the whole pill turns accent when on (chips, 1-7 numbers, preferences).</summary>
+        static Toggle Pill(Transform parent, string text, int fontSize, float width, float height, bool layout = true,
+            TextAnchor alignment = TextAnchor.MiddleCenter)
         {
-            var go = DefaultControls.CreateToggle(_res);
-            go.name = text;
+            var go = new GameObject(text, typeof(RectTransform), typeof(Image), typeof(Toggle), typeof(ToggleVisual));
             go.transform.SetParent(parent, false);
-            var label = go.GetComponentInChildren<Text>();
-            if (label != null)
-            {
-                Style(label, 24);
-                label.text = text;
-                var lr = (RectTransform)label.transform;
-                lr.offsetMin = new Vector2(60, 0);
-                lr.offsetMax = new Vector2(-8, 0);
-                label.alignment = TextAnchor.MiddleLeft;
-            }
+            var image = go.GetComponent<Image>();
+            image.sprite = UiTheme.Fill;
+            image.type = Image.Type.Sliced;
+            image.color = UiTheme.Surface;
             var toggle = go.GetComponent<Toggle>();
-            var box = go.transform.Find("Background") as RectTransform;
-            if (box != null)
+            toggle.targetGraphic = image;
+            toggle.graphic = null;
+            toggle.isOn = false;
+            toggle.colors = Tint();
+            var label = Label(go.transform, text, fontSize, 0, FontStyle.Bold, UiTheme.Text);
+            label.alignment = alignment;
+            label.verticalOverflow = VerticalWrapMode.Overflow;
+            Stretch((RectTransform)label.transform, 20);
+            var visual = go.GetComponent<ToggleVisual>();
+            visual.Toggle = toggle;
+            visual.Background = image;
+            visual.Label = label;
+            visual.OnFill = UiTheme.Accent;
+            visual.OffFill = UiTheme.Surface;
+            visual.OnText = UiTheme.AccentText;
+            visual.OffText = UiTheme.Text;
+            if (layout)
             {
-                box.anchorMin = box.anchorMax = new Vector2(0, 0.5f);
-                box.pivot = new Vector2(0.5f, 0.5f);
-                box.anchoredPosition = new Vector2(26, 0);
-                box.sizeDelta = new Vector2(40, 40);
-                var bg = box.GetComponent<Image>();
-                bg.sprite = UiTheme.Outline;
-                bg.type = Image.Type.Sliced;
-                bg.color = Color.white;
-                var mark = box.Find("Checkmark") as RectTransform;
-                if (mark != null)
-                {
-                    mark.sizeDelta = new Vector2(30, 30);
-                    mark.GetComponent<Image>().color = UiTheme.Accent;
-                }
+                var le = go.AddComponent<LayoutElement>();
+                if (width > 0) le.preferredWidth = width;
+                else le.flexibleWidth = 1;
+                le.preferredHeight = height;
             }
-            if (layout) go.AddComponent<LayoutElement>().preferredHeight = 52;
             return toggle;
+        }
+
+        static Toggle MakeToggle(Transform parent, string text) =>
+            Pill(parent, text, SmallSize, 0, 68, alignment: TextAnchor.MiddleLeft);
+
+        static Transform ChipGrid(Transform parent, string name, int rows)
+        {
+            var grid = new GameObject(name, typeof(RectTransform), typeof(GridLayoutGroup), typeof(LayoutElement));
+            grid.transform.SetParent(parent, false);
+            var g = grid.GetComponent<GridLayoutGroup>();
+            g.cellSize = new Vector2(352, 80);
+            g.spacing = new Vector2(14, 14);
+            g.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            g.constraintCount = 4;
+            grid.GetComponent<LayoutElement>().preferredHeight = rows * 80 + (rows - 1) * 14;
+            return grid.transform;
         }
 
         static InputField MakeInput(Transform parent, string placeholder)
@@ -528,22 +630,25 @@ namespace App.UI.Editor
             go.transform.SetParent(parent, false);
             var field = go.GetComponent<InputField>();
             field.lineType = InputField.LineType.MultiLineNewline;
+            field.colors = Tint();
+            field.customCaretColor = true;
+            field.caretColor = UiTheme.Text;
+            field.caretWidth = 3;
+            field.selectionColor = new Color(UiTheme.Accent.r, UiTheme.Accent.g, UiTheme.Accent.b, 0.4f);
             var fieldImage = go.GetComponent<Image>();
-            fieldImage.sprite = UiTheme.Outline;
+            fieldImage.sprite = UiTheme.Fill;
             fieldImage.type = Image.Type.Sliced;
-            fieldImage.color = Color.white;
-            field.textComponent.font = _font;
-            field.textComponent.fontSize = 24;
-            field.textComponent.fontStyle = FontStyle.Bold;
-            field.textComponent.color = UiTheme.Ink;
-            if (field.placeholder is Text ph)
+            fieldImage.color = UiTheme.Surface;
+            foreach (var t in new[] { field.textComponent, field.placeholder as Text })
             {
-                ph.font = _font;
-                ph.fontSize = 24;
-                ph.fontStyle = FontStyle.Bold;
-                ph.color = UiTheme.Muted;
-                ph.text = placeholder;
+                if (t == null) continue;
+                t.font = _font;
+                t.fontSize = SmallSize + 2;
+                t.fontStyle = t == field.textComponent ? FontStyle.Normal : FontStyle.Italic;
+                t.color = t == field.textComponent ? UiTheme.Text : UiTheme.Muted;
+                Stretch((RectTransform)t.transform, 20);
             }
+            ((Text)field.placeholder).text = placeholder;
             go.AddComponent<LayoutElement>().preferredHeight = 110;
             return field;
         }
@@ -551,66 +656,25 @@ namespace App.UI.Editor
         static RatingRow Rating(Transform parent, string label)
         {
             var row = Group(parent, label, horizontal: true);
-            row.GetComponent<HorizontalOrVerticalLayoutGroup>().childForceExpandWidth = false;
-            row.GetComponent<LayoutElement>().preferredHeight = 60;
-            Label(row.transform, label, 20, 32).GetComponent<LayoutElement>().preferredWidth = 300;
-            var sliderGo = DefaultControls.CreateSlider(_res);
-            sliderGo.transform.SetParent(row.transform, false);
-            var sle = sliderGo.AddComponent<LayoutElement>();
-            sle.flexibleWidth = 1;
-            sle.preferredHeight = 48;
-            var slider = sliderGo.GetComponent<Slider>();
-            slider.minValue = 1;
-            slider.maxValue = 7;
-            slider.wholeNumbers = true;
-            slider.value = 1;
-            StyleSlider(sliderGo, slider);
-            var value = Label(row.transform, "1 / 7", 20, 32);
-            value.GetComponent<LayoutElement>().preferredWidth = 120;
+            var h = (HorizontalLayoutGroup)row.GetComponent<HorizontalOrVerticalLayoutGroup>();
+            h.childForceExpandWidth = false;
+            h.childAlignment = TextAnchor.MiddleLeft;
+            h.spacing = 14;
+            row.GetComponent<LayoutElement>().preferredHeight = 100;
+            var name = Label(row.transform, label, BodySize, 100, FontStyle.Bold, UiTheme.Text);
+            name.alignment = TextAnchor.MiddleLeft;
+            name.GetComponent<LayoutElement>().preferredWidth = 380;
             var r = row.AddComponent<RatingRow>();
-            r.Slider = slider;
-            r.ValueLabel = value;
+            for (var i = 1; i <= RatingRow.Max; i++) r.Options.Add(Pill(row.transform, i.ToString(), NumberSize, 120, 100));
             return r;
         }
 
-        static Text Style(Text t, int size)
+        static void Stretch(RectTransform rect, float inset)
         {
-            t.font = _font;
-            t.fontSize = size;
-            t.fontStyle = FontStyle.Bold;
-            t.color = UiTheme.Ink;
-            t.horizontalOverflow = HorizontalWrapMode.Wrap;
-            t.verticalOverflow = VerticalWrapMode.Truncate;
-            return t;
-        }
-
-        // Chunky VR-friendly slider: thick track, ink fill, large round handle.
-        static void StyleSlider(GameObject sliderGo, Slider slider)
-        {
-            var track = sliderGo.transform.Find("Background")?.GetComponent<Image>();
-            if (track != null) { track.sprite = UiTheme.Fill; track.type = Image.Type.Sliced; track.color = UiTheme.Border; }
-            var fill = sliderGo.transform.Find("Fill Area/Fill")?.GetComponent<Image>();
-            if (fill != null) { fill.sprite = UiTheme.Fill; fill.type = Image.Type.Sliced; fill.color = UiTheme.Ink; }
-            var handleRect = sliderGo.transform.Find("Handle Slide Area/Handle") as RectTransform;
-            if (handleRect != null)
-            {
-                handleRect.sizeDelta = new Vector2(48, 0);
-                var handle = handleRect.GetComponent<Image>();
-                handle.sprite = _res.knob;
-                handle.color = UiTheme.Accent;
-                slider.targetGraphic = handle;
-                var colors = slider.colors;
-                colors.highlightedColor = UiTheme.AccentHover;
-                colors.pressedColor = UiTheme.Ink;
-                slider.colors = colors;
-            }
-        }
-
-        // Re-colours every label under a dark container; button labels keep the colour chosen for their button.
-        static void Recolor(GameObject root, Color color)
-        {
-            foreach (var t in root.GetComponentsInChildren<Text>(true))
-                if (t.GetComponentInParent<Button>() == null) t.color = color;
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = new Vector2(inset, 6);
+            rect.offsetMax = new Vector2(-inset, -6);
         }
     }
 }

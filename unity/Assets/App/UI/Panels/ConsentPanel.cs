@@ -45,10 +45,14 @@ namespace App.UI.Panels
 
         public override void Refresh()
         {
-            Body.text = "Experimental wellness prototype. Not a medical device or diagnosis. Pause or exit at any time. "
-                + "Reports stay in memory until Exit or New session. Free text stays on-device. "
-                + "Backend upload sends aggregates and ratings to the configured server. Networked demos accept wholly invented data only; "
-                + "participant sessions use the on-device report. Gemini stays disabled for interactive check-ins.\n\n"
+            Body.text = "An experimental wellness prototype: not a medical device and not a diagnosis.\n\n"
+                + "•  About 4 minutes: a baseline, a short task, then a quick check-in and your summary.\n"
+                + "•  Pause any time with Y or B. Exit is always at the top.\n"
+                + "•  Your report stays in memory until Exit or New session.\n"
+                + (Controller.CheckInLeavesDevice
+                    ? "•  Upload is on: invented eye aggregates, your ratings, chips and words go to the configured server.\n"
+                    : "•  Analysis runs on this headset; nothing is uploaded. Real eye data never leave it.\n")
+                + "\n"
                 + $"Eye data source: {Controller.EyeSourceDescription}"
                 + (Controller.ReplayLoadStatus == null ? "" : "\n\n" + Controller.ReplayLoadStatus)
                 + (Controller.EyeSource == App.Capture.EyeSourceMode.Hardware ? "\n\n" + Controller.HardwareReadinessText : "");

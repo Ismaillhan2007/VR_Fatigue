@@ -31,6 +31,7 @@ public class QuestPresentationTests
     {
         yield return SceneManager.LoadSceneAsync("Assessment");
         _controller = Object.FindAnyObjectByType<SessionController>();
+        _controller.ShowPhaseInstructions = false; // flow and capture tests; PhaseInstructionTests cover the gate
         var head = Camera.main;
         _view = new GameObject("Simulated Quest presentation").AddComponent<QuestAssessmentPresentation>();
         _view.Configure(_controller, head);
