@@ -1,12 +1,15 @@
 # Quest Pro capture: integrator handoff
 
+Product objective: an eye-tracking assessment and experimental wellness report, with successful report-only completion. Rendering a forest is a separately chosen relaxation use case. Hardware consent must not imply scene participation; see [objectives and current flow gaps](OBJECTIVES.md).
+
 ## Delivered and pending
 
 The hardware module is implemented: pure C# `HardwareEyeProvider`, an SDK-backed
 `MetaQuestEyeSource`, and `QuestProCaptureController`. The existing replay, quality,
 metrics, baseline and indicator code is reused. This is a source/API handoff; the upstream application scaffold now supplies session UI, DTOs and integration seams.
-The new signal APIs are not yet wired into those seams; backend, forest and a validated
-Quest APK remain pending.
+The app now uses the signal metrics engine and JSON replay. The native capture bridge is
+not yet wired into the app's `EyeProviderFactory`; a validated Quest APK remains pending.
+The backend and placeholder forest are integrated, but normal report-only completion is not.
 
 Target editor: **Unity 6000.6.7f1**, retained in `unity/ProjectSettings/ProjectVersion.txt`.
 Meta XR Core SDK: **207.0.1**, the latest stable release reported by the

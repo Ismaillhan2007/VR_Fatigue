@@ -15,6 +15,7 @@ namespace App.Core.Flow
         ReRating,
         Done,
         Exited,
+        RelaxationSetup, // appended to preserve serialized values of the existing states
     }
 
     /// <summary>Everything one session knows. Lives in memory only and is cleared on exit/restart.</summary>
@@ -35,6 +36,7 @@ namespace App.Core.Flow
         public AnalysisResponse Analysis;
         public string AnalysisFallbackReason;
         public SelfReport PostSceneReport;
+        public bool SceneParticipated;
 
         public AiSource? AiSource => Analysis?.AiSource;
 
@@ -43,7 +45,7 @@ namespace App.Core.Flow
     }
 
     /// <summary>
-    /// Pure session state machine: Consent -> Baseline -> LoadTask -> CheckIn -> Summary -> Scene -> ReRating -> Done,
+    /// Pure session flow: assessment -> report -> Done, or explicitly chosen relaxation -> optional feedback -> Done,
     /// with pause (blocks transitions) and exit (from anywhere; clears session data). Invalid transitions throw.
     /// Provenance set at consent cannot be relabelled later.
     /// </summary>
@@ -95,7 +97,7 @@ namespace App.Core.Flow
         {
             Require(FlowState.CheckIn);
             RequireReport(postTaskReport, ReportPhase.PostTask);
-            if (preferences != null) ThrowIfInvalid(preferences);
+            if (preferences != null) throw new InvalidOperationException("choose scene preferences only after opting into relaxation");
             Context.PostTaskReport = postTaskReport.Copy();
             Context.Preferences = preferences;
             MoveTo(FlowState.Summary);
@@ -116,7 +118,9 @@ namespace App.Core.Flow
 
         public void SetAnalysis(AnalysisResponse analysis, string fallbackReason)
         {
-            Require(FlowState.Summary);
+            // Completing an in-flight explanation updates context, not the flow state. Keep the
+            // pause overlay active; subsequent participant transitions still require Resume.
+            if (State != FlowState.Summary) throw new InvalidOperationException("analysis requires Summary");
             if (Context.Summary == null) throw new InvalidOperationException("set the summary first");
             ThrowIfInvalid(analysis);
             if (analysis.SessionId != Context.SessionId || analysis.DataSource != Context.DataSource
@@ -127,19 +131,72 @@ namespace App.Core.Flow
             ContextChanged?.Invoke();
         }
 
-        public void EnterScene()
+        public void FinishWithReport()
         {
             Require(FlowState.Summary);
+            RequireAnalysis();
+            MoveTo(FlowState.Done);
+        }
+
+        public void ChooseRelaxation()
+        {
+            Require(FlowState.Summary);
+            RequireSceneAllowed();
+            MoveTo(FlowState.RelaxationSetup);
+        }
+
+        public void CancelRelaxation()
+        {
+            Require(FlowState.RelaxationSetup);
+            Context.Preferences = null;
+            MoveTo(FlowState.Summary);
+        }
+
+        public void SetScenePreferences(Preferences preferences)
+        {
+            Require(FlowState.RelaxationSetup);
+            if (preferences != null) ThrowIfInvalid(preferences);
+            Context.Preferences = preferences == null ? null :
+                ContractJson.Parse<Preferences>(ContractJson.Serialize(preferences));
+            ContextChanged?.Invoke();
+        }
+
+        public void EnterScene()
+        {
+            Require(FlowState.RelaxationSetup);
+            RequireSceneAllowed();
+            MoveTo(FlowState.Scene);
+        }
+
+        void RequireAnalysis()
+        {
+            if (Context.Summary == null || Context.Analysis == null)
+                throw new InvalidOperationException("wait for the report before completing");
+        }
+
+        void RequireSceneAllowed()
+        {
             if (Context.Analysis == null) throw new InvalidOperationException("no analysis yet");
             if (Context.Analysis.SafetyNotice == SafetyNotice.StopSession)
                 throw new InvalidOperationException("stop-session notice requires exiting and resting");
-            MoveTo(FlowState.Scene);
+        }
+
+        public void MarkSceneParticipated()
+        {
+            if (State != FlowState.Scene) throw new InvalidOperationException("no scene is being entered");
+            Context.SceneParticipated = true;
         }
 
         public void FinishScene()
         {
             Require(FlowState.Scene);
-            MoveTo(FlowState.ReRating);
+            MoveTo(Context.SceneParticipated ? FlowState.ReRating : FlowState.Done);
+        }
+
+        public void SkipReRating()
+        {
+            Require(FlowState.ReRating);
+            MoveTo(FlowState.Done);
         }
 
         public void SubmitReRating(SelfReport postSceneReport)

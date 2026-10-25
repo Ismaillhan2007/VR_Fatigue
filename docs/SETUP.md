@@ -1,5 +1,7 @@
 # Setup: full desktop demo
 
+The desktop app supports a complete report-only session and an explicitly chosen optional forest. Finish with report retains the report until Exit or New session. See [report-only flow and verification](REPORT_ONLY_FLOW.md); headset acceptance remains separate.
+
 Everything below runs without a headset or a Gemini key. Eye data are synthetic and labelled as such; the backend runs its offline rules by default.
 
 ## Full demo in four commands
@@ -14,7 +16,7 @@ cd backend && uv sync --locked --extra dev && cd ..
 cd backend && uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-Then in Unity: open `unity/` in Hub, open `Assets/App/Scenes/Assessment.unity`, press Play, and walk Consent -> Baseline -> Task -> Check-in -> Summary -> Scene -> Re-rating. With the backend running the top bar shows "AI: FALLBACK from backend rules (no AI used)"; stop the backend and it shows "AI: LOCAL FALLBACK (no AI used: backend unreachable ...)". Both paths reach the forest.
+Then in Unity: open `unity/` in Hub, open `Assets/App/Scenes/Assessment.unity`, press Play, and walk Consent -> Baseline -> Task -> Check-in -> Summary -> Finish with report. To exercise the optional branch, choose Try optional relaxation -> preferences/preview -> Enter optional forest -> Finish -> optional feedback. With the backend running the top bar shows "AI: FALLBACK from backend rules (no AI used)"; stop the backend and it shows "AI: LOCAL FALLBACK (no AI used: backend unreachable ...)". Both backend and client-fallback paths can finish with the report; neither requires a forest load.
 
 Tests (close the editor first; a project cannot be open twice):
 
@@ -38,7 +40,7 @@ cd backend && uv run pytest -q && cd .. && backend/.venv/bin/python contracts/va
 | XR Interaction Toolkit / OpenXR / XR Management | 3.6.1 / 1.18.0 / 4.7.0 | manifest |
 | Input System | 1.20.1 (active input handling: Input System only) | manifest, Player settings |
 | Test Framework / Newtonsoft Json | 1.8.0 / 3.2.2 | manifest |
-| Backend | Python >= 3.11, FastAPI, `uv.lock` | `backend/pyproject.toml` |
+| Backend | Python 3.12, FastAPI, `uv.lock` | `.python-version`, `backend/pyproject.toml` |
 
 Do not upgrade packages in a feature PR; propose it in a `chore/` PR.
 

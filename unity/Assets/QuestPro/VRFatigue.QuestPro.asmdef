@@ -1,7 +1,7 @@
 {
   "name": "VRFatigue.QuestPro",
   "rootNamespace": "VRFatigue.QuestPro",
-  "references": ["VRFatigue.Signals", "Oculus.VR"],
+  "references": ["VRFatigue.Signals", "Oculus.VR", "Unity.XR.Management", "Unity.XR.OpenXR"],
   "autoReferenced": true,
   "versionDefines": [
     {

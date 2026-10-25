@@ -1,0 +1,14 @@
+{
+  "name": "App.Quest",
+  "rootNamespace": "App.Quest",
+  "references": [
+    "App.Core",
+    "App.UI",
+    "VRFatigue.QuestPro",
+    "Oculus.VR",
+    "Unity.XR.Interaction.Toolkit",
+    "Unity.InputSystem",
+    "UnityEngine.UI"
+  ],
+  "autoReferenced": true
+}

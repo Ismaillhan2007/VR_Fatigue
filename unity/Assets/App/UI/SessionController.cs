@@ -57,6 +57,7 @@ namespace App.UI
 
         public SessionFlow Flow { get; private set; }
         public string ProviderNote { get; private set; }
+        public string MetricsFailureMessage { get; private set; }
         public bool IsCapturing => _recording != null;
         /// <summary>Remaining phase time in real seconds (replay may run faster than real time).</summary>
         public float PhaseRemainingSeconds => Mathf.Max(0, (_phaseDuration - _phaseElapsed) / Mathf.Max(0.01f, PhaseSpeed));
@@ -69,6 +70,9 @@ namespace App.UI
 
         float PhaseSpeed => _provider is ReplayEyeProvider r ? (float)r.Speed : 1f;
         public int SampleCount => _recording?.Samples.Count ?? 0;
+        public bool ReplayLoading { get; private set; }
+        public string ReplayLoadStatus { get; private set; }
+        int _replayLoadRevision;
         public bool AnalysisInProgress { get; private set; }
         public string SceneStatus { get; private set; } = "";
 
@@ -110,6 +114,7 @@ namespace App.UI
 
         void OnDestroy()
         {
+            ClearReplayLoad();
             _cts.Cancel();
             _provider?.Stop();
         }
@@ -138,8 +143,61 @@ namespace App.UI
 
         public void AcceptConsent()
         {
+            if (ReplayLoading || Flow.State != FlowState.Consent || Flow.IsPaused) return;
+            var path = ResolveReplayPath(ReplayCsvPath);
+            if (EyeSource == EyeSourceMode.Replay && ReplayAssetLoader.IsAssetUrl(path))
+            {
+                StartCoroutine(LoadReplayAndAccept(path));
+                return;
+            }
+            StartConsentedCapture(null);
+        }
+
+        System.Collections.IEnumerator LoadReplayAndAccept(string path)
+        {
+            var revision = ++_replayLoadRevision;
+            var sessionId = Flow.Context.SessionId;
+            ReplayLoading = true;
+            ReplayLoadStatus = "Loading bundled replay (not live eye measurements)...";
+            RefreshVisible();
+            ReplayEyeProvider prepared = null;
+            string error = null;
+            yield return ReplayAssetLoader.Load(path, ReplayOrigin, (provider, reason) => { prepared = provider; error = reason; });
+            if (revision != _replayLoadRevision || Flow.Context.SessionId != sessionId) yield break;
+            ReplayLoading = false;
+            ReplayLoadStatus = error;
+            if (prepared != null && Flow.State == FlowState.Consent && !Flow.IsPaused)
+                StartConsentedCapture(prepared);
+            else RefreshVisible(); // Keep consent on failure; never substitute synthetic data for this selected replay.
+        }
+
+        void ClearReplayLoad()
+        {
+            _replayLoadRevision++;
+            ReplayLoading = false;
+            ReplayLoadStatus = null;
+        }
+
+        void StartConsentedCapture(ReplayEyeProvider prepared)
+        {
+            MetricsFailureMessage = null;
             _provider?.Stop();
-            _provider = EyeProviderFactory.CreateAndStart(EyeSource, Now, SyntheticSeed, ResolveReplayPath(ReplayCsvPath), ReplayOrigin, out var note, ReplaySpeed);
+            string note = null;
+            if (prepared != null)
+            {
+                prepared.Speed = ReplaySpeed;
+                prepared.Start(Now);
+                _provider = prepared;
+            }
+            else _provider = EyeProviderFactory.CreateAndStart(EyeSource, Now, SyntheticSeed,
+                ResolveReplayPath(ReplayCsvPath), ReplayOrigin, out note, ReplaySpeed);
+            if (_provider is ReplayEyeProvider replay)
+            {
+                // File parsing happens before capture. Start the replay clock only when the phase is ready.
+                var ready = Now;
+                replay.Start(ready);
+                replay.SetHold(true, ready);
+            }
             ProviderNote = note;
             Flow.AcceptConsent(_provider.DataSource, _provider.ReplayOrigin, _provider.Capabilities, _provider.Name);
             _baseline.Recording.Clear();
@@ -165,16 +223,8 @@ namespace App.UI
         {
             Flow.SubmitCheckIn(report, preferences);
             var sessionId = Flow.Context.SessionId;
-            SessionSummary summary;
-            try
-            {
-                summary = _metrics.Compute(_task, _baseline, ContextForMetrics(report));
-            }
-            catch (Exception e)
-            {
-                Debug.LogError($"[SessionController] metrics engine failed, using stub: {e}");
-                summary = new StubMetricsEngine().Compute(_task, _baseline, ContextForMetrics(report));
-            }
+            var succeeded = MetricsEngineFactory.TryCompute(_metrics, _task, _baseline, ContextForMetrics(report), out var summary);
+            MetricsFailureMessage = succeeded ? null : "Measurements could not be calculated. Please repeat the session or continue using your check-in.";
             Flow.SetSummary(summary);
 
             var request = AnalyzeRequest.Create(summary, Flow.Context.BaselineReport, preferences);
@@ -187,13 +237,21 @@ namespace App.UI
             }
             catch (Exception e)
             {
-                Debug.LogWarning($"[SessionController] analysis client threw: {e.Message}");
+                Debug.LogWarning($"[SessionController] analysis client threw: {e.GetType().Name}");
                 result = new AnalysisResult { Response = LocalFallbackAnalysis.Analyze(request), FallbackReason = "client error" };
             }
-            AnalysisInProgress = false;
             if (this == null || Flow.State != FlowState.Summary || Flow.Context.SessionId != sessionId) return;
+            AnalysisInProgress = false;
             Flow.SetAnalysis(result.Response, result.FallbackReason);
         }
+
+        public void FinishWithReport() => Flow.FinishWithReport();
+        public void ChooseRelaxation() => Flow.ChooseRelaxation();
+        public void CancelRelaxation() => Flow.CancelRelaxation();
+        public void SkipReRating() => Flow.SkipReRating();
+
+        public SceneConfig ScenePreview => Flow.Context.Analysis == null ? null
+            : SceneConfigSanitizer.Sanitize(Flow.Context.Analysis.SceneConfig, Flow.Context.Preferences);
 
         public void EnterScene()
         {
@@ -201,12 +259,19 @@ namespace App.UI
             Flow.EnterScene();
             var config = Flow.Context.Analysis.SceneConfig;
             SceneStatus = "Loading scene...";
-            StartCoroutine(EnterSceneRoutine(config));
+            StartCoroutine(EnterSceneRoutine(config, Flow.Context.SessionId));
         }
 
-        System.Collections.IEnumerator EnterSceneRoutine(SceneConfig config)
+        System.Collections.IEnumerator EnterSceneRoutine(SceneConfig config, string sessionId)
         {
             yield return _scene.Enter(config, Flow.Context.Preferences);
+            if (Flow.Context.SessionId != sessionId || Flow.State != FlowState.Scene)
+            {
+                yield return _scene.Exit();
+                SceneConfigHandoff.Clear();
+                yield break;
+            }
+            if (_scene.ForestLoaded) Flow.MarkSceneParticipated();
             SceneStatus = (_scene.ForestLoaded ? "Forest scene loaded." : "Forest scene not available yet (stub applier): showing the config only.")
                 + "\n\n" + SummaryFormatter.SceneLine(SceneConfigHandoff.Current)
                 + "\n\nYou can mute, pause or exit at any time.";
@@ -240,7 +305,10 @@ namespace App.UI
 
         public void Exit()
         {
+            ClearReplayLoad();
+            MetricsFailureMessage = null;
             _cts.Cancel();
+            _cts.Dispose();
             _cts = new CancellationTokenSource();
             StopCapture();
             StartCoroutine(_scene.Exit());
@@ -249,12 +317,26 @@ namespace App.UI
             _baseline.SelfReport = null;
             _task.Clear();
             AnalysisInProgress = false;
+            SceneStatus = "";
             Flow.Exit();
         }
 
         public void Restart()
         {
+            if (Flow.State != FlowState.Done && Flow.State != FlowState.Exited)
+                throw new InvalidOperationException("finish or exit before restarting");
+            ClearReplayLoad();
+            _cts.Cancel();
+            _cts.Dispose();
+            _cts = new CancellationTokenSource();
+            MetricsFailureMessage = null;
             StopCapture();
+            _baseline.Recording.Clear();
+            _baseline.SelfReport = null;
+            _task.Clear();
+            SceneConfigHandoff.Clear();
+            SceneStatus = "";
+            AnalysisInProgress = false;
             ProviderNote = null;
             Flow.Restart();
         }
@@ -263,10 +345,11 @@ namespace App.UI
 
         void BeginCapture(PhaseRecording recording, float seconds, string probePrefix, bool loaded)
         {
+            var now = Now;
             recording.Clear();
-            recording.StartTime = Now;
-            if (_provider is IHoldableProvider holdable) holdable.SetHold(false, Now);
-            _provider.ReadSamples(_discard, Now); // drop anything produced before this phase
+            recording.StartTime = now;
+            if (_provider is IHoldableProvider holdable) holdable.SetHold(false, now);
+            _provider.ReadSamples(_discard, now); // drop anything produced before this phase
             _discard.Clear();
             if (_provider is IProbeFollower follower) follower.SetLoaded(loaded);
             _recording = recording;
@@ -274,7 +357,13 @@ namespace App.UI
             _lastTrial = -1;
             _phaseDuration = Mathf.Max(1, seconds);
             _phaseElapsed = 0;
-            _phaseStartReplay = _provider is ReplayEyeProvider replay ? replay.ReplayedSeconds(Now) : 0;
+            _phaseStartReplay = _provider is ReplayEyeProvider replay ? replay.ReplayedSeconds(now) : 0;
+            if (_provider is ReplayEyeProvider timed)
+            {
+                timed.BeginPhase(_phaseDuration, now);
+                recording.SensorClockRate = Math.Max(0.01, timed.Speed);
+                recording.SensorStartTime = timed.SensorTime(now);
+            }
         }
 
         /// <summary>
@@ -304,10 +393,12 @@ namespace App.UI
 
         void EndCapture()
         {
-            _recording.EndTime = Now;
+            var now = Now;
+            _recording.EndTime = now;
+            if (_provider is ReplayEyeProvider replay) _recording.SensorEndTime = replay.SensorTime(now);
             _recording = null;
             ProbeRunner?.Hide();
-            if (_provider is IHoldableProvider holdable) holdable.SetHold(true, Now);
+            if (_provider is IHoldableProvider holdable) holdable.SetHold(true, now);
             if (Flow.State == FlowState.LoadTask)
             {
                 _provider.Stop();
@@ -366,16 +457,8 @@ namespace App.UI
         }
 
         /// <summary>Relative to the unity/ folder; falls back to the StreamingAssets copy (builds have no repo).</summary>
-        static string ResolveReplayPath(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path)) return path;
-            var full = System.IO.Path.IsPathRooted(path)
-                ? path
-                : System.IO.Path.GetFullPath(System.IO.Path.Combine(Application.dataPath, "..", path));
-            if (System.IO.File.Exists(full)) return full;
-            var packaged = System.IO.Path.Combine(Application.streamingAssetsPath, "fixtures", "replay", System.IO.Path.GetFileName(path));
-            return System.IO.File.Exists(packaged) ? packaged : full;
-        }
+        static string ResolveReplayPath(string path) => ReplayAssetLoader.Resolve(path, Application.dataPath,
+            Application.streamingAssetsPath, Application.platform == RuntimePlatform.Android && !Application.isEditor);
 
         static string CommandLineValue(string name)
         {
