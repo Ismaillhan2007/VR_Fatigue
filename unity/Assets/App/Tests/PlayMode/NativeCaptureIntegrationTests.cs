@@ -86,6 +86,7 @@ public class NativeCaptureIntegrationTests
     [UnityTest]
     public IEnumerator NativeAdapterCompletesLocallyWithHonestSyntheticTestProvenanceAndNoForest()
     {
+        _controller.ConfigureBackend("https://unreachable.invalid", "invented-native-token", false, true, true);
         _controller.Analysis = AnalysisMode.Http;
         Prepare();
         _controller.EndCaptureEarly(); Assert.IsTrue(_controller.IsCapturing, "no desktop skip for native acceptance");
@@ -110,6 +111,7 @@ public class NativeCaptureIntegrationTests
         Assert.IsFalse(SceneManager.GetSceneByName("ForestDemo").isLoaded);
         Assert.NotNull(_controller.HardwareDiagnostics);
         _controller.Exit(); Assert.IsNull(_controller.HardwareDiagnostics);
+        Assert.IsEmpty(_controller.BackendToken); Assert.IsFalse(_controller.AllowBackendUpload);
         Assert.IsNull(_controller.Flow.Context.Summary); Assert.IsFalse(_provider.ConsentGranted);
     }
 
@@ -152,6 +154,33 @@ public class NativeCaptureIntegrationTests
         StringAssert.Contains("Calibration: operator confirmation only", _controller.NativeDiagnosticSummary);
         _controller.Exit(); _controller.Restart();
         Assert.IsFalse(_controller.NativeDiagnostic); Assert.IsNull(_controller.HardwareDiagnostics);
+    }
+
+    [UnityTest]
+    public IEnumerator NativeDiagnosticCancelsPendingBackendCheckAndExitClearsBothFeatures()
+    {
+        using (var receiver = new App.Tests.BackendRuntimeTests.Receiver(wait: true))
+        {
+            _controller.ConfigureBackend(receiver.Url, "invented-native-token", true, true, true);
+            _controller.CheckBackendConnection();
+            yield return Until(() => receiver.Received.Task.IsCompleted);
+            Assert.IsTrue(_controller.BackendCheckInProgress);
+            _controller.RequestHardwarePermission(); _source.Permission = true;
+            _controller.ConfirmHardwareCalibration(true);
+            _controller.StartNativeDiagnostic();
+            Assert.AreEqual(FlowState.Baseline, _controller.Flow.State);
+            Assert.IsFalse(_controller.BackendCheckInProgress);
+            var status = _controller.BackendConnectionStatus;
+            receiver.Release.TrySetResult(true);
+            for (var i = 0; i < 10; i++) yield return null;
+            Assert.AreEqual(status, _controller.BackendConnectionStatus);
+            _controller.Exit();
+            Assert.IsEmpty(_controller.BackendToken);
+            Assert.IsFalse(_controller.AllowBackendUpload);
+            Assert.IsFalse(_controller.NativeDiagnostic);
+            Assert.IsNull(_controller.HardwareDiagnostics);
+            Assert.IsFalse(_source.Enabled);
+        }
     }
 
     [UnityTest]

@@ -31,7 +31,7 @@ namespace App.Tests
             Assert.IsTrue(ready(), "timed out");
         }
 
-        sealed class Receiver : IDisposable
+        internal sealed class Receiver : IDisposable
         {
             readonly HttpListener listener = new HttpListener();
             public readonly TaskCompletionSource<bool> Received = new TaskCompletionSource<bool>();

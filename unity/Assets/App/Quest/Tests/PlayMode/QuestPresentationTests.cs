@@ -239,10 +239,22 @@ public class QuestPresentationTests
     public IEnumerator TrackedRayOpensBackendSettingsAndReturnsToConsent()
     {
         var panel = Object.FindAnyObjectByType<ConsentPanel>();
+        var setup = new GameObject("Combined native and backend controls").AddComponent<QuestEyeSetupPanel>();
+        setup.Configure(_controller);
+        yield return null;
         var pointer = new Pointer(_module, _view.Head);
         _module.RegisterInteractor(pointer);
         try
         {
+            Canvas.ForceUpdateCanvases();
+            var bounds = new Vector3[4];
+            foreach (var button in panel.GetComponentsInChildren<Button>())
+            {
+                ((RectTransform)button.transform).GetWorldCorners(bounds);
+                foreach (var corner in bounds)
+                    Assert.IsTrue(((RectTransform)_view.Canvas.transform).rect.Contains(
+                        _view.Canvas.transform.InverseTransformPoint(corner)), "combined consent control stays on canvas: " + button.name);
+            }
             yield return Click(pointer, panel.OpenSettingsButton);
             Assert.IsTrue(panel.SettingsRoot.activeSelf);
             Assert.AreEqual(InputField.ContentType.Password, panel.BackendToken.contentType);
@@ -261,7 +273,7 @@ public class QuestPresentationTests
             Assert.IsFalse(panel.SettingsRoot.activeSelf);
             Assert.AreEqual(FlowState.Consent, _controller.Flow.State);
         }
-        finally { _module.UnregisterInteractor(pointer); }
+        finally { _module.UnregisterInteractor(pointer); Object.Destroy(setup.gameObject); }
     }
 
     [UnityTest]
