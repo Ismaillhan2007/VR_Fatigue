@@ -71,6 +71,7 @@ namespace App.Quest
             ConfigureRay(rig.rightControllerAnchor, "RightHand");
             owner.Presentation = root.AddComponent<QuestAssessmentPresentation>();
             owner.Presentation.Configure(controller, owner.Head);
+            root.AddComponent<QuestEyeSetupPanel>().Configure(controller);
             owner._pause = new InputAction("Pause assessment", InputActionType.Button);
             owner._pause.AddBinding("<XRController>{LeftHand}/secondaryButton");
             owner._pause.AddBinding("<XRController>{RightHand}/secondaryButton");

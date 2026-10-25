@@ -42,5 +42,9 @@ namespace App.Core.Capture
         public double EndTime;
         /// <summary>Target direction in the head frame (head-locked target).</summary>
         public Vector3 TargetDirection;
+        /// <summary>Optional native acquisition times, stamped when each target event actually occurs.</summary>
+        public double? SensorOnsetTime;
+        public double? SensorHoldStartTime;
+        public double? SensorEndTime;
     }
 }

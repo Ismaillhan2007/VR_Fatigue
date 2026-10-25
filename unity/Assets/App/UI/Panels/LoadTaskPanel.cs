@@ -16,8 +16,12 @@ namespace App.UI.Panels
 
         void Awake() => SkipButton.onClick.AddListener(() => Controller.EndCaptureEarly());
 
-        public override void Refresh() => Status.text =
+        public override void Refresh()
+        {
+            SkipButton.gameObject.SetActive(Controller.EyeSource != App.Capture.EyeSourceMode.Hardware);
+            Status.text =
             "Task: keep following the yellow target (same layout as the baseline; the reading/visual-search load is a placeholder).\n"
             + $"{Controller.PhaseRemainingSeconds:0} s left ({Controller.SampleCount} samples, {Controller.ProbeCount} targets, {Controller.EyeSourceDescription})";
+        }
     }
 }

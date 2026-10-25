@@ -3,6 +3,7 @@
     "rootNamespace": "App.Tests",
     "references": [
         "App.Core",
+        "VRFatigue.Signals",
         "App.UI",
         "App.Relaxation",
         "App.Capture",

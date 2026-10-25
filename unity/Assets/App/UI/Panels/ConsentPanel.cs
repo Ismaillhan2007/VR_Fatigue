@@ -41,6 +41,7 @@ namespace App.UI.Panels
             SettingsRoot.SetActive(false);
             Refresh();
         }
+        void Update() { if (Controller != null && Controller.EyeSource == App.Capture.EyeSourceMode.Hardware) Refresh(); }
 
         public override void Refresh()
         {
@@ -49,7 +50,8 @@ namespace App.UI.Panels
                 + "Backend upload sends aggregates and ratings to the configured server. Networked demos accept wholly invented data only; "
                 + "participant sessions use the on-device report. Gemini stays disabled for interactive check-ins.\n\n"
                 + $"Eye data source: {Controller.EyeSourceDescription}"
-                + (Controller.ReplayLoadStatus == null ? "" : "\n\n" + Controller.ReplayLoadStatus);
+                + (Controller.ReplayLoadStatus == null ? "" : "\n\n" + Controller.ReplayLoadStatus)
+                + (Controller.EyeSource == App.Capture.EyeSourceMode.Hardware ? "\n\n" + Controller.HardwareReadinessText : "");
             ConnectionStatus.text = Controller.BackendConnectionStatus;
             StartButton.interactable = !Controller.ReplayLoading;
             OpenSettingsButton.interactable = !Controller.ReplayLoading;
