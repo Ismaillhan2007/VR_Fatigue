@@ -60,7 +60,7 @@ namespace App.Quest
                     var layout = body.GetComponent<LayoutElement>();
                     if (layout != null && layout.flexibleHeight > 0) MakeScrollable(body);
                 }
-                if (panel is BaselinePanel baseline) MakeScrollable(baseline.Status, 340); // instructions fit unscrolled
+                if (panel is BaselinePanel baseline) MakeScrollable(baseline.Status, 200); // with the spacer, instructions fit unscrolled
                 if (panel is ScenePanel) panelRect.anchorMax = new Vector2(panelRect.anchorMax.x, 0.58f);
             }
             var pauseRect = (RectTransform)controller.PauseOverlay.transform;

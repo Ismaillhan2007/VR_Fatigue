@@ -116,6 +116,7 @@ namespace App.UI.Editor
             p.BackendUrl.gameObject.name = "BackendUrl";
             p.BackendUrl.lineType = InputField.LineType.SingleLine;
             p.BackendUrl.characterLimit = 2048;
+            p.BackendUrl.GetComponent<LayoutElement>().minHeight = 64;
             p.BackendUrl.GetComponent<LayoutElement>().preferredHeight = 64;
             p.BackendToken = MakeInput(settings.transform, "Team demo token");
             p.BackendToken.gameObject.name = "BackendToken";
@@ -123,6 +124,7 @@ namespace App.UI.Editor
             p.BackendToken.contentType = InputField.ContentType.Password;
             p.BackendToken.characterLimit = 4096;
             p.BackendToken.shouldHideMobileInput = true;
+            p.BackendToken.GetComponent<LayoutElement>().minHeight = 64;
             p.BackendToken.GetComponent<LayoutElement>().preferredHeight = 64;
             p.LocalDevelopment = MakeToggle(settings.transform, "Local development: allow loopback / private LAN HTTP");
             p.InventedDemo = MakeToggle(settings.transform, "This entire session uses invented eye data AND invented check-ins");
@@ -142,6 +144,7 @@ namespace App.UI.Editor
             Eyebrow(root.transform, "STEP 1 OF 4  ·  BASELINE");
             p.Title = Title(root.transform, "Before we start");
             p.Status = Body(root.transform, height: 330);
+            p.Status.GetComponent<LayoutElement>().minHeight = 120; // short once recording is done
             p.Countdown = Countdown(root.transform);
             p.RatingGroup = Group(root.transform, "Ratings");
             Legend(p.RatingGroup.transform);
@@ -162,6 +165,7 @@ namespace App.UI.Editor
             Eyebrow(root.transform, "STEP 2 OF 4  ·  TASK");
             p.Title = Title(root.transform, "The task");
             p.Status = Body(root.transform, height: 330);
+            p.Status.GetComponent<LayoutElement>().minHeight = 120; // short once recording is done
             p.Countdown = Countdown(root.transform);
             Spacer(root.transform);
             var row = ButtonRow(root.transform);
@@ -203,7 +207,7 @@ namespace App.UI.Editor
             Body(words.transform, "Point at the box and press the trigger: the headset keyboard opens. "
                 + "Press its microphone key to dictate, or type.", 100).fontSize = SmallSize + 2;
             p.FreeText = MakeInput(words.transform, "For example: my eyes feel dry and I want somewhere quiet");
-            p.FreeText.GetComponent<LayoutElement>().preferredHeight = 140;
+            p.FreeText.GetComponent<LayoutElement>().preferredHeight = p.FreeText.GetComponent<LayoutElement>().minHeight = 140;
             p.Hint = Small(words.transform, "", 44);
             p.CloudExplanation = Pill(words.transform, "Optional: also send aggregate eye measurements and ratings to the configured "
                 + "backend and Google Gemini for an experimental explanation (Google's Gemini terms apply). "
@@ -249,7 +253,7 @@ namespace App.UI.Editor
             g.spacing = new Vector2(14, 14);
             g.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             g.constraintCount = 4;
-            p.PreferenceGroup.GetComponent<LayoutElement>().preferredHeight = 76;
+            p.PreferenceGroup.GetComponent<LayoutElement>().preferredHeight = p.PreferenceGroup.GetComponent<LayoutElement>().minHeight = 76;
             p.Animals = Pill(p.PreferenceGroup.transform, "Animals", SmallSize, 0, 0, layout: false);
             p.Silent = Pill(p.PreferenceGroup.transform, "Silent", SmallSize, 0, 0, layout: false);
             p.Sunset = Pill(p.PreferenceGroup.transform, "Sunset (off = day)", SmallSize, 0, 0, layout: false);
@@ -474,7 +478,7 @@ namespace App.UI.Editor
                 : go.AddComponent<VerticalLayoutGroup>();
             g.spacing = horizontal ? 16 : 14;
             g.childControlWidth = g.childControlHeight = true;
-            g.childForceExpandWidth = horizontal;
+            g.childForceExpandWidth = true;
             g.childForceExpandHeight = false;
             return go;
         }
@@ -484,7 +488,7 @@ namespace App.UI.Editor
             var row = Group(parent, "Buttons", horizontal: true);
             ((HorizontalLayoutGroup)row.GetComponent<HorizontalOrVerticalLayoutGroup>()).childAlignment = TextAnchor.MiddleRight;
             row.GetComponent<HorizontalOrVerticalLayoutGroup>().childForceExpandWidth = false;
-            row.GetComponent<LayoutElement>().preferredHeight = ButtonHeight + 4;
+            row.GetComponent<LayoutElement>().preferredHeight = row.GetComponent<LayoutElement>().minHeight = ButtonHeight + 4;
             return row.transform;
         }
 
@@ -512,8 +516,9 @@ namespace App.UI.Editor
             t.raycastTarget = false;
             t.text = text;
             var le = go.AddComponent<LayoutElement>();
-            if (height > 0) le.preferredHeight = height;
-            if (flexible) le.flexibleHeight = 1;
+            if (height > 0) le.preferredHeight = le.minHeight = height;
+            // A long flexible body must not squeeze the fixed rows to zero: it fills what is left (or scrolls on Quest).
+            if (flexible) { le.flexibleHeight = 1; le.preferredHeight = 1; }
             return t;
         }
 
@@ -570,8 +575,8 @@ namespace App.UI.Editor
             label.verticalOverflow = VerticalWrapMode.Overflow;
             Stretch((RectTransform)label.transform, 16);
             var le = go.GetComponent<LayoutElement>();
-            le.preferredWidth = ButtonWidth;
-            le.preferredHeight = ButtonHeight;
+            le.preferredWidth = Mathf.Max(ButtonWidth, text.Length * 21 + 64); // long labels stay on one line
+            le.preferredHeight = le.minHeight = ButtonHeight;
             return button;
         }
 
@@ -605,9 +610,9 @@ namespace App.UI.Editor
             if (layout)
             {
                 var le = go.AddComponent<LayoutElement>();
-                if (width > 0) le.preferredWidth = width;
+                if (width > 0) le.preferredWidth = le.minWidth = width;
                 else le.flexibleWidth = 1;
-                le.preferredHeight = height;
+                le.preferredHeight = le.minHeight = height;
             }
             return toggle;
         }
@@ -624,7 +629,7 @@ namespace App.UI.Editor
             g.spacing = new Vector2(14, 14);
             g.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             g.constraintCount = 4;
-            grid.GetComponent<LayoutElement>().preferredHeight = rows * 80 + (rows - 1) * 14;
+            grid.GetComponent<LayoutElement>().preferredHeight = grid.GetComponent<LayoutElement>().minHeight = rows * 80 + (rows - 1) * 14;
             return grid.transform;
         }
 
@@ -654,7 +659,9 @@ namespace App.UI.Editor
                 Stretch((RectTransform)t.transform, 20);
             }
             ((Text)field.placeholder).text = placeholder;
-            go.AddComponent<LayoutElement>().preferredHeight = 110;
+            var fieldLayout = go.AddComponent<LayoutElement>();
+            fieldLayout.preferredHeight = fieldLayout.minHeight = 110;
+            fieldLayout.flexibleWidth = 1;
             return field;
         }
 
@@ -665,7 +672,7 @@ namespace App.UI.Editor
             h.childForceExpandWidth = false;
             h.childAlignment = TextAnchor.MiddleLeft;
             h.spacing = 14;
-            row.GetComponent<LayoutElement>().preferredHeight = 100;
+            row.GetComponent<LayoutElement>().preferredHeight = row.GetComponent<LayoutElement>().minHeight = 100;
             var name = Label(row.transform, label, BodySize, 100, FontStyle.Bold, UiTheme.Text);
             name.alignment = TextAnchor.MiddleLeft;
             name.GetComponent<LayoutElement>().preferredWidth = 380;

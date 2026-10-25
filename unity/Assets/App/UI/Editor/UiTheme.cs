@@ -15,14 +15,12 @@ namespace App.UI.Editor
         public const string SpriteDir = "Assets/App/UI/Generated";
 
         public static readonly Color Card = Hex("17221E");        // panel background
-        public static readonly Color Surface = Hex("25332D");     // secondary buttons, unselected chips and numbers, inputs
+        public static readonly Color Surface = Hex("33473E");     // secondary buttons, unselected chips and numbers, inputs
         public static readonly Color Bar = Hex("0E1512");         // provenance bar and pause overlay
         public static readonly Color Text = Hex("EEF2EC");
         public static readonly Color Muted = Hex("A9B9AF");
         public static readonly Color Accent = Hex("8ED1B0");      // primary action and selection
         public static readonly Color AccentText = Hex("0E1A14");  // text on the accent
-        public static readonly Color Probe = Hex("FFD84D");       // the yellow target the instructions name
-        public static readonly Color Background = Hex("0B110E");  // camera clear colour behind the panels
 
         public const int CornerRadius = 16;                      // canvas units (about 16 mm at 0.001 m per unit)
         const int SpriteSize = 64;

@@ -102,7 +102,7 @@ public class QuestPresentationTests
         Canvas.ForceUpdateCanvases();
         var scroll = body.GetComponentInParent<ScrollRect>();
         Assert.IsFalse(body.resizeTextForBestFit);
-        Assert.AreEqual(24, body.fontSize);
+        Assert.GreaterOrEqual(body.fontSize, 30, "report text keeps a headset-readable size");
         Assert.Greater(scroll.content.rect.height, scroll.viewport.rect.height);
         var pointer = new Pointer(_module, _view.Head);
         pointer.Target = scroll.viewport.TransformPoint(scroll.viewport.rect.center);
@@ -170,15 +170,37 @@ public class QuestPresentationTests
         _module.RegisterInteractor(pointer);
         try
         {
+            // The participant path with the ray only: instructions, number buttons and check-in steps.
+            _controller.ShowPhaseInstructions = true;
             yield return Click(pointer, Object.FindAnyObjectByType<ConsentPanel>().StartButton);
             var deadline = Time.realtimeSinceStartup + 15;
+            while (!_controller.AwaitingPhaseStart && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.IsFalse(_controller.IsCapturing, "nothing records before the instructions are confirmed");
+            var baseline = Object.FindAnyObjectByType<BaselinePanel>();
+            yield return Click(pointer, baseline.StartButton);
+            Assert.IsTrue(_controller.IsCapturing);
+            deadline = Time.realtimeSinceStartup + 15;
             while (_controller.IsCapturing && Time.realtimeSinceStartup < deadline) yield return null;
             Assert.IsFalse(_controller.IsCapturing);
-            yield return Click(pointer, Object.FindAnyObjectByType<BaselinePanel>().ContinueButton);
+            yield return Click(pointer, baseline.EyeStrain.Options[1]);
+            yield return Click(pointer, baseline.MentalFatigue.Options[2]);
+            Assert.AreEqual(2, baseline.EyeStrain.Value);
+            Assert.AreEqual(3, baseline.MentalFatigue.Value);
+            yield return Click(pointer, baseline.ContinueButton);
+            Assert.AreEqual(FlowState.LoadTask, _controller.Flow.State);
+            yield return Click(pointer, Object.FindAnyObjectByType<LoadTaskPanel>().StartButton);
             deadline = Time.realtimeSinceStartup + 15;
             while (_controller.Flow.State != FlowState.CheckIn && Time.realtimeSinceStartup < deadline) yield return null;
             Assert.AreEqual(FlowState.CheckIn, _controller.Flow.State);
-            yield return Click(pointer, Object.FindAnyObjectByType<CheckInPanel>().SubmitButton);
+            var checkIn = Object.FindAnyObjectByType<CheckInPanel>();
+            yield return Click(pointer, checkIn.EyeStrain.Options[3]);
+            yield return Click(pointer, checkIn.MentalFatigue.Options[4]);
+            yield return Click(pointer, checkIn.NextButton);
+            yield return Click(pointer, checkIn.ChipToggles[0]);
+            Assert.IsTrue(checkIn.ChipToggles[0].isOn);
+            yield return Click(pointer, checkIn.NextButton);
+            yield return Click(pointer, checkIn.SubmitButton);
+            Assert.AreEqual(4, _controller.Flow.Context.PostTaskReport.EyeStrain);
             var summary = Object.FindAnyObjectByType<SummaryPanel>();
             var finish = summary.GetComponentsInChildren<Button>().Single(b => b.GetComponentInChildren<Text>().text == "Finish with report");
             yield return Click(pointer, finish);
@@ -322,7 +344,7 @@ public class QuestPresentationTests
         Assert.IsNull(provider.AggregateDiagnostics);
     }
 
-    static IEnumerator Click(Pointer pointer, Button button)
+    static IEnumerator Click(Pointer pointer, Selectable button)
     {
         Canvas.ForceUpdateCanvases();
         pointer.Target = button.transform.TransformPoint(((RectTransform)button.transform).rect.center);

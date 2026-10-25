@@ -602,6 +602,7 @@ namespace App.UI
             PendingPhaseSeconds = seconds / Mathf.Max(0.01f, PhaseSpeed);
             if (ShowPhaseInstructions) _pendingPhase = () => BeginCapture(recording, seconds, probePrefix, loaded);
             else BeginCapture(recording, seconds, probePrefix, loaded);
+            RefreshVisible(); // the phase panel was shown before the instructions were armed
         }
 
         void BeginCapture(PhaseRecording recording, float seconds, string probePrefix, bool loaded)
