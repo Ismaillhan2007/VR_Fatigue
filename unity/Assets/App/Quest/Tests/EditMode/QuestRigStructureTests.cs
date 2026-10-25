@@ -30,6 +30,7 @@ public class QuestRigStructureTests
             Assert.AreEqual(2, rays.Length);
             Assert.AreEqual("<XRController>{LeftHand}/triggerPressed", rays[0].uiPressInput.inputActionPerformed.bindings[0].path);
             Assert.AreEqual("<XRController>{RightHand}/triggerPressed", rays[1].uiPressInput.inputActionPerformed.bindings[0].path);
+            Assert.AreEqual("<XRController>{RightHand}/{TriggerButton}", rays[1].uiPressInput.inputActionPerformed.bindings[1].path);
             foreach (var ray in rays)
             {
                 Assert.AreEqual(XRInputButtonReader.InputSourceMode.InputAction, ray.uiPressInput.inputSourceMode);
