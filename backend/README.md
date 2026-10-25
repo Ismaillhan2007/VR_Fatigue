@@ -12,6 +12,8 @@ report + forest scene        <-   validated AnalysisResponse     <-  structured 
 
 The backend is offline by default. It returns a deterministic explanation and scene configuration immediately, so Unity integration can start without an API key or a headset. An optional Gemini adapter can select approved explanation codes and scene settings from synthetic input. The server renders the explanation from vetted text rather than accepting unrestricted medical prose.
 
+For cross-network HTTPS staging, hosted-mode safeguards, the Docker build and success criteria, see [issue 15 hosting runbook](../docs/ISSUE_15_HOSTING.md). The hosted image requires a backend token and currently accepts declared synthetic eye input only; local mode retains the existing offline development behavior. A hosted backend still requires internet.
+
 ## Run locally
 
 Prerequisites: Python 3.12 (pinned in the root `.python-version`) and [uv](https://docs.astral.sh/uv/). From the repository root:
