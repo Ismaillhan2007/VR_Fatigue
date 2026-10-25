@@ -25,6 +25,45 @@ namespace App.Tests
     public class BackendRuntimeTests
     {
         [UnityTest]
+        public IEnumerator ProvisionedDefaultsFillTheUiAndRestoreAcrossExitWithoutCloudConsent()
+        {
+            using (var receiver = new Receiver())
+            {
+                var path = System.IO.Path.GetTempFileName();
+                try
+                {
+                    File.WriteAllText(path, "{\"backend_url\":\"" + receiver.Url + "\",\"backend_token\":\"invented-provisioned-token\",\"local_development\":true}");
+                    yield return SceneManager.LoadSceneAsync("Assessment");
+                    var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+                    Assert.IsTrue(c.LoadOperatorBackendDefaults(path));
+                    var consent = c.Panels.OfType<ConsentPanel>().First();
+                    Assert.AreEqual(receiver.Url, consent.BackendUrl.text);
+                    Assert.AreEqual("invented-provisioned-token", c.BackendToken);
+                    Assert.IsTrue(consent.LocalDevelopment.isOn);
+                    Assert.IsFalse(consent.AllowUpload.isOn);
+                    Assert.IsFalse(c.AllowBackendUpload);
+                    c.CheckBackendConnection();
+                    yield return WaitFor(() => !c.BackendCheckInProgress);
+                    StringAssert.Contains("Connected: analyze/auth/contract accepted", c.BackendConnectionStatus);
+                    c.Exit(); Assert.IsEmpty(c.BackendToken);
+                    c.Restart();
+                    Assert.AreEqual("invented-provisioned-token", c.BackendToken);
+                    Assert.IsTrue(consent.LocalDevelopment.isOn);
+                    c.Flow.AcceptConsent(DataSource.Synthetic, null, new Capabilities(), "invented provision test");
+                    c.Flow.CompleteBaseline(new SelfReport { Phase = ReportPhase.Baseline, EyeStrain = 2, MentalFatigue = 2 });
+                    c.Flow.CompleteLoadTask();
+                    Assert.IsFalse(c.Panels.OfType<CheckInPanel>().First().CloudExplanation.isOn);
+                    c.Exit();
+                    File.Delete(path);
+                    c.Restart();
+                    Assert.IsEmpty(c.BackendToken);
+                    c.Exit();
+                }
+                finally { File.Delete(path); }
+            }
+        }
+
+        [UnityTest]
         public IEnumerator NewSessionRetainsOperatorConnectionButNeverParticipantConsentAndExitClearsToken()
         {
             yield return SceneManager.LoadSceneAsync("Assessment");

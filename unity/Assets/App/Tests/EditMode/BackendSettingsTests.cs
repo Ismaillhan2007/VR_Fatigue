@@ -1,12 +1,45 @@
 using App.Core.Analysis;
 using App.Core.Contracts;
 using App.Reports;
+using System.IO;
 using NUnit.Framework;
 
 namespace App.Tests
 {
     public class BackendSettingsTests
     {
+        [Test]
+        public void PrivateOperatorSetupLoadsConnectionWithoutGrantingParticipantConsent()
+        {
+            var path = Path.GetTempFileName();
+            try
+            {
+                File.WriteAllText(path, "{\"backend_url\":\"http://100.64.127.140:8147\",\"backend_token\":\"invented-defaults-token\",\"local_development\":true}");
+                Assert.IsTrue(OperatorBackendDefaults.TryLoad(path, out var settings, out var status));
+                Assert.AreEqual("http://100.64.127.140:8147", settings.BaseUrl);
+                Assert.AreEqual("invented-defaults-token", settings.AccessToken);
+                StringAssert.DoesNotContain("invented-defaults-token", status);
+            }
+            finally { File.Delete(path); }
+        }
+
+        [TestCase("{}")]
+        [TestCase("{\"backend_url\":\"http://100.64.127.140:8147\",\"backend_token\":\"private-marker\",\"local_development\":false}")]
+        [TestCase("{\"backend_url\":\"https://example.com\",\"backend_token\":\"private-marker\",\"local_development\":true,\"cloud_consent\":true}")]
+        [TestCase("{\"backend_url\":\"https://example.com\",\"backend_token\":\"\",\"local_development\":true}")]
+        [TestCase("{\"backend_url\":\"https://example.com\",\"backend_token\":\"private-marker\",\"local_development\":\"true\"}")]
+        public void InvalidOperatorSetupCannotEchoCredentialsOrGrantCloudConsent(string json)
+        {
+            var path = Path.GetTempFileName();
+            try
+            {
+                File.WriteAllText(path, json);
+                Assert.IsFalse(OperatorBackendDefaults.TryLoad(path, out _, out var status));
+                StringAssert.DoesNotContain("private-marker", status);
+            }
+            finally { File.Delete(path); }
+        }
+
         [Test]
         public void ConsentedSummaryContractRoundTripsAndNeedsSeparateParticipantChoice()
         {

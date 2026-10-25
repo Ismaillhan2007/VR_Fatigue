@@ -1,5 +1,8 @@
 # Running consented Gemini reports on Quest
 
+For the current development demo, use [laptop-provisioned defaults](QUEST_NO_TYPING_SETUP.md)
+instead of typing a URL/token in VR. The manual settings path below remains optional.
+
 The backend owns the Google key. Quest uses a separate backend bearer token.
 Every participant explicitly chooses cloud transfer for their own session.
 Replay remains labelled synthetic, even when Gemini explains it. Select
