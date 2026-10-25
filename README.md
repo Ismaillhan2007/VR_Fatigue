@@ -141,3 +141,5 @@ Keep machine-specific URLs and tokens out of committed scenes/prefabs. A develop
 Read [AGENTS.md](AGENTS.md) (short rules for people and coding agents) and [CONTRIBUTING.md](CONTRIBUTING.md) (branches, ownership, how to avoid conflicts, checks before a PR). Feature branches start from `dev` and go back into `dev` by PR with a merge commit; `main` is the demo-ready snapshot.
 
 The prototype is experimental and does not provide medical diagnosis or validated fatigue detection.
+
+- [Runtime desktop/Quest backend settings and transfer consent](docs/ISSUE_20_RUNTIME_SETTINGS.md)

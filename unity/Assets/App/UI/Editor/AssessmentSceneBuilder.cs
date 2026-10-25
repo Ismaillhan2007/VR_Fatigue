@@ -29,17 +29,7 @@ namespace App.UI.Editor
         [MenuItem("App/Build Assessment Scene")]
         public static void BuildAll()
         {
-            _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            _res = new DefaultControls.Resources
-            {
-                standard = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd"),
-                background = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Background.psd"),
-                inputField = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/InputFieldBackground.psd"),
-                knob = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd"),
-                checkmark = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Checkmark.psd"),
-                dropdown = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/DropdownArrow.psd"),
-                mask = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UIMask.psd"),
-            };
+            InitializeWidgets();
             Directory.CreateDirectory(PrefabDir);
             Directory.CreateDirectory(Path.GetDirectoryName(ScenePath));
 
@@ -56,6 +46,42 @@ namespace App.UI.Editor
             Debug.Log("[AssessmentSceneBuilder] prefabs and Assessment scene written");
         }
 
+        static void InitializeWidgets()
+        {
+            _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            _res = new DefaultControls.Resources
+            {
+                standard = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd"),
+                background = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Background.psd"),
+                inputField = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/InputFieldBackground.psd"),
+                knob = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd"),
+                checkmark = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Checkmark.psd"),
+                dropdown = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/DropdownArrow.psd"),
+                mask = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UIMask.psd"),
+            };
+        }
+
+        [MenuItem("App/Update Backend Settings UI")]
+        public static void BuildBackendSettings()
+        {
+            InitializeWidgets();
+            var prefab = Save(Consent());
+            var scene = EditorSceneManager.OpenScene(ScenePath);
+            var controller = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+            var old = controller.Panels.OfType<ConsentPanel>().Single();
+            var parent = old.transform.parent;
+            var sibling = old.transform.GetSiblingIndex();
+            var index = controller.Panels.IndexOf(old);
+            UnityEngine.Object.DestroyImmediate(old.gameObject);
+            var replacement = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
+            replacement.transform.SetSiblingIndex(sibling);
+            controller.Panels[index] = replacement.GetComponent<ConsentPanel>();
+            EditorUtility.SetDirty(controller);
+            EditorSceneManager.SaveScene(scene);
+            AssetDatabase.SaveAssets();
+            Debug.Log("[AssessmentSceneBuilder] backend settings UI updated; other panels preserved");
+        }
+
         // ----- panels -----
 
         static GameObject Consent()
@@ -64,7 +90,38 @@ namespace App.UI.Editor
             var p = root.AddComponent<ConsentPanel>();
             Label(root.transform, "Welcome", 30, 44);
             p.Body = Label(root.transform, "", 20, flexible: true);
-            p.StartButton = MakeButton(ButtonRow(root.transform), "I agree, start");
+            var row = ButtonRow(root.transform);
+            p.OpenSettingsButton = MakeButton(row, "Optional backend settings");
+            p.StartButton = MakeButton(row, "I agree, start");
+
+            var settings = PanelRoot("BackendSettings", Vector2.zero, Vector2.one);
+            settings.transform.SetParent(root.transform, false);
+            settings.AddComponent<LayoutElement>().ignoreLayout = true;
+            settings.GetComponent<Image>().color = new Color(0.12f, 0.16f, 0.2f, 1);
+            p.SettingsRoot = settings;
+            Label(settings.transform, "Optional backend (session only)", 26, 38);
+            Label(settings.transform, "Use HTTPS. The team demo token stays in memory and clears on Exit / New session. "
+                + "Checking sends only an invented test request. Upload permission below is separate from eye capture and Gemini.", 18, 72);
+            p.BackendUrl = MakeInput(settings.transform, "HTTPS backend origin");
+            p.BackendUrl.gameObject.name = "BackendUrl";
+            p.BackendUrl.lineType = InputField.LineType.SingleLine;
+            p.BackendUrl.characterLimit = 2048;
+            p.BackendUrl.GetComponent<LayoutElement>().preferredHeight = 44;
+            p.BackendToken = MakeInput(settings.transform, "Team demo token");
+            p.BackendToken.gameObject.name = "BackendToken";
+            p.BackendToken.lineType = InputField.LineType.SingleLine;
+            p.BackendToken.contentType = InputField.ContentType.Password;
+            p.BackendToken.characterLimit = 4096;
+            p.BackendToken.shouldHideMobileInput = true;
+            p.BackendToken.GetComponent<LayoutElement>().preferredHeight = 44;
+            p.LocalDevelopment = MakeToggle(settings.transform, "Local development: allow loopback / private LAN HTTP");
+            p.InventedDemo = MakeToggle(settings.transform, "This entire session uses invented eye data AND invented check-ins");
+            p.AllowUpload = MakeToggle(settings.transform, "Allow this session's invented aggregates and ratings to reach this server");
+            p.ConnectionStatus = Label(settings.transform, "", 18, flexible: true);
+            var buttons = ButtonRow(settings.transform);
+            p.CheckConnectionButton = MakeButton(buttons, "Check with invented data");
+            p.SaveSettingsButton = MakeButton(buttons, "Save and back");
+            settings.SetActive(false);
             return root;
         }
 

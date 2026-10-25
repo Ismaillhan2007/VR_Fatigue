@@ -42,8 +42,89 @@ namespace App.UI
 
         [Header("Analysis")]
         public AnalysisMode Analysis = AnalysisMode.Http;
-        [Tooltip("Override at runtime with the command-line argument -backendUrl http://<laptop-ip>:8000")]
+        [Tooltip("Non-secret default only. Runtime backend settings override it; local HTTP requires explicit development mode.")]
         public string BackendBaseUrl = HttpAnalysisClient.DefaultBaseUrl;
+
+        // Properties cannot be serialised into a Unity scene/prefab. Token and transfer flags live in memory only.
+        public string BackendToken { get; private set; } = "";
+        public bool BackendLocalDevelopment { get; private set; }
+        public bool InventedDemoSession { get; private set; }
+        public bool AllowBackendUpload { get; private set; }
+        public string BackendConnectionStatus { get; private set; } = "On-device report available. Backend has not been checked.";
+        public bool BackendCheckInProgress { get; private set; }
+
+        public void ConfigureBackend(string url, string token, bool localDevelopment, bool invented, bool allowUpload)
+        {
+            if (Flow.State != FlowState.Consent) throw new InvalidOperationException("Configure backend before capture");
+            if (ReplayLoading) throw new InvalidOperationException("Wait for replay loading before configuring backend");
+            if (url == BackendBaseUrl && (token ?? "") == BackendToken && localDevelopment == BackendLocalDevelopment
+                && invented == InventedDemoSession && allowUpload == AllowBackendUpload) return;
+            CancelBackendCheck();
+            BackendBaseUrl = url;
+            BackendToken = token ?? "";
+            BackendLocalDevelopment = localDevelopment;
+            InventedDemoSession = invented;
+            AllowBackendUpload = allowUpload;
+            BackendConnectionStatus = BackendSettings.TryCreate(url, token, localDevelopment, out _, out var error)
+                ? "Settings applied in memory. Check the backend using invented data." : error;
+        }
+
+        public async void CheckBackendConnection()
+        {
+            if (Flow.State != FlowState.Consent || BackendCheckInProgress) return;
+            if (!BackendSettings.TryCreate(BackendBaseUrl, BackendToken, BackendLocalDevelopment, out var settings, out var error))
+            { BackendConnectionStatus = error; RefreshVisible(); return; }
+            if (ReplayLoading) return;
+            var revision = ++_backendRevision;
+            var check = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
+            _backendCheck = check;
+            BackendCheckInProgress = true;
+            BackendConnectionStatus = "Checking authentication and analyze contract using invented data...";
+            RefreshVisible();
+            try
+            {
+                var request = ContractJson.Parse<AnalyzeRequest>(Resources.Load<TextAsset>("backend-connection-probe").text);
+                request.SessionSummary.SessionId = Guid.NewGuid().ToString();
+                request.CloudPolicy = CloudPolicy.LocalOnly;
+                var client = new HttpAnalysisClient(settings.BaseUrl, settings.AccessToken);
+                var result = await client.AnalyzeAsync(request, check.Token);
+                if (this == null || revision != _backendRevision || Flow.State != FlowState.Consent) return;
+                BackendConnectionStatus = client.BackendResponseAccepted
+                    ? "Connected: analyze/auth/contract accepted. Explanation: " + result.Response.AiSource.ToString().ToLowerInvariant()
+                        + (result.FallbackReason == null ? "." : " (" + result.FallbackReason + ").")
+                    : "Connection check failed: " + result.FallbackReason + ". On-device report remains available.";
+            }
+            catch (Exception)
+            {
+                if (this != null && revision == _backendRevision) BackendConnectionStatus = "Connection check unavailable. On-device report remains available.";
+            }
+            finally
+            {
+                if (ReferenceEquals(_backendCheck, check)) _backendCheck = null;
+                check.Dispose();
+                if (this != null && revision == _backendRevision) { BackendCheckInProgress = false; RefreshVisible(); }
+            }
+        }
+
+        void ClearBackendSession()
+        {
+            CancelBackendCheck();
+            BackendToken = "";
+            InventedDemoSession = AllowBackendUpload = BackendCheckInProgress = false;
+            BackendConnectionStatus = "Backend token and upload permission cleared. On-device report available.";
+            foreach (var panel in Panels) if (panel is ConsentPanel consent && consent != null) consent.ClearCredentials();
+        }
+
+        void CancelBackendCheck()
+        {
+            _backendRevision++;
+            _backendCheck?.Cancel();
+            _backendCheck = null;
+            BackendCheckInProgress = false;
+        }
+
+        int _backendRevision;
+        CancellationTokenSource _backendCheck;
 
         [Header("Durations in replay/eye-data seconds (demo_session.json: 130 s baseline + 60 s task)")]
         public float BaselineSeconds = 130;
@@ -97,7 +178,11 @@ namespace App.UI
 
         void Awake()
         {
-            BackendBaseUrl = CommandLineValue("-backendUrl") ?? BackendBaseUrl;
+            var desktop = !Application.isMobilePlatform;
+            BackendBaseUrl = BackendSettings.InitialUrl(BackendBaseUrl,
+                desktop ? Environment.GetEnvironmentVariable("VR_BACKEND_URL") : null,
+                desktop ? CommandLineValue("-backendUrl") : null, desktop);
+            BackendToken = desktop ? Environment.GetEnvironmentVariable("VR_BACKEND_ACCESS_TOKEN") ?? "" : "";
             Flow = new SessionFlow();
             Flow.StateChanged += (_, __) => ShowCurrent();
             Flow.PauseChanged += paused =>
@@ -115,7 +200,9 @@ namespace App.UI
         void OnDestroy()
         {
             ClearReplayLoad();
+            ClearBackendSession();
             _cts.Cancel();
+            _cts.Dispose();
             _provider?.Stop();
         }
 
@@ -144,6 +231,7 @@ namespace App.UI
         public void AcceptConsent()
         {
             if (ReplayLoading || Flow.State != FlowState.Consent || Flow.IsPaused) return;
+            CancelBackendCheck();
             var path = ResolveReplayPath(ReplayCsvPath);
             if (EyeSource == EyeSourceMode.Replay && ReplayAssetLoader.IsAssetUrl(path))
             {
@@ -306,6 +394,7 @@ namespace App.UI
         public void Exit()
         {
             ClearReplayLoad();
+            ClearBackendSession();
             MetricsFailureMessage = null;
             _cts.Cancel();
             _cts.Dispose();
@@ -326,6 +415,7 @@ namespace App.UI
             if (Flow.State != FlowState.Done && Flow.State != FlowState.Exited)
                 throw new InvalidOperationException("finish or exit before restarting");
             ClearReplayLoad();
+            ClearBackendSession();
             _cts.Cancel();
             _cts.Dispose();
             _cts = new CancellationTokenSource();
@@ -430,8 +520,8 @@ namespace App.UI
             switch (Analysis)
             {
                 case AnalysisMode.Mock: return new MockAnalysisClient();
-                // The optional backend token comes only from the VR_BACKEND_ACCESS_TOKEN environment variable.
-                case AnalysisMode.Http: return new HttpAnalysisClient(BackendBaseUrl);
+                case AnalysisMode.Http: return new ConfiguredBackendClient(BackendBaseUrl, BackendToken,
+                    BackendLocalDevelopment, InventedDemoSession, AllowBackendUpload);
                 default: return new LocalAnalysisClient();
             }
         }

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using App.Core.Analysis;
 using App.Core.Contracts;
 using UnityEngine;
+using Newtonsoft.Json;
 using UnityEngine.Networking;
 
 namespace App.Reports
@@ -25,15 +26,19 @@ namespace App.Reports
         public HttpAnalysisClient(string baseUrl, string accessToken = null)
         {
             _baseUrl = string.IsNullOrWhiteSpace(baseUrl) ? DefaultBaseUrl : baseUrl.TrimEnd('/');
-            _accessToken = accessToken ?? Environment.GetEnvironmentVariable("VR_BACKEND_ACCESS_TOKEN");
+            _accessToken = accessToken ?? "";
         }
 
-        public string Name => "backend " + _baseUrl;
+        public bool BackendResponseAccepted { get; private set; }
+
+        public string Name => "backend HTTP";
 
         public async Task<AnalysisResult> AnalyzeAsync(AnalyzeRequest request, CancellationToken cancellationToken)
         {
+            BackendResponseAccepted = false;
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 using (var web = CreateRequest(request))
                 using (cancellationToken.Register(web.Abort))
                 {
@@ -46,6 +51,7 @@ namespace App.Reports
                             : "backend connection failed or timed out");
                     var response = ContractJson.Parse<AnalysisResponse>(web.downloadHandler.text);
                     response = AnalysisResponseGuard.Accept(request, response);
+                    BackendResponseAccepted = true;
                     return new AnalysisResult
                     {
                         Response = response,
@@ -57,6 +63,10 @@ namespace App.Reports
             catch (OperationCanceledException)
             {
                 return Fallback(request, "request cancelled");
+            }
+            catch (JsonException)
+            {
+                return Fallback(request, "backend response rejected");
             }
             catch (ContractException)
             {
@@ -81,6 +91,7 @@ namespace App.Reports
             web.SetRequestHeader("Accept", "application/json");
             if (!string.IsNullOrEmpty(_accessToken)) web.SetRequestHeader("Authorization", "Bearer " + _accessToken);
             web.timeout = TimeoutSeconds;
+            web.redirectLimit = 0; // Never forward the bearer token or summary to a redirect destination.
             return web;
         }
 
@@ -100,7 +111,7 @@ namespace App.Reports
             switch (code)
             {
                 case "local_only": return "cloud use disabled for this check-in";
-                case "non_synthetic_input": return "participant eye data stays local";
+                case "non_synthetic_input": return "participant eye data not sent to Gemini";
                 case "safety_stop": return "session stopped for comfort";
                 case "insufficient_data": return "insufficient comparable measurements";
                 case "gemini_disabled": return "Gemini disabled";
