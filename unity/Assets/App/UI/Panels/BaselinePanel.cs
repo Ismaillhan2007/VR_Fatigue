@@ -34,11 +34,13 @@ namespace App.UI.Panels
         public override void Refresh()
         {
             var capturing = Controller.IsCapturing;
-            RatingGroup.SetActive(!capturing);
-            SkipButton.gameObject.SetActive(capturing);
-            ContinueButton.gameObject.SetActive(!capturing);
-            Status.text = capturing
-                ? $"Baseline: follow the yellow target with your eyes.\n{Controller.PhaseRemainingSeconds:0} s left ({Controller.SampleCount} samples, {Controller.ProbeCount} targets, {Controller.EyeSourceDescription})"
+            RatingGroup.SetActive(!capturing && !Controller.NativeDiagnostic);
+            SkipButton.gameObject.SetActive(capturing && Controller.EyeSource != App.Capture.EyeSourceMode.Hardware);
+            ContinueButton.gameObject.SetActive(!capturing && !Controller.NativeDiagnostic);
+            Status.text = Controller.NativeDiagnosticComplete
+                ? "60-second native diagnostic completed. Aggregate diagnostics are available locally. Start a new session for the full assessment; this diagnostic is not an eligible baseline.\n\n" + Controller.NativeDiagnosticSummary
+                : capturing
+                ? $"{(Controller.NativeDiagnostic ? "Diagnostic" : "Baseline")}: follow the yellow target with your eyes.\n{Controller.PhaseRemainingSeconds:0} s left ({Controller.SampleCount} samples, {Controller.ProbeCount} targets, {Controller.EyeSourceDescription})"
                 : "Baseline done. How do you feel right now?";
         }
     }

@@ -17,6 +17,7 @@ namespace App.UI.Panels
         void Awake() => StartButton.onClick.AddListener(() => Controller.AcceptConsent());
 
         public override void OnShow() => Refresh();
+        void Update() { if (Controller != null && Controller.EyeSource == App.Capture.EyeSourceMode.Hardware) Refresh(); }
 
         public override void Refresh()
         {
@@ -26,7 +27,8 @@ namespace App.UI.Panels
             + "We record eye-movement aggregates for this session only. Nothing leaves this computer except a summary "
             + "without your free text (and only if a backend is configured). Your report stays in memory until Exit or New session.\n\n"
             + $"Eye data source: {Controller.EyeSourceDescription}\n\nYou can pause or exit at any time."
-            + (Controller.ReplayLoadStatus == null ? "" : "\n\n" + Controller.ReplayLoadStatus);
+            + (Controller.ReplayLoadStatus == null ? "" : "\n\n" + Controller.ReplayLoadStatus)
+            + (Controller.EyeSource == App.Capture.EyeSourceMode.Hardware ? "\n\n" + Controller.HardwareReadinessText : "");
         }
     }
 }

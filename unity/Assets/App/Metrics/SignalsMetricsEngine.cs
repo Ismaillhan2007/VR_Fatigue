@@ -150,7 +150,17 @@ namespace App.Metrics
             foreach (var p in r.Probes)
             {
                 var target = new Sig.Direction3(p.TargetDirection.X, p.TargetDirection.Y, p.TargetDirection.Z);
-                long onset = clock.Us(p.OnsetTime, endUs, r.SensorClockRate), hold = clock.Us(p.HoldStartTime, endUs, r.SensorClockRate), end = clock.Us(p.EndTime, endUs, r.SensorClockRate);
+                long onset, hold, end;
+                if (p.SensorOnsetTime.HasValue || p.SensorHoldStartTime.HasValue || p.SensorEndTime.HasValue)
+                {
+                    // Native events never use receipt-time interpolation, especially across lost gaze frames.
+                    if (!p.SensorOnsetTime.HasValue || !p.SensorHoldStartTime.HasValue || !p.SensorEndTime.HasValue) continue;
+                    onset = clock.NativeUs(p.SensorOnsetTime.Value, endUs);
+                    hold = clock.NativeUs(p.SensorHoldStartTime.Value, endUs);
+                    end = clock.NativeUs(p.SensorEndTime.Value, endUs);
+                }
+                else
+                { onset = clock.Us(p.OnsetTime, endUs, r.SensorClockRate); hold = clock.Us(p.HoldStartTime, endUs, r.SensorClockRate); end = clock.Us(p.EndTime, endUs, r.SensorClockRate); }
                 if (!(onset < hold && hold < end)) continue; // clipped at the session edge: not an evaluable trial
                 var id = string.IsNullOrEmpty(p.TrialId) ? $"t{onset}" : p.TrialId;
                 yield return new Sig.ProbeEvent(onset, id, "target_onset", target);
@@ -173,6 +183,12 @@ namespace App.Metrics
                 _frame = ordered.Select(s => s.FrameTime).ToArray();
                 _sensor = ordered.Select(s => s.SensorTimestamp).ToArray();
                 _origin = origin;
+            }
+
+            public long NativeUs(double time, long endUs)
+            {
+                if (!Finite(time)) throw new ArgumentException("Nonfinite native probe time");
+                return Math.Max(0, Math.Min(endUs, (long)Math.Round((time - _origin) * 1e6)));
             }
 
             public long Us(double frameTime, long endUs, double rate)
@@ -229,7 +245,9 @@ namespace App.Metrics
                 ValidDurationMs = validMs,
                 GapDurationMs = durationMs - validMs,
                 MaxGapMs = (long)Math.Round(q.LongestGapUs / 1000.0),
-                RepeatedSampleFraction = q.InputSamples == 0 ? 0 : Math.Round((double)q.DuplicateTimestamps / q.InputSamples, 4),
+                RepeatedSampleFraction = c.ObservedRepeatedFraction.HasValue
+                    ? Math.Round(Math.Max(0, Math.Min(1, c.ObservedRepeatedFraction.Value)), 4)
+                    : q.InputSamples == 0 ? 0 : Math.Round((double)q.DuplicateTimestamps / q.InputSamples, 4),
                 MedianDtMs = deltas.Count == 0 ? (double?)null : Math.Round(deltas[deltas.Count / 2], 3),
                 Unavailable = unavailable.GroupBy(u => u.Signal).Select(g => g.First()).Take(8).ToList(),
                 PolicyVersion = q.Policy.Version,

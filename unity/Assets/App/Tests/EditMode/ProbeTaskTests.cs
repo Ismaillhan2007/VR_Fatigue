@@ -156,6 +156,45 @@ namespace App.Tests
         }
 
         [Test]
+        public void NativeProbeTimesAreIndependentOfDelayedFrameReceiptAndMissingGaze()
+        {
+            var (baseline, task, ctx) = Stream(130, 60, .25, drop: t => t >= 149.9 && t < 150.1);
+            var expected = new SignalsMetricsEngine().Compute(task, baseline, ctx);
+            foreach (var phase in new[] { baseline.Recording, task })
+            {
+                for (int i = 0; i < phase.Probes.Count; i++)
+                {
+                    var trial = phase.Probes[i];
+                    trial.SensorOnsetTime = trial.OnsetTime;
+                    trial.SensorHoldStartTime = trial.HoldStartTime;
+                    trial.SensorEndTime = trial.EndTime;
+                    // Wall-clock values deliberately differ from acquisition time and cannot rescue these probes.
+                    trial.OnsetTime += 500; trial.HoldStartTime += 500; trial.EndTime += 500;
+                    phase.Probes[i] = trial;
+                }
+                for (int i = 0; i < phase.Samples.Count; i++)
+                { var row = phase.Samples[i]; row.FrameTime += 100 + (i % 2) * .2; phase.Samples[i] = row; }
+            }
+            var actual = new SignalsMetricsEngine().Compute(task, baseline, ctx);
+            Assert.AreEqual(expected.Metrics.ProbeLatencyMs, actual.Metrics.ProbeLatencyMs);
+            Assert.AreEqual(expected.Metrics.ProbeMissFraction, actual.Metrics.ProbeMissFraction);
+            Assert.AreEqual(expected.Baseline.Windows, actual.Baseline.Windows);
+            Assert.AreEqual(expected.Quality.MaxGapMs, actual.Quality.MaxGapMs);
+            Assert.IsNotNull(actual.Metrics.ProbeLatencyMs);
+        }
+
+        [Test]
+        public void PartiallyStampedNativeTrialsNeverFallBackToScheduledFrameEvents()
+        {
+            var (baseline, task, ctx) = Stream(130, 60, .25);
+            for (int i = 0; i < task.Probes.Count; i++)
+            { var trial = task.Probes[i]; trial.SensorOnsetTime = trial.OnsetTime; task.Probes[i] = trial; }
+            var summary = new SignalsMetricsEngine().Compute(task, baseline, ctx);
+            Assert.IsNull(summary.Metrics.ProbeLatencyMs);
+            Assert.AreEqual(StrainLevel.Unavailable, summary.StrainIndicator.Level);
+        }
+
+        [Test]
         public void StallWithValidFlagsIsTreatedAsAGap()
         {
             var (baseline, task, ctx) = Stream(130, 60, 0.25, drop: t => t >= 150 && t < 150.9);

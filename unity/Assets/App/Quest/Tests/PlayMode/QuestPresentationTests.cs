@@ -235,6 +235,46 @@ public class QuestPresentationTests
         }
     }
 
+    [UnityTest]
+    public IEnumerator NativeSetupControlsReachConsentAndUnavailableHardwareDoesNotBecomeReplay()
+    {
+        var setup = new GameObject("Native setup controls").AddComponent<QuestEyeSetupPanel>();
+        setup.Configure(_controller);
+        var consent = Object.FindAnyObjectByType<ConsentPanel>();
+        var buttons = consent.GetComponentsInChildren<Button>();
+        buttons.Single(b => b.name == "Use native eyes").onClick.Invoke();
+        Assert.AreEqual(EyeSourceMode.Hardware, _controller.EyeSource);
+        var original = EyeProviderFactory.HardwareFactory;
+        EyeProviderFactory.HardwareFactory = null; // No physical headset in this test.
+        try
+        {
+            buttons.Single(b => b.name == "I consent: request eye permission").onClick.Invoke();
+            consent.StartButton.onClick.Invoke();
+            Assert.AreEqual(FlowState.Consent, _controller.Flow.State);
+            Assert.IsNull(_controller.Flow.Context.DataSource);
+            StringAssert.Contains("Grant eye permission", _controller.HardwareSetupStatus);
+            buttons.Single(b => b.name == "Use replay").onClick.Invoke();
+            Assert.AreEqual(EyeSourceMode.Replay, _controller.EyeSource);
+            Assert.IsFalse(_controller.HardwareCalibrationConfirmed);
+        }
+        finally { EyeProviderFactory.HardwareFactory = original; Object.Destroy(setup.gameObject); }
+        yield return null;
+    }
+
+    [UnityTest]
+    public IEnumerator ProductionNativeFactoryIsUnavailableInEditorAndReleasesItsOwner()
+    {
+        var provider = QuestNativeEyeFactory.Create();
+        Assert.AreEqual(DataSource.Live, provider.DataSource, "declared production source, not successful live acquisition");
+        Assert.IsFalse(provider.Capabilities.GazePose, "capability is not claimed until Start succeeds");
+        Assert.IsFalse(provider.RequestPermissionAfterConsent());
+        provider.ConfirmCalibration(true);
+        Assert.Throws<System.InvalidOperationException>(() => provider.Start(0));
+        Assert.IsFalse(provider.IsRunning);
+        provider.Dispose(); yield return null;
+        Assert.IsNull(provider.AggregateDiagnostics);
+    }
+
     static IEnumerator Click(Pointer pointer, Button button)
     {
         Canvas.ForceUpdateCanvases();

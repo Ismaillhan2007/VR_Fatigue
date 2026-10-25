@@ -21,6 +21,8 @@ namespace VRFatigue.Signals
         public string StatusReason { get; private set; }
         public string SourceErrorType { get; private set; }
         public long ElapsedUs { get { return elapsedUs; } }
+        public int FramesReceived => counters.FramesReceived;
+        public int DuplicateFrames => counters.Duplicates;
         public bool IsComplete { get { return State == "stopped" || State == "unavailable" || State == "faulted" || State == "disposed"; } }
 
         public HardwareEyeProvider(IHardwareEyeSource source, HardwareCaptureOptions options = null)
@@ -100,6 +102,15 @@ namespace VRFatigue.Signals
             }
             var events = new List<ProbeEvent>(pendingProbes); pendingProbes.Clear();
             return new EyeTrackingBatch(batch, events);
+        }
+
+        /// <summary>Current acquisition-clock time, including empty intervals; never inferred from the latest sample.</summary>
+        public bool TryGetCaptureTime(out long timestampUs)
+        {
+            ThrowIfDisposed(); timestampUs = elapsedUs;
+            if (State != "running") return false;
+            try { if (!UpdateClock()) return false; timestampUs = elapsedUs; return true; }
+            catch (Exception error) { SourceFault(error); return false; }
         }
 
         public bool RecordProbe(string id, string kind, Direction3 headLocalTargetDirection)

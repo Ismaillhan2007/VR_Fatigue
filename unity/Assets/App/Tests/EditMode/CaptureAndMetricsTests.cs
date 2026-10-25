@@ -58,11 +58,10 @@ namespace App.Tests
             Assert.Throws<System.FormatException>(() => ReplayEyeProvider.Parse("time,x,y\n0,0,0"));
 
         [Test]
-        public void HardwarePlaceholderFallsBackToLabelledSynthetic()
+        public void HardwareNeverSilentlySubstitutesSynthetic()
         {
-            var p = EyeProviderFactory.CreateAndStart(EyeSourceMode.Hardware, 0, 1, null, ReplayOrigin.Recorded, out var note);
-            Assert.AreEqual(DataSource.Synthetic, p.DataSource);
-            StringAssert.Contains("synthetic", note);
+            Assert.Throws<System.InvalidOperationException>(() => EyeProviderFactory.CreateAndStart(
+                EyeSourceMode.Hardware, 0, 1, null, ReplayOrigin.Recorded, out var note));
         }
 
         static (PhaseRecording task, BaselineData baseline, MetricsContext ctx) Record(double baselineSeconds, double taskSeconds, SelfReport baselineReport)
