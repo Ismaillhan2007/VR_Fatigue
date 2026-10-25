@@ -1,0 +1,1421 @@
+{
+  "schema_version": "eye-session.v1",
+  "session_id": "bbcfeb88-d64e-5951-84c6-719acecadb35",
+  "data_source": "synthetic",
+  "replay_origin": null,
+  "coordinate_frame": "head_local",
+  "start_timestamp_us": 0,
+  "end_timestamp_us": 2000000,
+  "capabilities": {
+    "gaze": {
+      "available": true,
+      "reason": null
+    },
+    "pupil_diameter": {
+      "available": false,
+      "reason": "not_exposed_by_runtime"
+    },
+    "eyelid_openness": {
+      "available": false,
+      "reason": "not_exposed_by_runtime"
+    },
+    "confidence_informative": false
+  },
+  "samples": [
+    {
+      "timestamp_us": 0,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.0,
+          "y": 0,
+          "z": 1.0
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.0,
+          "y": 0,
+          "z": 1.0
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.0,
+          0,
+          1.0
+        ]
+      }
+    },
+    {
+      "timestamp_us": 30000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.0010471973597998385,
+          "y": 0,
+          "z": 0.9999994516886945
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.0010471973597998385,
+          "y": 0,
+          "z": 0.9999994516886945
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.00523596383141958,
+          0,
+          0.9999862922474267
+        ]
+      }
+    },
+    {
+      "timestamp_us": 100000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.003490651415223732,
+          "y": 0,
+          "z": 0.9999939076577904
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.003490651415223732,
+          "y": 0,
+          "z": 0.9999939076577904
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.01745240643728351,
+          0,
+          0.9998476951563913
+        ]
+      }
+    },
+    {
+      "timestamp_us": 140000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.0048869024540245404,
+          "y": 0,
+          "z": 0.9999880590209089
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.0048869024540245404,
+          "y": 0,
+          "z": 0.9999880590209089
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.024432178152653156,
+          0,
+          0.9997014897811831
+        ]
+      }
+    },
+    {
+      "timestamp_us": 200000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.0069812602979615525,
+          "y": 0,
+          "z": 0.9999756307053947
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.0069812602979615525,
+          "y": 0,
+          "z": 0.9999756307053947
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.03489949670250097,
+          0,
+          0.9993908270190958
+        ]
+      }
+    },
+    {
+      "timestamp_us": 230000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.008028428310396471,
+          "y": 0,
+          "z": 0.9999677716500991
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.008028428310396471,
+          "y": 0,
+          "z": 0.9999677716500991
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.04013179253255974,
+          0,
+          0.999194395114446
+        ]
+      }
+    },
+    {
+      "timestamp_us": 300000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.010471784116245792,
+          "y": 0,
+          "z": 0.9999451693655121
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.010471784116245792,
+          "y": 0,
+          "z": 0.9999451693655121
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.052335956242943835,
+          0,
+          0.9986295347545738
+        ]
+      }
+    },
+    {
+      "timestamp_us": 340000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.011867960298537237,
+          "y": 0,
+          "z": 0.9999295732792147
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.011867960298537237,
+          "y": 0,
+          "z": 0.9999295732792147
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.05930637357596163,
+          0,
+          0.9982398279237653
+        ]
+      }
+    },
+    {
+      "timestamp_us": 400000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.013962180339145272,
+          "y": 0,
+          "z": 0.9999025240093042
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.013962180339145272,
+          "y": 0,
+          "z": 0.9999025240093042
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.0697564737441253,
+          0,
+          0.9975640502598242
+        ]
+      }
+    },
+    {
+      "timestamp_us": 430000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.01500926796672368,
+          "y": 0,
+          "z": 0.9998873545930577
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.01500926796672368,
+          "y": 0,
+          "z": 0.9998873545930577
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.0749787268263277,
+          0,
+          0.9971851335251157
+        ]
+      }
+    },
+    {
+      "timestamp_us": 500000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.01745240643728351,
+          "y": 0,
+          "z": 0.9998476951563913
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.01745240643728351,
+          "y": 0,
+          "z": 0.9998476951563913
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.08715574274765817,
+          0,
+          0.9961946980917455
+        ]
+      }
+    },
+    {
+      "timestamp_us": 540000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.018848439715408175,
+          "y": 0,
+          "z": 0.999822352380809
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.018848439715408175,
+          "y": 0,
+          "z": 0.999822352380809
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.09410831331851433,
+          0,
+          0.99556196460308
+        ]
+      }
+    },
+    {
+      "timestamp_us": 600000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.020942419883356957,
+          "y": 0,
+          "z": 0.9997806834748455
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.020942419883356957,
+          "y": 0,
+          "z": 0.9997806834748455
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.10452846326765347,
+          0,
+          0.9945218953682733
+        ]
+      }
+    },
+    {
+      "timestamp_us": 630000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.021989376092505106,
+          "y": 0,
+          "z": 0.999758204436984
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.021989376092505106,
+          "y": 0,
+          "z": 0.999758204436984
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.10973431109104527,
+          0,
+          0.9939609554551797
+        ]
+      }
+    },
+    {
+      "timestamp_us": 700000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.024432178152653153,
+          "y": 0,
+          "z": 0.9997014897811831
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.024432178152653153,
+          "y": 0,
+          "z": 0.9997014897811831
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.12186934340514748,
+          0,
+          0.992546151641322
+        ]
+      }
+    },
+    {
+      "timestamp_us": 740000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.02582800048591857,
+          "y": 0,
+          "z": 0.9996664015514872
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.02582800048591857,
+          "y": 0,
+          "z": 0.9996664015514872
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.1287955965775628,
+          0,
+          0.9916711623830904
+        ]
+      }
+    },
+    {
+      "timestamp_us": 800000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.02792163872356888,
+          "y": 0,
+          "z": 0.9996101150403544
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.02792163872356888,
+          "y": 0,
+          "z": 0.9996101150403544
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.13917310096006544,
+          0,
+          0.9902680687415704
+        ]
+      }
+    },
+    {
+      "timestamp_us": 830000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.02896841248711817,
+          "y": 0,
+          "z": 0.9995803274764746
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.02896841248711817,
+          "y": 0,
+          "z": 0.9995803274764746
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.14435620100097318,
+          0,
+          0.9895257890689695
+        ]
+      }
+    },
+    {
+      "timestamp_us": 900000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.03141075907812829,
+          "y": 0,
+          "z": 0.9995065603657316
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.03141075907812829,
+          "y": 0,
+          "z": 0.9995065603657316
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.15643446504023087,
+          0,
+          0.9876883405951378
+        ]
+      }
+    },
+    {
+      "timestamp_us": 940000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.032806302436123154,
+          "y": 0,
+          "z": 0.9994617283920728
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.032806302436123154,
+          "y": 0,
+          "z": 0.9994617283920728
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.16332596224162224,
+          0,
+          0.9865721616069694
+        ]
+      }
+    },
+    {
+      "timestamp_us": 1000000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.03489949670250097,
+          "y": 0,
+          "z": 0.9993908270190958
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.03489949670250097,
+          "y": 0,
+          "z": 0.9993908270190958
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.17364817766693033,
+          0,
+          0.984807753012208
+        ]
+      }
+    },
+    {
+      "timestamp_us": 1030000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.03594603700217495,
+          "y": 0,
+          "z": 0.9993537323810014
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.03594603700217495,
+          "y": 0,
+          "z": 0.9993537323810014
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.1788022151163496,
+          0,
+          0.9838850379335417
+        ]
+      }
+    },
+    {
+      "timestamp_us": 1100000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.038387809087519945,
+          "y": 0,
+          "z": 0.9992629164106211
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.038387809087519945,
+          "y": 0,
+          "z": 0.9992629164106211
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.1908089953765448,
+          0,
+          0.981627183447664
+        ]
+      }
+    },
+    {
+      "timestamp_us": 1140000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.03978300545342978,
+          "y": 0,
+          "z": 0.9992083428780468
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.03978300545342978,
+          "y": 0,
+          "z": 0.9992083428780468
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.19765734037912613,
+          0,
+          0.9802711746217219
+        ]
+      }
+    },
+    {
+      "timestamp_us": 1200000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.04187565372919962,
+          "y": 0,
+          "z": 0.9991228300988584
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.04187565372919962,
+          "y": 0,
+          "z": 0.9991228300988584
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.20791169081775934,
+          0,
+          0.9781476007338057
+        ]
+      }
+    },
+    {
+      "timestamp_us": 1230000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.04292190955810053,
+          "y": 0,
+          "z": 0.9990784301944899
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.04292190955810053,
+          "y": 0,
+          "z": 0.9990784301944899
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.21303038627497659,
+          0,
+          0.9770455744352636
+        ]
+      }
+    },
+    {
+      "timestamp_us": 1300000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.04536298812925378,
+          "y": 0,
+          "z": 0.9989705697907147
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.04536298812925378,
+          "y": 0,
+          "z": 0.9989705697907147
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.224951054343865,
+          0,
+          0.9743700647852352
+        ]
+      }
+    },
+    {
+      "timestamp_us": 1340000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.04675776950317608,
+          "y": 0,
+          "z": 0.9989062573590616
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.04675776950317608,
+          "y": 0,
+          "z": 0.9989062573590616
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.23174790349415733,
+          0,
+          0.9727758782093966
+        ]
+      }
+    },
+    {
+      "timestamp_us": 1400000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.04884976979561326,
+          "y": 0,
+          "z": 0.9988061373414341
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.04884976979561326,
+          "y": 0,
+          "z": 0.9988061373414341
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.24192189559966773,
+          0,
+          0.9702957262759965
+        ]
+      }
+    },
+    {
+      "timestamp_us": 1430000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.04989569016070803,
+          "y": 0,
+          "z": 0.9987544343347802
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.04989569016070803,
+          "y": 0,
+          "z": 0.9987544343347802
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.24699901272274288,
+          0,
+          0.9690157314068695
+        ]
+      }
+    },
+    {
+      "timestamp_us": 1500000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.052335956242943835,
+          "y": 0,
+          "z": 0.9986295347545738
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.052335956242943835,
+          "y": 0,
+          "z": 0.9986295347545738
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.25881904510252074,
+          0,
+          0.9659258262890683
+        ]
+      }
+    },
+    {
+      "timestamp_us": 1540000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.053730254645202154,
+          "y": 0,
+          "z": 0.9985554865583393
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.053730254645202154,
+          "y": 0,
+          "z": 0.9985554865583393
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.2655561174868088,
+          0,
+          0.9640954042341101
+        ]
+      }
+    },
+    {
+      "timestamp_us": 1600000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.0558215049931638,
+          "y": 0,
+          "z": 0.998440764181981
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.0558215049931638,
+          "y": 0,
+          "z": 0.998440764181981
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.27563735581699916,
+          0,
+          0.9612616959383189
+        ]
+      }
+    },
+    {
+      "timestamp_us": 1630000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.056867038917769425,
+          "y": 0,
+          "z": 0.9983817605929732
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.056867038917769425,
+          "y": 0,
+          "z": 0.9983817605929732
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.28066670892078777,
+          0,
+          0.9598052919751869
+        ]
+      }
+    },
+    {
+      "timestamp_us": 1700000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.05930637357596162,
+          "y": 0,
+          "z": 0.9982398279237653
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.05930637357596162,
+          "y": 0,
+          "z": 0.9982398279237653
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.29237170472273677,
+          0,
+          0.9563047559630354
+        ]
+      }
+    },
+    {
+      "timestamp_us": 1740000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.06070012105041891,
+          "y": 0,
+          "z": 0.9981560475719538
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.06070012105041891,
+          "y": 0,
+          "z": 0.9981560475719538
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.29904079225608665,
+          0,
+          0.9542403285162769
+        ]
+      }
+    },
+    {
+      "timestamp_us": 1800000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.06279051952931337,
+          "y": 0,
+          "z": 0.9980267284282716
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.06279051952931337,
+          "y": 0,
+          "z": 0.9980267284282716
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.3090169943749474,
+          0,
+          0.9510565162951535
+        ]
+      }
+    },
+    {
+      "timestamp_us": 1830000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.0638356160555814,
+          "y": 0,
+          "z": 0.9979604271326616
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.0638356160555814,
+          "y": 0,
+          "z": 0.9979604271326616
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.31399245596740494,
+          0,
+          0.9494254776419039
+        ]
+      }
+    },
+    {
+      "timestamp_us": 1900000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.06627390040000014,
+          "y": 0,
+          "z": 0.99780146829205
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.06627390040000014,
+          "y": 0,
+          "z": 0.99780146829205
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.3255681544571567,
+          0,
+          0.9455185755993168
+        ]
+      }
+    },
+    {
+      "timestamp_us": 1940000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.06766702901737075,
+          "y": 0,
+          "z": 0.9977079598679978
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.06766702901737075,
+          "y": 0,
+          "z": 0.9977079598679978
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.3321611318837033,
+          0,
+          0.943222657947601
+        ]
+      }
+    },
+    {
+      "timestamp_us": 2000000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0.0697564737441253,
+          "y": 0,
+          "z": 0.9975640502598242
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0.0697564737441253,
+          "y": 0,
+          "z": 0.9975640502598242
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0.3420201433256687,
+          0,
+          0.9396926207859084
+        ]
+      }
+    }
+  ],
+  "probe_events": []
+}

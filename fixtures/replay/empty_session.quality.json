@@ -1,0 +1,51 @@
+{
+  "schema_version": "signal-quality.v1",
+  "session_id": "0a5d5231-8473-5815-8dbf-3ce758761452",
+  "data_source": "replay",
+  "replay_origin": "synthetic",
+  "duration_ms": 1000.0,
+  "policy": {
+    "version": "quality-policy.v1",
+    "maximum_gap_us": 100000,
+    "minimum_valid_duration_us": 1000000,
+    "minimum_coverage": 0.8,
+    "minimum_valid_samples": 2
+  },
+  "capabilities": {
+    "gaze": {
+      "available": true,
+      "reason": null
+    },
+    "pupil_diameter": {
+      "available": false,
+      "reason": "not_exposed_by_runtime"
+    },
+    "eyelid_openness": {
+      "available": false,
+      "reason": "not_exposed_by_runtime"
+    },
+    "confidence_informative": false
+  },
+  "quality": {
+    "status": "insufficient_data",
+    "valid_coverage": 0.0,
+    "valid_duration_ms": 0.0,
+    "gap_duration_ms": 1000.0,
+    "longest_gap_ms": 1000.0,
+    "reasons": [
+      "no_samples",
+      "too_few_valid_samples",
+      "too_short",
+      "low_coverage"
+    ],
+    "counts": {
+      "input": 0,
+      "accepted": 0,
+      "valid_gaze": 0,
+      "invalid_gaze": 0,
+      "duplicate_timestamps": 0,
+      "out_of_order_timestamps": 0,
+      "out_of_bounds_timestamps": 0
+    }
+  }
+}

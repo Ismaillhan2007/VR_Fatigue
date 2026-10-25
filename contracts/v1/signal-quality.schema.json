@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:vr-fatigue:signal-quality:v1",
+  "title": "Local signal quality result v1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "session_id", "data_source", "replay_origin", "duration_ms", "policy", "capabilities", "quality"],
+  "properties": {
+    "schema_version": {"const": "signal-quality.v1"},
+    "session_id": {"type": "string", "format": "uuid"},
+    "data_source": {"enum": ["live", "replay", "synthetic"]},
+    "replay_origin": {"enum": [null, "recorded", "synthetic"]},
+    "duration_ms": {"type": "number", "minimum": 0},
+    "capabilities": {"$ref": "urn:vr-fatigue:eye-session:v1#/$defs/capabilities"},
+    "policy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "maximum_gap_us", "minimum_valid_duration_us", "minimum_coverage", "minimum_valid_samples"],
+      "properties": {
+        "version": {"type": "string", "minLength": 1, "pattern": "\\S"},
+        "maximum_gap_us": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+        "minimum_valid_duration_us": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+        "minimum_coverage": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+        "minimum_valid_samples": {"type": "integer", "minimum": 2, "maximum": 2147483647}
+      }
+    },
+    "quality": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "valid_coverage", "valid_duration_ms", "gap_duration_ms", "longest_gap_ms", "reasons", "counts"],
+      "properties": {
+        "status": {"enum": ["usable", "insufficient_data"]},
+        "valid_coverage": {"type": "number", "minimum": 0, "maximum": 1},
+        "valid_duration_ms": {"type": "number", "minimum": 0},
+        "gap_duration_ms": {"type": "number", "minimum": 0},
+        "longest_gap_ms": {"type": "number", "minimum": 0},
+        "reasons": {
+          "type": "array", "uniqueItems": true,
+          "items": {"enum": ["gaze_unavailable", "zero_duration", "no_samples", "too_few_valid_samples", "too_short", "low_coverage"]}
+        },
+        "counts": {
+          "type": "object", "additionalProperties": false,
+          "required": ["input", "accepted", "valid_gaze", "invalid_gaze", "duplicate_timestamps", "out_of_order_timestamps", "out_of_bounds_timestamps"],
+          "properties": {
+            "input": {"$ref": "#/$defs/count"},
+            "accepted": {"$ref": "#/$defs/count"},
+            "valid_gaze": {"$ref": "#/$defs/count"},
+            "invalid_gaze": {"$ref": "#/$defs/count"},
+            "duplicate_timestamps": {"$ref": "#/$defs/count"},
+            "out_of_order_timestamps": {"$ref": "#/$defs/count"},
+            "out_of_bounds_timestamps": {"$ref": "#/$defs/count"}
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"data_source": {"const": "replay"}}},
+      "then": {"properties": {"replay_origin": {"enum": ["recorded", "synthetic"]}}},
+      "else": {"properties": {"replay_origin": {"type": "null"}}}
+    },
+    {
+      "if": {"properties": {"quality": {"properties": {"status": {"const": "usable"}}}}},
+      "then": {"properties": {"quality": {"properties": {"reasons": {"maxItems": 0}}}}},
+      "else": {"properties": {"quality": {"properties": {"reasons": {"minItems": 1}}}}}
+    }
+  ],
+  "$defs": {"count": {"type": "integer", "minimum": 0, "maximum": 2147483647}}
+}

@@ -16,6 +16,11 @@ unity/Assets/App/
   Tests/EditMode/ App.Tests.EditMode
 ```
 
+The implemented signal module is separate: `Assets/Signals/` (`VRFatigue.Signals`) and
+`Assets/QuestPro/` (`VRFatigue.QuestPro`). It provides JSON replay, real metric calculations
+and the native eye adapter. The application factories below still use their original stubs;
+bridging the two APIs is pending. See [signal/Quest handoff](QUEST_PRO_INTEGRATION.md).
+
 ## Data flow
 
 ```text

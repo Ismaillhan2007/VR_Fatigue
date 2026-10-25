@@ -1,0 +1,378 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:vr-fatigue:hardware-diagnostics:v1",
+  "title": "Local hardware capture diagnostics v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "session_id",
+    "data_source",
+    "timestamp_source",
+    "timestamp_semantics",
+    "sdk_package_version",
+    "capture_state",
+    "status_reason",
+    "source_error_type",
+    "consent_confirmed",
+    "calibration_confirmed_by_operator",
+    "duration_ms",
+    "recording_period_complete",
+    "headset_review_required",
+    "capture_policy",
+    "counts",
+    "repeated_fraction",
+    "median_dt_ms",
+    "dt_histogram",
+    "confidence",
+    "quality_report"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardware-diagnostics.v1"
+    },
+    "session_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "data_source": {
+      "enum": [
+        "live",
+        "synthetic"
+      ]
+    },
+    "timestamp_source": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "timestamp_semantics": {
+      "const": "runtime_reported_unverified"
+    },
+    "sdk_package_version": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "capture_state": {
+      "enum": [
+        "idle",
+        "running",
+        "stopped",
+        "unavailable",
+        "faulted",
+        "disposed"
+      ]
+    },
+    "status_reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_error_type": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "consent_confirmed": {
+      "type": "boolean"
+    },
+    "calibration_confirmed_by_operator": {
+      "type": "boolean"
+    },
+    "duration_ms": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 600000
+    },
+    "recording_period_complete": {
+      "type": "boolean"
+    },
+    "headset_review_required": {
+      "const": true
+    },
+    "capture_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "maximum_duration_us",
+        "maximum_samples",
+        "maximum_probe_events",
+        "head_alignment_tolerance_us"
+      ],
+      "properties": {
+        "version": {
+          "const": "hardware-capture.v1"
+        },
+        "maximum_duration_us": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600000000
+        },
+        "maximum_samples": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 200000
+        },
+        "maximum_probe_events": {
+          "type": "integer",
+          "minimum": 3,
+          "maximum": 10000
+        },
+        "head_alignment_tolerance_us": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frame_polls",
+        "frames_received",
+        "read_failures",
+        "accepted_samples",
+        "duplicate_timestamps",
+        "out_of_order_timestamps",
+        "quantized_collisions",
+        "pre_start_frames",
+        "future_frames",
+        "post_end_frames",
+        "invalid_timestamps",
+        "unaligned_head_frames",
+        "clock_resets",
+        "clock_failures",
+        "dt_count"
+      ],
+      "properties": {
+        "frame_polls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "frames_received": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "read_failures": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "accepted_samples": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "duplicate_timestamps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "out_of_order_timestamps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "quantized_collisions": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "pre_start_frames": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "future_frames": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "post_end_frames": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "invalid_timestamps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "unaligned_head_frames": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "clock_resets": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "clock_failures": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "dt_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        }
+      }
+    },
+    "repeated_fraction": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "median_dt_ms": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "exclusiveMinimum": 0
+    },
+    "dt_histogram": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "le_5_ms",
+        "gt_5_le_15_ms",
+        "gt_15_le_25_ms",
+        "gt_25_le_100_ms",
+        "gt_100_ms"
+      ],
+      "properties": {
+        "le_5_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "gt_5_le_15_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "gt_15_le_25_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "gt_25_le_100_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "gt_100_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        }
+      }
+    },
+    "confidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "used_as_filter",
+        "left",
+        "right"
+      ],
+      "properties": {
+        "used_as_filter": {
+          "const": false
+        },
+        "left": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "count",
+            "minimum",
+            "maximum",
+            "observed_variation"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483647
+            },
+            "minimum": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "maximum": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "observed_variation": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "right": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "count",
+            "minimum",
+            "maximum",
+            "observed_variation"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483647
+            },
+            "minimum": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "maximum": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "observed_variation": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        }
+      }
+    },
+    "quality_report": {
+      "$ref": "urn:vr-fatigue:signal-quality:v1"
+    }
+  }
+}

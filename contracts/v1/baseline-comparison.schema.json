@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:vr-fatigue:baseline-comparison:v1",
+  "title": "Local experimental baseline references and signed metric deviations",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "method_version", "metric_version", "session_id", "data_source", "replay_origin", "coordinate_frame", "reference_kind", "selected_eye", "baseline_policy", "quality_policy", "metric_policy", "session_quality", "baseline", "comparison"],
+  "properties": {
+    "schema_version": {"const": "baseline-comparison.v1"},
+    "method_version": {"const": "baseline-method.v1"},
+    "metric_version": {"const": "gaze-metrics.v1"},
+    "session_id": {"type": "string", "format": "uuid"},
+    "data_source": {"enum": ["live", "replay", "synthetic"]},
+    "replay_origin": {"enum": [null, "recorded", "synthetic"]},
+    "coordinate_frame": {"const": "head_local"},
+    "reference_kind": {"const": "session_start"},
+    "selected_eye": {"enum": ["left", "right"]},
+    "baseline_policy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "window_duration_us", "minimum_usable_windows", "maximum_windows_per_phase", "mad_multiplier", "z_clip", "metric_floors"],
+      "properties": {
+        "version": {"type": "string", "minLength": 1, "pattern": "\\S"},
+        "window_duration_us": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+        "minimum_usable_windows": {"type": "integer", "minimum": 6, "maximum": 1000},
+        "maximum_windows_per_phase": {"const": 1000},
+        "mad_multiplier": {"const": 1.4826},
+        "z_clip": {"type": "number", "exclusiveMinimum": 0},
+        "metric_floors": {"$ref": "#/$defs/floors"}
+      }
+    },
+    "quality_policy": {"$ref": "urn:vr-fatigue:signal-quality:v1#/properties/policy"},
+    "metric_policy": {"$ref": "urn:vr-fatigue:signal-metrics:v1#/properties/metric_policy"},
+    "session_quality": {"$ref": "urn:vr-fatigue:signal-quality:v1"},
+    "baseline": {
+      "type": "object", "additionalProperties": false,
+      "required": ["start_timestamp_us", "end_timestamp_us", "conditions_id", "self_report", "status", "low_confidence", "low_confidence_reasons", "complete_window_count", "usable_window_count", "selected_eye_valid_duration_ms", "references", "windows"],
+      "properties": {
+        "start_timestamp_us": {"$ref": "urn:vr-fatigue:eye-session:v1#/$defs/timestamp"},
+        "end_timestamp_us": {"$ref": "urn:vr-fatigue:eye-session:v1#/$defs/timestamp"},
+        "conditions_id": {"$ref": "urn:vr-fatigue:baseline-plan:v1#/$defs/conditions"},
+        "self_report": {"oneOf": [{"type": "null"}, {"$ref": "urn:vr-fatigue:baseline-plan:v1#/$defs/self_report"}]},
+        "status": {"enum": ["ready", "insufficient_data"]},
+        "low_confidence": {"type": "boolean"},
+        "low_confidence_reasons": {"type": "array", "uniqueItems": true, "items": {"enum": ["too_short", "insufficient_usable_windows", "no_reference_metrics", "self_report_missing", "self_reported_tired", "conditions_unconfirmed"]}},
+        "complete_window_count": {"$ref": "#/$defs/count"},
+        "usable_window_count": {"$ref": "#/$defs/count"},
+        "selected_eye_valid_duration_ms": {"type": "number", "minimum": 0},
+        "references": {"$ref": "#/$defs/references"},
+        "windows": {"type": "array", "maxItems": 1000, "items": {"$ref": "#/$defs/baseline_window"}}
+      }
+    },
+    "comparison": {
+      "type": "object", "additionalProperties": false,
+      "required": ["start_timestamp_us", "end_timestamp_us", "conditions_id", "status", "unavailable_reason", "windows"],
+      "properties": {
+        "start_timestamp_us": {"$ref": "urn:vr-fatigue:eye-session:v1#/$defs/timestamp"},
+        "end_timestamp_us": {"$ref": "urn:vr-fatigue:eye-session:v1#/$defs/timestamp"},
+        "conditions_id": {"$ref": "urn:vr-fatigue:baseline-plan:v1#/$defs/conditions"},
+        "status": {"enum": ["comparable", "not_comparable"]},
+        "unavailable_reason": {"$ref": "#/$defs/reason"},
+        "windows": {"type": "array", "maxItems": 1000, "items": {"$ref": "#/$defs/comparison_window"}}
+      },
+      "allOf": [{
+        "if": {"properties": {"status": {"const": "comparable"}}},
+        "then": {"properties": {"unavailable_reason": {"type": "null"}}},
+        "else": {"properties": {"unavailable_reason": {"type": "string"}}}
+      }]
+    }
+  },
+  "allOf": [{
+    "if": {"properties": {"data_source": {"const": "replay"}}},
+    "then": {"properties": {"replay_origin": {"enum": ["recorded", "synthetic"]}}},
+    "else": {"properties": {"replay_origin": {"type": "null"}}}
+  }],
+  "$defs": {
+    "count": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+    "reason": {"type": ["string", "null"], "minLength": 1, "pattern": "\\S"},
+    "reference": {
+      "type": "object", "additionalProperties": false,
+      "required": ["median", "mad", "scale", "floor", "usable_window_count", "unavailable_reason"],
+      "properties": {
+        "median": {"type": ["number", "null"], "minimum": 0},
+        "mad": {"type": ["number", "null"], "minimum": 0},
+        "scale": {"type": ["number", "null"], "exclusiveMinimum": 0},
+        "floor": {"type": "number", "exclusiveMinimum": 0},
+        "usable_window_count": {"$ref": "#/$defs/count"},
+        "unavailable_reason": {"$ref": "#/$defs/reason"}
+      },
+      "allOf": [{
+        "if": {"properties": {"median": {"type": "null"}}},
+        "then": {"properties": {"mad": {"type": "null"}, "scale": {"type": "null"}, "unavailable_reason": {"type": "string"}}},
+        "else": {"properties": {"mad": {"type": "number"}, "scale": {"type": "number"}, "unavailable_reason": {"type": "null"}}}
+      }]
+    },
+    "deviation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["value", "delta", "z_score", "clipped", "unavailable_reason"],
+      "properties": {
+        "value": {"type": ["number", "null"], "minimum": 0},
+        "delta": {"type": ["number", "null"]},
+        "z_score": {"type": ["number", "null"]},
+        "clipped": {"type": ["boolean", "null"]},
+        "unavailable_reason": {"$ref": "#/$defs/reason"}
+      },
+      "allOf": [{
+        "if": {"properties": {"z_score": {"type": "null"}}},
+        "then": {"properties": {"delta": {"type": "null"}, "clipped": {"type": "null"}, "unavailable_reason": {"type": "string"}}},
+        "else": {"properties": {"value": {"type": "number"}, "delta": {"type": "number"}, "clipped": {"type": "boolean"}, "unavailable_reason": {"type": "null"}}}
+      }]
+    },
+    "references": {
+      "type": "object", "additionalProperties": false,
+      "required": ["gaze_speed_median_deg_s", "gaze_speed_p95_deg_s", "gaze_dispersion_deg", "head_speed_deg_s", "probe_latency_ms", "probe_rms_error_deg", "probe_miss_fraction"],
+      "properties": {
+        "gaze_speed_median_deg_s": {"$ref": "#/$defs/reference"}, "gaze_speed_p95_deg_s": {"$ref": "#/$defs/reference"},
+        "gaze_dispersion_deg": {"$ref": "#/$defs/reference"}, "head_speed_deg_s": {"$ref": "#/$defs/reference"},
+        "probe_latency_ms": {"$ref": "#/$defs/reference"}, "probe_rms_error_deg": {"$ref": "#/$defs/reference"}, "probe_miss_fraction": {"$ref": "#/$defs/reference"}
+      }
+    },
+    "deviations": {
+      "type": "object", "additionalProperties": false,
+      "required": ["gaze_speed_median_deg_s", "gaze_speed_p95_deg_s", "gaze_dispersion_deg", "head_speed_deg_s", "probe_latency_ms", "probe_rms_error_deg", "probe_miss_fraction"],
+      "properties": {
+        "gaze_speed_median_deg_s": {"$ref": "#/$defs/deviation"}, "gaze_speed_p95_deg_s": {"$ref": "#/$defs/deviation"},
+        "gaze_dispersion_deg": {"$ref": "#/$defs/deviation"}, "head_speed_deg_s": {"$ref": "#/$defs/deviation"},
+        "probe_latency_ms": {"$ref": "#/$defs/deviation"}, "probe_rms_error_deg": {"$ref": "#/$defs/deviation"}, "probe_miss_fraction": {"$ref": "#/$defs/deviation"}
+      }
+    },
+    "floors": {
+      "type": "object", "additionalProperties": false,
+      "required": ["gaze_speed_median_deg_s", "gaze_speed_p95_deg_s", "gaze_dispersion_deg", "head_speed_deg_s", "probe_latency_ms", "probe_rms_error_deg", "probe_miss_fraction"],
+      "properties": {
+        "gaze_speed_median_deg_s": {"type": "number", "exclusiveMinimum": 0}, "gaze_speed_p95_deg_s": {"type": "number", "exclusiveMinimum": 0},
+        "gaze_dispersion_deg": {"type": "number", "exclusiveMinimum": 0}, "head_speed_deg_s": {"type": "number", "exclusiveMinimum": 0},
+        "probe_latency_ms": {"type": "number", "exclusiveMinimum": 0}, "probe_rms_error_deg": {"type": "number", "exclusiveMinimum": 0}, "probe_miss_fraction": {"type": "number", "exclusiveMinimum": 0}
+      }
+    },
+    "window_base": {
+      "type": "object",
+      "required": ["index", "start_timestamp_us", "end_timestamp_us", "complete", "eligible", "excluded_boundary_probe_count", "measurements"],
+      "properties": {
+        "index": {"$ref": "#/$defs/count"},
+        "start_timestamp_us": {"$ref": "urn:vr-fatigue:eye-session:v1#/$defs/timestamp"},
+        "end_timestamp_us": {"$ref": "urn:vr-fatigue:eye-session:v1#/$defs/timestamp"},
+        "complete": {"type": "boolean"}, "eligible": {"type": "boolean"},
+        "excluded_boundary_probe_count": {"$ref": "#/$defs/count"},
+        "measurements": {"$ref": "urn:vr-fatigue:signal-metrics:v1"}
+      }
+    },
+    "baseline_window": {"allOf": [{"$ref": "#/$defs/window_base"}], "unevaluatedProperties": false},
+    "comparison_window": {
+      "allOf": [{"$ref": "#/$defs/window_base"}], "unevaluatedProperties": false,
+      "required": ["deviations"], "properties": {"deviations": {"$ref": "#/$defs/deviations"}}
+    }
+  }
+}

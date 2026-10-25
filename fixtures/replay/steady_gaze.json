@@ -1,0 +1,432 @@
+{
+  "schema_version": "eye-session.v1",
+  "session_id": "7e3c75ed-2dc0-5bd5-974b-8f29a9fddd61",
+  "data_source": "synthetic",
+  "replay_origin": null,
+  "coordinate_frame": "head_local",
+  "start_timestamp_us": 0,
+  "end_timestamp_us": 1000000,
+  "capabilities": {
+    "gaze": {
+      "available": true,
+      "reason": null
+    },
+    "pupil_diameter": {
+      "available": false,
+      "reason": "not_exposed_by_runtime"
+    },
+    "eyelid_openness": {
+      "available": false,
+      "reason": "not_exposed_by_runtime"
+    },
+    "confidence_informative": false
+  },
+  "samples": [
+    {
+      "timestamp_us": 0,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0,
+          "y": 0,
+          "z": 1
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0,
+          "y": 0,
+          "z": 1
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "timestamp_us": 100000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0,
+          "y": 0,
+          "z": 1
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0,
+          "y": 0,
+          "z": 1
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "timestamp_us": 200000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0,
+          "y": 0,
+          "z": 1
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0,
+          "y": 0,
+          "z": 1
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "timestamp_us": 300000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0,
+          "y": 0,
+          "z": 1
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0,
+          "y": 0,
+          "z": 1
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "timestamp_us": 400000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0,
+          "y": 0,
+          "z": 1
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0,
+          "y": 0,
+          "z": 1
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "timestamp_us": 500000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0,
+          "y": 0,
+          "z": 1
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0,
+          "y": 0,
+          "z": 1
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "timestamp_us": 600000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0,
+          "y": 0,
+          "z": 1
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0,
+          "y": 0,
+          "z": 1
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "timestamp_us": 700000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0,
+          "y": 0,
+          "z": 1
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0,
+          "y": 0,
+          "z": 1
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "timestamp_us": 800000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0,
+          "y": 0,
+          "z": 1
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0,
+          "y": 0,
+          "z": 1
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "timestamp_us": 900000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0,
+          "y": 0,
+          "z": 1
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0,
+          "y": 0,
+          "z": 1
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "timestamp_us": 1000000,
+      "left": {
+        "valid": true,
+        "direction": {
+          "x": 0,
+          "y": 0,
+          "z": 1
+        },
+        "confidence": 0.0
+      },
+      "right": {
+        "valid": true,
+        "direction": {
+          "x": 0,
+          "y": 0,
+          "z": 1
+        },
+        "confidence": 0.0
+      },
+      "head_pose": {
+        "position_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation_xyzw": [
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    }
+  ],
+  "probe_events": [
+    {
+      "timestamp_us": 0,
+      "probe_id": "probe-1",
+      "kind": "target_onset",
+      "target_direction": {
+        "x": 0,
+        "y": 0,
+        "z": 1
+      }
+    },
+    {
+      "timestamp_us": 100000,
+      "probe_id": "probe-1",
+      "kind": "hold_start",
+      "target_direction": {
+        "x": 0,
+        "y": 0,
+        "z": 1
+      }
+    },
+    {
+      "timestamp_us": 1000000,
+      "probe_id": "probe-1",
+      "kind": "target_end",
+      "target_direction": {
+        "x": 0,
+        "y": 0,
+        "z": 1
+      }
+    }
+  ]
+}
