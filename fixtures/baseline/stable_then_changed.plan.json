@@ -1,0 +1,15 @@
+{
+  "schema_version": "baseline-plan.v1",
+  "session_id": "00000000-0000-4000-8000-000000000003",
+  "baseline": {
+    "start_timestamp_us": 0,
+    "end_timestamp_us": 120000000,
+    "conditions_id": "neutral-probes-v1",
+    "self_report": {"eye_strain": 2, "mental_fatigue": 2}
+  },
+  "comparison": {
+    "start_timestamp_us": 120000000,
+    "end_timestamp_us": 160000000,
+    "conditions_id": "neutral-probes-v1"
+  }
+}

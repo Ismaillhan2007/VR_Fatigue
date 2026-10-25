@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:vr-fatigue:baseline-plan:v1",
+  "title": "Local same-session baseline/comparison plan",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "session_id", "baseline", "comparison"],
+  "properties": {
+    "schema_version": {"const": "baseline-plan.v1"},
+    "session_id": {"type": "string", "format": "uuid"},
+    "baseline": {
+      "type": "object", "additionalProperties": false,
+      "required": ["start_timestamp_us", "end_timestamp_us", "conditions_id", "self_report"],
+      "properties": {
+        "start_timestamp_us": {"$ref": "urn:vr-fatigue:eye-session:v1#/$defs/timestamp"},
+        "end_timestamp_us": {"$ref": "urn:vr-fatigue:eye-session:v1#/$defs/timestamp"},
+        "conditions_id": {"$ref": "#/$defs/conditions"},
+        "self_report": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/self_report"}]}
+      }
+    },
+    "comparison": {"$ref": "#/$defs/phase"}
+  },
+  "$defs": {
+    "conditions": {"type": ["string", "null"], "pattern": "^[A-Za-z0-9_.-]{1,64}$"},
+    "self_report": {
+      "type": "object", "additionalProperties": false, "required": ["eye_strain", "mental_fatigue"],
+      "properties": {"eye_strain": {"type": "integer", "minimum": 1, "maximum": 7}, "mental_fatigue": {"type": "integer", "minimum": 1, "maximum": 7}}
+    },
+    "phase": {
+      "type": "object", "additionalProperties": false, "required": ["start_timestamp_us", "end_timestamp_us", "conditions_id"],
+      "properties": {
+        "start_timestamp_us": {"$ref": "urn:vr-fatigue:eye-session:v1#/$defs/timestamp"},
+        "end_timestamp_us": {"$ref": "urn:vr-fatigue:eye-session:v1#/$defs/timestamp"},
+        "conditions_id": {"$ref": "#/$defs/conditions"}
+      }
+    }
+  }
+}

@@ -43,7 +43,7 @@ The interaction simulator does not establish that eye tracking works. Put eye in
 ```text
 IEyeTrackingProvider
   ReplayEyeProvider    -> synthetic samples now
-  HardwareEyeProvider  -> actual headset samples later
+  HardwareEyeProvider  -> SDK bridge implemented; device acceptance pending
                          |
                          v
                    same metrics code

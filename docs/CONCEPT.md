@@ -28,12 +28,12 @@ Consequence: the eye signal is a *weak, transparent hint*; the person's report i
 
 ## 3. Session flow
 
-Total live demo: about 7-8 minutes; the pilot protocol uses the longer values.
+Total live demo: about 8-9 minutes; the pilot protocol uses the longer values.
 
 | # | Step | Demo / pilot | What happens | Data |
 | --- | --- | --- | --- | --- |
 | 0 | Consent and capability check | 30 s | Explain what is recorded and that it stays local; check eye tracking permission, calibration, tracking status. Unsupported -> labelled replay. | `capabilities` |
-| 1 | Baseline | 90 s / 2 min | Standardised gaze task (see 5.1) in a calm neutral scene. Then sliders `eye_strain`, `mental_fatigue` (1-7). | metrics windows + `SelfReport(baseline)` |
+| 1 | Baseline | 120 s minimum / 2 min minimum | Standardised gaze task (see 5.1) in a calm neutral scene. Extend if needed to collect six complete usable windows. Then sliders `eye_strain`, `mental_fatigue` (1-7). | metrics windows + `SelfReport(baseline)` |
 | 2 | Load task | 2 min / 5+ min | Work-like visual task (dense reading plus visual search) with the same probes embedded. | metrics windows |
 | 3 | Check-in | 30 s | Sliders again, chips, optional text. This is the agent entry. A "tired" background trigger would open the same screen. | `SelfReport(post_task)` |
 | 4 | Summary | 20 s | Per-metric deviation from baseline, the experimental indicator, reconciliation with the words, limitations. | `SessionSummary`, `AnalysisResponse` |
@@ -46,7 +46,7 @@ A baseline taken while already tired is wrong. Mitigations, in order of importan
 
 1. **Anchor with words.** Ask the sliders at baseline. If `eye_strain >= 5` or `mental_fatigue >= 5`, mark `baseline.low_confidence = true` (`self_reported_tired`). The UI says "compared with how you started today, not with your rested self"; the app still works, claims shrink.
 2. **Same conditions.** Baseline and loaded task use the same lighting, scene and probe layout, so differences are not scene artefacts.
-3. **Enough windows.** At least 6 usable 20 s windows; otherwise `low_confidence` (`too_short`) and no indicator.
+3. **Enough windows.** At least 6 complete usable 20 s windows (120 s nominal minimum); exclude partial/poor-quality windows and extend acquisition when needed. Otherwise mark `low_confidence` (`too_short` or `insufficient_usable_windows`) and show no indicator. Actual valid time is reported separately. [BASELINE.md](BASELINE.md) defines the implemented window/reference policy.
 4. **Within-session drift.** The indicator is a *change since the start of this session*. That is honest and available even with a poor baseline.
 5. **Later (not MVP).** Multi-day local baseline with the participant's opt-in.
 
@@ -73,11 +73,11 @@ For each metric `f` and 20 s window `w`:
 
 - Baseline reference: median `m_f` and `s_f = max(1.4826 * MAD_f, floor_f)` over baseline windows (floor prevents divide-by-near-zero).
 - Deviation: `z_f = clamp((x_f - m_f) / s_f, -4, 4)`. Stored in `SessionSummary.deviations`.
-- Signed combination with fixed, a-priori weights and directions: `d = sum(w_f * sign_f * z_f) / sum(w_f)`; initial weights: latency 3, rms error 2, miss fraction 2, speed p95 1, dispersion 0.5, others 0.
-- Indicator `v = clamp(d / 3, 0, 1)`, smoothed with EWMA (alpha 0.3) across windows. Level: `low < 0.35`, `moderate < 0.6`, `high` otherwise. Nudge only after 3 consecutive windows above `0.6`, release below `0.4` (hysteresis).
+- Signed combination with fixed, a-priori weights and directions: `d = sum(w_f * sign_f * z_f) / sum(w_f)`; implemented v1 weights: latency 3 (+), rms error 2 (+), miss fraction 2 (+), speed p95 1 (-), others 0. Dispersion's earlier proposed weight 0.5 is disabled because its direction is unspecified; it remains an observation. All four active deviations are required; do not renormalize around missing measurements.
+- Indicator `v = clamp(d / 3, 0, 1)`, smoothed with EWMA (alpha 0.3) across contiguous windows, seeded from the first valid value. Level: `low < 0.35`, `moderate < 0.6`, `high` otherwise. Nudge only after 3 consecutive smoothed windows strictly above `0.6`, release strictly below `0.4` (hysteresis). Missing/ineligible windows or a time gap reset smoothing and confirmation; never carry a stale value across loss.
 - Not computed (`level = unavailable`, `value = null`) when `quality.status = insufficient_data`, when fewer than 6 baseline windows exist, or when probes were not run.
 
-All constants above are **initial guesses**, kept in one versioned config (`method_version`). They are not validated thresholds. The UI always shows the per-metric deviations next to the indicator and the label "experimental".
+All constants above are **initial guesses**, kept in one versioned config (`method_version`). They are not validated thresholds. The UI always shows the per-metric deviations next to the indicator and the label "experimental". [INDICATOR.md](INDICATOR.md) defines the implemented policy, missing-data gates, state rules and reproduction commands.
 
 ### 5.3 Wording rules
 

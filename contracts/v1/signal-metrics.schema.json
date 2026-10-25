@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:vr-fatigue:signal-metrics:v1",
+  "title": "Local gaze and probe metrics v1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "metric_version", "session_id", "data_source", "replay_origin", "coordinate_frame", "selected_eye", "duration_ms", "quality_policy", "quality", "capabilities", "metric_policy", "metrics", "unavailable_reasons", "support", "probes"],
+  "properties": {
+    "schema_version": {"const": "signal-metrics.v1"},
+    "metric_version": {"const": "gaze-metrics.v1"},
+    "session_id": {"type": "string", "format": "uuid"},
+    "data_source": {"enum": ["live", "replay", "synthetic"]},
+    "replay_origin": {"enum": [null, "recorded", "synthetic"]},
+    "coordinate_frame": {"const": "head_local"},
+    "selected_eye": {"enum": ["left", "right"]},
+    "duration_ms": {"type": "number", "minimum": 0},
+    "quality_policy": {"$ref": "urn:vr-fatigue:signal-quality:v1#/properties/policy"},
+    "quality": {"$ref": "urn:vr-fatigue:signal-quality:v1#/properties/quality"},
+    "capabilities": {"$ref": "urn:vr-fatigue:eye-session:v1#/$defs/capabilities"},
+    "metric_policy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "gaze_eye", "smoothing_window", "smoothing_order", "probe_tolerance_deg", "acquisition_deadline_us", "minimum_hold_coverage", "minimum_hold_duration_us", "minimum_target_separation_deg"],
+      "properties": {
+        "version": {"type": "string", "minLength": 1, "pattern": "\\S"},
+        "gaze_eye": {"enum": ["auto", "left", "right"]},
+        "smoothing_window": {"type": "integer", "minimum": 3, "maximum": 101, "not": {"multipleOf": 2}},
+        "smoothing_order": {"const": 2},
+        "probe_tolerance_deg": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 180},
+        "acquisition_deadline_us": {"$ref": "#/$defs/positive_us"},
+        "minimum_hold_coverage": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+        "minimum_hold_duration_us": {"$ref": "#/$defs/positive_us"},
+        "minimum_target_separation_deg": {"type": "number", "minimum": 0, "maximum": 180}
+      }
+    },
+    "metrics": {
+      "type": "object", "additionalProperties": false,
+      "required": ["gaze_speed_median_deg_s", "gaze_speed_p95_deg_s", "gaze_dispersion_deg", "head_speed_deg_s", "probe_latency_ms", "probe_rms_error_deg", "probe_miss_fraction"],
+      "properties": {
+        "gaze_speed_median_deg_s": {"$ref": "#/$defs/nullable_nonnegative"},
+        "gaze_speed_p95_deg_s": {"$ref": "#/$defs/nullable_nonnegative"},
+        "gaze_dispersion_deg": {"type": ["number", "null"], "minimum": 0, "maximum": 180},
+        "head_speed_deg_s": {"$ref": "#/$defs/nullable_nonnegative"},
+        "probe_latency_ms": {"$ref": "#/$defs/nullable_nonnegative"},
+        "probe_rms_error_deg": {"type": ["number", "null"], "minimum": 0, "maximum": 180},
+        "probe_miss_fraction": {"type": ["number", "null"], "minimum": 0, "maximum": 1}
+      }
+    },
+    "unavailable_reasons": {
+      "type": "object", "additionalProperties": false,
+      "required": ["gaze_speed_median_deg_s", "gaze_speed_p95_deg_s", "gaze_dispersion_deg", "head_speed_deg_s", "probe_latency_ms", "probe_rms_error_deg", "probe_miss_fraction"],
+      "properties": {
+        "gaze_speed_median_deg_s": {"$ref": "#/$defs/reason"},
+        "gaze_speed_p95_deg_s": {"$ref": "#/$defs/reason"},
+        "gaze_dispersion_deg": {"$ref": "#/$defs/reason"},
+        "head_speed_deg_s": {"$ref": "#/$defs/reason"},
+        "probe_latency_ms": {"$ref": "#/$defs/reason"},
+        "probe_rms_error_deg": {"$ref": "#/$defs/reason"},
+        "probe_miss_fraction": {"$ref": "#/$defs/reason"}
+      }
+    },
+    "support": {
+      "type": "object", "additionalProperties": false,
+      "required": ["gaze_valid_duration_ms", "gaze_speed_duration_ms", "gaze_speed_interval_count", "head_speed_duration_ms", "head_speed_interval_count", "probe_count", "acquired_probe_count", "missed_probe_count", "excluded_probe_count"],
+      "properties": {
+        "gaze_valid_duration_ms": {"type": "number", "minimum": 0},
+        "gaze_speed_duration_ms": {"type": "number", "minimum": 0},
+        "gaze_speed_interval_count": {"$ref": "#/$defs/count"},
+        "head_speed_duration_ms": {"type": "number", "minimum": 0},
+        "head_speed_interval_count": {"$ref": "#/$defs/count"},
+        "probe_count": {"$ref": "#/$defs/count"},
+        "acquired_probe_count": {"$ref": "#/$defs/count"},
+        "missed_probe_count": {"$ref": "#/$defs/count"},
+        "excluded_probe_count": {"$ref": "#/$defs/count"}
+      }
+    },
+    "probes": {"type": "array", "items": {"$ref": "#/$defs/probe"}}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"data_source": {"const": "replay"}}},
+      "then": {"properties": {"replay_origin": {"enum": ["recorded", "synthetic"]}}},
+      "else": {"properties": {"replay_origin": {"type": "null"}}}
+    },
+    {
+      "if": {"properties": {"metrics": {"properties": {"gaze_speed_median_deg_s": {"type": "null"}}}}},
+      "then": {"properties": {"unavailable_reasons": {"properties": {"gaze_speed_median_deg_s": {"type": "string"}}}}},
+      "else": {"properties": {"unavailable_reasons": {"properties": {"gaze_speed_median_deg_s": {"type": "null"}}}}}
+    },
+    {
+      "if": {"properties": {"metrics": {"properties": {"gaze_speed_p95_deg_s": {"type": "null"}}}}},
+      "then": {"properties": {"unavailable_reasons": {"properties": {"gaze_speed_p95_deg_s": {"type": "string"}}}}},
+      "else": {"properties": {"unavailable_reasons": {"properties": {"gaze_speed_p95_deg_s": {"type": "null"}}}}}
+    },
+    {
+      "if": {"properties": {"metrics": {"properties": {"gaze_dispersion_deg": {"type": "null"}}}}},
+      "then": {"properties": {"unavailable_reasons": {"properties": {"gaze_dispersion_deg": {"type": "string"}}}}},
+      "else": {"properties": {"unavailable_reasons": {"properties": {"gaze_dispersion_deg": {"type": "null"}}}}}
+    },
+    {
+      "if": {"properties": {"metrics": {"properties": {"head_speed_deg_s": {"type": "null"}}}}},
+      "then": {"properties": {"unavailable_reasons": {"properties": {"head_speed_deg_s": {"type": "string"}}}}},
+      "else": {"properties": {"unavailable_reasons": {"properties": {"head_speed_deg_s": {"type": "null"}}}}}
+    },
+    {
+      "if": {"properties": {"metrics": {"properties": {"probe_latency_ms": {"type": "null"}}}}},
+      "then": {"properties": {"unavailable_reasons": {"properties": {"probe_latency_ms": {"type": "string"}}}}},
+      "else": {"properties": {"unavailable_reasons": {"properties": {"probe_latency_ms": {"type": "null"}}}}}
+    },
+    {
+      "if": {"properties": {"metrics": {"properties": {"probe_rms_error_deg": {"type": "null"}}}}},
+      "then": {"properties": {"unavailable_reasons": {"properties": {"probe_rms_error_deg": {"type": "string"}}}}},
+      "else": {"properties": {"unavailable_reasons": {"properties": {"probe_rms_error_deg": {"type": "null"}}}}}
+    },
+    {
+      "if": {"properties": {"metrics": {"properties": {"probe_miss_fraction": {"type": "null"}}}}},
+      "then": {"properties": {"unavailable_reasons": {"properties": {"probe_miss_fraction": {"type": "string"}}}}},
+      "else": {"properties": {"unavailable_reasons": {"properties": {"probe_miss_fraction": {"type": "null"}}}}}
+    }
+  ],
+  "$defs": {
+    "positive_us": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+    "count": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+    "nullable_nonnegative": {"type": ["number", "null"], "minimum": 0},
+    "reason": {"type": ["string", "null"], "minLength": 1, "pattern": "\\S"},
+    "probe": {
+      "type": "object", "additionalProperties": false,
+      "required": ["probe_id", "outcome", "latency_ms", "acquisition_unavailable_reason", "hold_rms_error_deg", "hold_unavailable_reason", "acquisition_window_ms", "acquisition_valid_duration_ms", "hold_duration_ms", "hold_valid_duration_ms"],
+      "properties": {
+        "probe_id": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "\\S"},
+        "outcome": {"enum": ["acquired", "missed", "unavailable"]},
+        "latency_ms": {"$ref": "#/$defs/nullable_nonnegative"},
+        "acquisition_unavailable_reason": {"$ref": "#/$defs/reason"},
+        "hold_rms_error_deg": {"type": ["number", "null"], "minimum": 0, "maximum": 180},
+        "hold_unavailable_reason": {"$ref": "#/$defs/reason"},
+        "acquisition_window_ms": {"$ref": "#/$defs/nullable_nonnegative"},
+        "acquisition_valid_duration_ms": {"$ref": "#/$defs/nullable_nonnegative"},
+        "hold_duration_ms": {"$ref": "#/$defs/nullable_nonnegative"},
+        "hold_valid_duration_ms": {"$ref": "#/$defs/nullable_nonnegative"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"outcome": {"const": "acquired"}}},
+          "then": {"properties": {"latency_ms": {"type": "number"}, "acquisition_unavailable_reason": {"type": "null"}}},
+          "else": {"properties": {"latency_ms": {"type": "null"}}}
+        },
+        {
+          "if": {"properties": {"outcome": {"const": "unavailable"}}},
+          "then": {"properties": {"acquisition_unavailable_reason": {"type": "string"}}},
+          "else": {"properties": {"acquisition_unavailable_reason": {"type": "null"}}}
+        },
+        {
+          "if": {"properties": {"hold_rms_error_deg": {"type": "null"}}},
+          "then": {"properties": {"hold_unavailable_reason": {"type": "string"}}},
+          "else": {"properties": {"hold_unavailable_reason": {"type": "null"}}}
+        }
+      ]
+    }
+  }
+}

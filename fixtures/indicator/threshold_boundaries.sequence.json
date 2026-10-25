@@ -1,0 +1,11 @@
+{
+  "schema_version": "indicator-sequence.v1",
+  "data_source": "synthetic", "test_only": true,
+  "alpha": 1, "start_timestamp_us": 0, "window_duration_us": 20000000,
+  "raw_values": [0.35, 0.6, 0.6, 0.6, 1, 1, 1, 0.4, 0.399999],
+  "expected_values": [0.35, 0.6, 0.6, 0.6, 1, 1, 1, 0.4, 0.399999],
+  "expected_levels": ["moderate", "high", "high", "high", "high", "high", "high", "moderate", "moderate"],
+  "expected_events": ["none", "none", "none", "none", "none", "none", "offer_break", "none", "released"],
+  "expected_active": [false, false, false, false, false, false, true, true, false],
+  "expected_high_counts": [0, 0, 0, 0, 1, 2, 3, 0, 0]
+}
