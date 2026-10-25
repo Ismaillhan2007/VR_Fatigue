@@ -113,6 +113,22 @@ git pull --ff-only origin dev
 
 Keep machine-specific URLs and tokens out of committed scenes/prefabs. A development HTTP bearer token is for the trusted local demo; use HTTPS and proper access controls before public hosting.
 
+## Project guides
+
+- [Project objectives, architecture, feature acceptance, and build order](docs/PROJECT_PLAN.md)
+- [Backend setup and Unity/HTTP integration](backend/README.md)
+- [Concept: baseline, check-in agent, indicator maths, and scene parameters](docs/CONCEPT.md)
+- [Meta Quest Pro: signals, first-hour test, and networking](docs/HARDWARE_QUEST_PRO.md)
+- [Versioned JSON contracts](contracts/README.md) and [synthetic fixtures](fixtures/README.md)
+- [Signals module: integration, quality policy, and checks](docs/SIGNALS.md)
+- [Gaze/head metrics and target-probe calculations](docs/METRICS.md)
+- [Personal baseline, window quality and metric comparison](docs/BASELINE.md)
+- [Experimental indicator, smoothing and offer-state rules](docs/INDICATOR.md)
+- [Quest Pro provider, SDK setup and integrator handoff](docs/QUEST_PRO_INTEGRATION.md)
+- [MVP stages and four-person work plan](stages.md)
+- [Branching, PRs, review requests, and Unity collaboration](CONTRIBUTING.md)
+- [Short shared agent rules](AGENTS.md)
+
 ## Working together
 
 Read [AGENTS.md](AGENTS.md) (short rules for people and coding agents) and [CONTRIBUTING.md](CONTRIBUTING.md) (branches, ownership, how to avoid conflicts, checks before a PR). Feature branches start from `dev` and go back into `dev` by PR with a merge commit; `main` is the demo-ready snapshot.
