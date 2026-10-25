@@ -61,6 +61,17 @@ class AnalysisService:
         ):
             return fallback
 
+        try:
+            # Include lock/queue time, so concurrent requests cannot extend the deadline.
+            async with asyncio.timeout(self.settings.gemini_timeout_seconds):
+                return await self._generate_or_cache(request, fallback)
+        except TimeoutError:
+            return fallback
+
+    async def _generate_or_cache(
+        self, request: AnalysisRequest, fallback: AnalysisResponse
+    ) -> AnalysisResponse:
+        session = request.session_summary
         # Only successful synthetic results are cached; never persist participant sessions.
         payload = request.model_dump()
         payload["session_summary"].pop("session_id")
@@ -75,10 +86,7 @@ class AnalysisService:
             if not self.reserve_attempt():
                 return fallback
             try:
-                choice = await asyncio.wait_for(
-                    self.adapter.generate(request, fallback.observations),
-                    timeout=self.settings.gemini_timeout_seconds,
-                )
+                choice = await self.adapter.generate(request, fallback.observations)
                 # Revalidate adapter output even when a mock/custom implementation is used.
                 choice = GeminiChoice.model_validate(choice.model_dump())
                 allowed = {item.code: item for item in fallback.observations}

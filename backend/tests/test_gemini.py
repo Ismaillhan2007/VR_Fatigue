@@ -8,7 +8,7 @@ import pytest
 
 from app.config import Settings
 from app.fallback import local_response
-from app.gemini import GeminiAdapter
+from app.gemini import GeminiAdapter, output_schema
 from app.models import AnalysisRequest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -68,8 +68,57 @@ def test_sdk_adapter_calls_are_bounded_and_schema_validated():
     assert options.retry_options.attempts == 1
     config = fake.models.generate_content.call_args.kwargs["config"]
     assert config.max_output_tokens == 1000
+    assert config.response_schema is None
+    assert config.response_json_schema["additionalProperties"] is False
     assert config.thinking_config.thinking_budget == 0
     assert config.automatic_function_calling.disable is True
+
+
+def test_cloud_schema_preserves_strict_singleton_literals_as_enums():
+    schema = output_schema()
+    scene = schema["$defs"]["SceneConfig"]
+    assert scene["properties"]["scene_id"]["enum"] == ["forest_v1"]
+    assert scene["properties"]["schema_version"]["enum"] == ["1.0"]
+    assert scene["additionalProperties"] is False
+    assert '"const"' not in json.dumps(schema)
+
+
+def test_gemini_3_uses_minimal_thinking_and_records_only_token_usage():
+    body = request()
+    fallback = local_response(body)
+    fake = FakeAsyncClient(
+        1500,
+        json.dumps(
+            {
+                "observation_codes": [item.code for item in fallback.observations],
+                "scene_config": fallback.scene_config.model_dump(),
+            }
+        ),
+    )
+    fake.models.generate_content.return_value.usage_metadata = SimpleNamespace(
+        prompt_token_count=1400,
+        candidates_token_count=300,
+        thoughts_token_count=20,
+        total_token_count=1720,
+    )
+    live_adapter = GeminiAdapter(
+        Settings(
+            _env_file=None,
+            GEMINI_API_KEY="unit-test-placeholder",
+            GEMINI_MODEL="gemini-3.1-flash-lite",
+        )
+    )
+    with patch("app.gemini.genai.Client", return_value=SimpleNamespace(aio=fake)):
+        asyncio.run(live_adapter.generate(body, fallback.observations))
+    config = fake.models.generate_content.call_args.kwargs["config"]
+    assert config.thinking_config.thinking_level == "MINIMAL"
+    assert config.thinking_config.thinking_budget is None
+    assert live_adapter.last_usage == {
+        "prompt_token_count": 1400,
+        "candidates_token_count": 300,
+        "thoughts_token_count": 20,
+        "total_token_count": 1720,
+    }
 
 
 @pytest.mark.parametrize("tokens", [2001, None])
