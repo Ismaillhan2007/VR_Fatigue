@@ -203,7 +203,7 @@ namespace App.UI.Editor
         {
             var root = new GameObject("ProvenanceBar", typeof(RectTransform), typeof(Image), typeof(HorizontalLayoutGroup));
             var rt = (RectTransform)root.transform;
-            rt.anchorMin = new Vector2(0, 0.9f);
+            rt.anchorMin = new Vector2(0, 0.88f); // 130 units: three label rows (about 105) plus padding; panels start below at 0.88
             rt.anchorMax = Vector2.one;
             rt.offsetMin = rt.offsetMax = Vector2.zero;
             var barImage = root.GetComponent<Image>();
