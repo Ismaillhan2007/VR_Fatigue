@@ -1,0 +1,22 @@
+{
+    "name": "App.UI",
+    "rootNamespace": "App.UI",
+    "references": [
+        "App.Core",
+        "App.Metrics",
+        "App.Capture",
+        "App.Reports",
+        "App.Relaxation",
+        "Unity.InputSystem",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
