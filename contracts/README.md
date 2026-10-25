@@ -9,6 +9,7 @@ JSON Schema draft 2020-12 for the objects named in [docs/PROJECT_PLAN.md](../doc
 | `preferences.schema.json` | Unity UI | Backend, scene |
 | `analysis_response.schema.json` | Backend (Gemini, cache or local fallback) | Unity report UI, scene |
 | `scene_config.schema.json` | Backend or local preset | Unity scene engine (validates and clamps again) |
+| `analyze_request.schema.json` | Unity (`AnalyzeRequest.Create`) | Backend `POST /api/v1/analyze`; free text is always `null` (decision D1 default) |
 
 Rules enforced by the schemas (clients must enforce them too):
 
