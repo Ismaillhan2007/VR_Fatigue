@@ -59,6 +59,11 @@ public class QuestPresentationTests
         Assert.That(local.z, Is.EqualTo(direction.Z * 2).Within(0.0001));
         _view.PlaceInFrontOfHead();
         Assert.That(Vector3.Distance(head.position, _view.Canvas.transform.position), Is.EqualTo(2).Within(0.0001));
+        // Placed along the horizontal view direction, upright: head pitch (10 deg) must not tilt the panel.
+        Assert.That(_view.Canvas.transform.position.y, Is.EqualTo(head.position.y).Within(0.0001));
+        Assert.That(Vector3.Angle(_view.Canvas.transform.up, Vector3.up), Is.LessThan(0.01f));
+        Assert.That(_view.Canvas.transform.eulerAngles.y, Is.EqualTo(45).Within(0.01));
+        Assert.GreaterOrEqual(_view.Canvas.GetComponent<CanvasScaler>().dynamicPixelsPerUnit, 3f, "text must be rasterized above 1 texel per unit");
     }
 
     [UnityTest]
