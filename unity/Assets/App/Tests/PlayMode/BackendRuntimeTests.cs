@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -23,6 +24,102 @@ namespace App.Tests
 {
     public class BackendRuntimeTests
     {
+        [UnityTest]
+        public IEnumerator NewSessionRetainsOperatorConnectionButNeverParticipantConsentAndExitClearsToken()
+        {
+            yield return SceneManager.LoadSceneAsync("Assessment");
+            var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+            c.ConfigureBackend("http://100.64.127.140:8147", "invented-operator-token", true, true, true);
+            c.Analysis = AnalysisMode.Local;
+            c.Flow.AcceptConsent(DataSource.Synthetic, null, new Capabilities(), "invented new session test");
+            c.Flow.CompleteBaseline(new SelfReport { Phase = ReportPhase.Baseline, EyeStrain = 2, MentalFatigue = 2 });
+            c.Flow.CompleteLoadTask();
+            c.SubmitCheckIn(new SelfReport { Phase = ReportPhase.PostTask, EyeStrain = 3, MentalFatigue = 4 }, null);
+            c.FinishWithReport(); c.Restart();
+            Assert.AreEqual("invented-operator-token", c.BackendToken);
+            Assert.IsTrue(c.BackendLocalDevelopment);
+            Assert.IsFalse(c.InventedDemoSession); Assert.IsFalse(c.AllowBackendUpload);
+            Assert.IsNull(c.Flow.Context.Summary); Assert.IsNull(c.Flow.Context.Analysis);
+            c.Flow.AcceptConsent(DataSource.Synthetic, null, new Capabilities(), "invented next participant");
+            c.Flow.CompleteBaseline(new SelfReport { Phase = ReportPhase.Baseline, EyeStrain = 2, MentalFatigue = 2 });
+            c.Flow.CompleteLoadTask();
+            Assert.IsFalse(c.Panels.OfType<CheckInPanel>().First().CloudExplanation.isOn);
+            c.Exit();
+            Assert.IsEmpty(c.BackendToken);
+        }
+
+        [UnityTest]
+        public IEnumerator CompletedReplayCanReceiveLiveGeminiBeforeFinishing()
+        {
+            var url = Environment.GetEnvironmentVariable("VR_GEMINI_BACKEND_TEST_URL");
+            if (string.IsNullOrEmpty(url)) Assert.Ignore("Manual budgeted Gemini verification only");
+            yield return SceneManager.LoadSceneAsync("Assessment");
+            var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+            c.ConfigureBackend(url, Environment.GetEnvironmentVariable("VR_GEMINI_BACKEND_TEST_TOKEN"), true, false, false);
+            c.ReplaySpeed = 40;
+            c.AcceptConsent();
+            yield return WaitFor(() => !c.IsCapturing);
+            c.SubmitBaseline(2, 2);
+            yield return WaitFor(() => c.Flow.State == FlowState.CheckIn);
+            var checkIn = c.Panels.OfType<CheckInPanel>().First();
+            checkIn.EyeStrain.Slider.value = 4; checkIn.MentalFatigue.Slider.value = 4;
+            checkIn.CloudExplanation.isOn = true;
+            checkIn.SubmitButton.onClick.Invoke();
+            yield return WaitFor(() => !c.AnalysisInProgress);
+            Assert.IsNull(c.MetricsFailureMessage);
+            Assert.AreEqual(AiSource.Live, c.Flow.Context.Analysis.AiSource, c.Flow.Context.AnalysisFallbackReason);
+            Assert.AreEqual(DataSource.Replay, c.Flow.Context.Analysis.DataSource);
+            Assert.AreEqual(ReplayOrigin.Synthetic, c.Flow.Context.Analysis.ReplayOrigin);
+            Assert.AreEqual(190000, c.Flow.Context.Summary.DurationMs);
+            StringAssert.Contains("AI: live", c.ProvenanceBar.AiLabel.text);
+            yield return AssessmentFlowSmokeTest.CaptureEvidence("completed-gemini-report");
+            c.FinishWithReport();
+            Assert.AreEqual(FlowState.Done, c.Flow.State);
+            Assert.AreEqual(AiSource.Live, c.Flow.Context.Analysis.AiSource);
+            c.Exit();
+        }
+
+        [UnityTest]
+        public IEnumerator LocalReportCanOptIntoGeminiWithoutRepeatingCaptureOrSendingFreeText()
+        {
+            using (var receiver = new Receiver(wait: true))
+            {
+                yield return SceneManager.LoadSceneAsync("Assessment");
+                var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+                c.Analysis = AnalysisMode.Local;
+                c.ConfigureBackend(receiver.Url, "invented-retry-token", true, false, false);
+                c.Flow.AcceptConsent(DataSource.Synthetic, null, new Capabilities(), "invented retry test");
+                c.Flow.CompleteBaseline(new SelfReport { Phase = ReportPhase.Baseline, EyeStrain = 2, MentalFatigue = 2 });
+                c.Flow.CompleteLoadTask();
+                c.SubmitCheckIn(new SelfReport { Phase = ReportPhase.PostTask, EyeStrain = 3, MentalFatigue = 4, FreeText = "private-retry-marker" }, null);
+                var summary = c.Panels.OfType<SummaryPanel>().First();
+                Assert.IsFalse(summary.CloudExplanation.isOn);
+                Assert.IsFalse(summary.GenerateGeminiButton.interactable);
+                c.RequestGeminiExplanation(false);
+                Assert.IsFalse(receiver.Received.Task.IsCompleted);
+                var id = c.Flow.Context.SessionId;
+                summary.CloudExplanation.isOn = true;
+                Assert.IsTrue(summary.GenerateGeminiButton.interactable);
+                summary.GenerateGeminiButton.onClick.Invoke();
+                Assert.IsFalse(summary.GenerateGeminiButton.interactable);
+                c.RequestGeminiExplanation(true); // A double click cannot start a duplicate request.
+                yield return WaitFor(() => receiver.Received.Task.IsCompleted);
+                var request = ContractJson.Parse<AnalyzeRequest>(receiver.Body);
+                Assert.AreEqual(id, request.SessionSummary.SessionId);
+                Assert.AreEqual(CloudPolicy.ConsentedSummary, request.CloudPolicy);
+                Assert.IsNull(request.SessionSummary.SelfReport.FreeText);
+                Assert.AreEqual(4, request.SessionSummary.SelfReport.MentalFatigue);
+                StringAssert.Contains("cancel Gemini", summary.FinishReportButton.GetComponentInChildren<Text>().text);
+                yield return AssessmentFlowSmokeTest.CaptureEvidence("report-gemini-retry");
+                receiver.Release.TrySetResult(true);
+                yield return WaitFor(() => !c.AnalysisInProgress);
+                Assert.AreEqual(FlowState.Summary, c.Flow.State);
+                c.FinishWithReport();
+                Assert.AreEqual(FlowState.Done, c.Flow.State);
+                c.Exit();
+            }
+        }
+
         [UnityTest]
         public IEnumerator ExplicitLiveGeminiRoundTripUsesOnlyTheInventedProbe()
         {

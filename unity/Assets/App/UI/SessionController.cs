@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using App.Capture;
 using App.Core.Analysis;
 using App.Core.Capture;
@@ -456,7 +457,6 @@ namespace App.UI
         {
             if (Flow.State != FlowState.CheckIn || Flow.IsPaused) return;
             Flow.SubmitCheckIn(report, preferences);
-            var sessionId = Flow.Context.SessionId;
             var succeeded = MetricsEngineFactory.TryCompute(_metrics, _task, _baseline, ContextForMetrics(report), out var summary);
             MetricsFailureMessage = succeeded ? null : "Measurements could not be calculated. Please repeat the session or continue using your check-in.";
             Flow.SetSummary(summary);
@@ -464,6 +464,20 @@ namespace App.UI
             var request = AnalyzeRequest.Create(summary, Flow.Context.BaselineReport, preferences);
             // The report is complete locally before optional HTTP/AI work starts.
             Flow.SetAnalysis(LocalFallbackAnalysis.Analyze(request), "on-device report ready");
+            await AnalyzeReportAsync(request, consentedCloud);
+        }
+
+        // A missed check-in choice or transient failure must not require another capture.
+        public async void RequestGeminiExplanation(bool consentedCloud)
+        {
+            if (!consentedCloud || Flow.State != FlowState.Summary || Flow.IsPaused || AnalysisInProgress) return;
+            var request = AnalyzeRequest.Create(Flow.Context.Summary, Flow.Context.BaselineReport, Flow.Context.Preferences);
+            await AnalyzeReportAsync(request, true);
+        }
+
+        async Task AnalyzeReportAsync(AnalyzeRequest request, bool consentedCloud)
+        {
+            var sessionId = Flow.Context.SessionId;
             if (consentedCloud) request.CloudPolicy = CloudPolicy.ConsentedSummary;
             AnalysisInProgress = true;
             RefreshVisible();
@@ -578,7 +592,15 @@ namespace App.UI
             if (Flow.State != FlowState.Done && Flow.State != FlowState.Exited)
                 throw new InvalidOperationException("finish or exit before restarting");
             ClearReplayLoad();
-            ClearBackendSession();
+            if (Flow.State == FlowState.Exited) ClearBackendSession();
+            else
+            {
+                // Operator connection settings can serve the next participant in this app run.
+                // Participant data and cloud/upload choices are reset; Exit still clears credentials.
+                CancelBackendCheck();
+                InventedDemoSession = AllowBackendUpload = BackendCheckInProgress = false;
+                BackendConnectionStatus = "Connection settings retained in memory. Gemini requires fresh consent for this session.";
+            }
             _cts.Cancel();
             _cts.Dispose();
             _cts = new CancellationTokenSource();

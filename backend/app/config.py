@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     output_price_per_million: Decimal | None = Field(default=None, ge=0)
     gemini_budget_usd: Decimal = Field(default=Decimal("0"), ge=0)
     gemini_max_attempts_per_day: int = Field(default=20, ge=0, le=100)
+    gemini_max_total_attempts: int | None = Field(default=None, ge=0, le=100)
+    gemini_ledger_path: Path | None = None
     gemini_timeout_seconds: float = Field(default=12, gt=0, le=15)
     max_request_bytes: int = Field(default=16384, ge=4096, le=65536)
     backend_access_token: SecretStr = SecretStr("")

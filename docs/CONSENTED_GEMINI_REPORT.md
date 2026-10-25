@@ -1,5 +1,11 @@
 # Immediate reports and optional consented Gemini explanations
 
+Operational update: [Quest Gemini launch and repeated-session instructions](QUEST_GEMINI_RUN.md)
+supersede the original three-request verification allowance below. On October
+25 the user approved a new $0.50 / 100-attempt allowance; the updated launcher
+persists reservations across restarts, and the report screen supports explicit
+consented generation without repeating capture.
+
 ## Current product decision
 
 The user explicitly requested real VR measurements and ratings explained by
