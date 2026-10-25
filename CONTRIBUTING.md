@@ -1,48 +1,106 @@
 # Development workflow
 
-Use one integration branch: `main`. Keep it ready to demonstrate. No separate `develop` branch during the hackathon.
+Goal: four people work in parallel without merge conflicts, lost code or leaked data. The short binding version is in [AGENTS.md](AGENTS.md).
 
-## Branches and commits
+## Branch model
 
-1. Start each task from the latest `origin/main` with a clean working tree. Preserve unrelated local work.
-2. Create a short-lived branch: `feat/eye-capture`, `feat/gemini-report`, `feat/forest-scene`, `fix/tracking-loss`, or `docs/project-foundation`.
-3. Keep one feature or fix per PR. Open a draft early if others need its contract; list dependencies explicitly.
-4. Use clear commit subjects such as `feat: add replay eye provider`. Avoid mixing formatting or unrelated changes into feature PRs.
-5. Before review, incorporate current `main`. Rebase only your unpublished work; merge `origin/main` into an already shared branch. Do not force-push a shared branch.
+| Branch | Purpose | Who updates it |
+| --- | --- | --- |
+| `dev` | Integration branch. Every feature PR targets `dev`. Must compile and pass tests. | PR merge (merge commit) after one teammate approval |
+| `main` | Demo-ready snapshot used for judging and the submission. | `dev` -> `main` PR by the integrator after the full check below |
+| `feat/...`, `fix/...`, `docs/...`, `test/...`, `chore/...` | One task each, short-lived (hours, not days). | Its author only |
 
-Example for a new task:
+**Merge method: always "Create a merge commit".** The same commits must never reach `main` and `dev` by different routes (squash on one side, merge on the other): that is what produced ten conflicts on the first integration day. Squash and rebase-merge are not used.
+
+## Daily flow
 
 ```sh
+# Start a task (close the Unity editor first)
 git fetch origin
-git switch -c feat/eye-capture origin/main
-# Implement, check, and commit the focused change.
-git push -u origin feat/eye-capture
-gh pr create --draft --base main
-# When ready, mark ready for review and request one teammate in GitHub.
+git switch -c feat/my-task origin/dev
+
+# While working: commit small, then catch up with dev every few hours
+git fetch origin && git merge origin/dev
+
+# Ready for review
+git push -u origin feat/my-task
+gh pr create --draft --base dev
+# run the checks for your area, then mark ready and request one reviewer
 ```
 
-## Pull requests and review requests
+- Only rebase commits nobody else has; once pushed and shared, merge `origin/dev` instead. Never force-push a shared branch.
+- Keep PRs small: one feature or fix, ideally under a few hundred lines of hand-written code (generated fixtures and scenes excluded). Big PRs are where conflicts happen.
+- Updating your local `dev`: `git switch dev && git pull --ff-only origin dev`. If git refuses, you have local commits on `dev`; move them to a feature branch instead of committing on `dev`.
 
-- Use the PR template: state the problem, resulting behavior, acceptance criteria, and actual verification.
-- Include a screenshot or short capture for visible Unity changes; identify the headset/runtime or desktop simulation used.
-- List changes to schemas, SDK versions, scene/prefab ownership, data handling, and API call volume when relevant.
-- Mark the PR ready only when its acceptance criteria pass. Request one available teammate who did not author the change; use GitHub's Reviewers field or `gh pr edit --add-reviewer <teammate-login>`.
-- Reviewers check behavior, honest source labels, missing-data handling, offline fallback, secret handling, and Unity asset/GUID integrity.
-- Address blocking comments and re-request review after significant changes. Do not dismiss reviews merely to merge.
-- One human teammate approval is required. The designated human integrator squash-merges and deletes the feature branch after confirming the demo still runs.
-- Agents may prepare PRs and fixes; merging remains a human action unless the user explicitly authorizes it.
+## Ownership (who edits what)
 
-## Repository settings to enable
+Edit only your area. If your task needs a change in another area, ask the owner (PR comment or chat) and let them make it or approve it explicitly in the PR. One person per `.unity` scene or shared prefab at a time.
 
-A repository admin should add a `main` ruleset/branch protection: require PRs, one approval, resolved review conversations, and block force pushes/deletion. Require meaningful CI checks once implemented; do not select nonexistent checks. These settings are recommendations and are **not configured by these files**. If the GitHub plan does not support enforcement, follow the same review policy manually.
+| Area | Paths | Owner | Notes |
+| --- | --- | --- | --- |
+| Unity app flow, UI, integration | `unity/Assets/App/Core/Flow`, `App/UI`, `App/Reports`, `App/Capture` (app providers), `App/Metrics/SignalsMetricsEngine.cs`, `Scenes/Assessment.unity`, `UI/Prefabs`, `tools/generate_demo_session.py`, `fixtures/replay/demo_session.json` | AleksandrChernysh (integrator) | Assessment scene and panel prefabs are generated by `App > Build Assessment Scene` |
+| Contracts and C# DTOs | `contracts/`, `unity/Assets/App/Core/Contracts`, `fixtures/*.json` (application fixtures) | integrator + backend owner together | Contract PRs only (see below) |
+| Signals, metrics, Quest Pro bridge | `unity/Assets/Signals`, `unity/Assets/QuestPro`, `fixtures/{replay,metrics,baseline,indicator}` (except the demo session), `tools/{generate_signal_fixtures,generate_metric_fixtures,generate_baseline_fixture,check_signals}.py`, `tools/SignalTestRunner.cs`, `docs/{SIGNALS,METRICS,BASELINE,INDICATOR,QUEST_PRO_INTEGRATION}.md` | Michael (GitHub login to confirm) | `App/Metrics/MetricsEngineFactory.cs` is the plug-in point |
+| Backend and Gemini | `backend/`, `.github/workflows/backend.yml`, `docs/BACKEND_RUNTIME_PLAN.md` | Ismaillhan2007 | Gemini key only in `backend/.env` |
+| Forest scene | `unity/Assets/App/Relaxation` (except `ForestSceneApplier.cs`, `RelaxationSceneLoader.cs`, `SceneConfigHandoff.cs`), `App/Squirrel`, `Scenes/ForestDemo.unity`, `docs/FOREST_SCENE.md`, `tools/generate_squirrel.py` | ReDBuss | The current `ForestDemo` is a generated placeholder; the owner replaces it |
+| Shared docs | `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, `docs/SETUP.md`, `docs/ARCHITECTURE.md`, `docs/PROJECT_PLAN.md`, `stages.md` | integrator | Append-only for everyone else (see hot spots) |
 
-## Unity collaboration
+A repository admin can mirror this table in `.github/CODEOWNERS` once every login is confirmed.
 
-- Pin the team's installed compatible Unity LTS editor in `ProjectVersion.txt`; commit `Packages/manifest.json` and `packages-lock.json` when the Unity project is created.
-- Set Asset Serialization to Force Text and Version Control Mode to Visible Meta Files. Commit each asset with its `.meta` file.
-- Assign one owner for each `.unity` scene and shared `.prefab` at a time. Other contributors work on separate scripts/prefabs; the owner integrates them.
-- Keep licensed third-party assets attributable in `docs/ASSETS.md` when added. Obtain permission before buying or redistributing assets; do not commit paid source assets that teammates cannot legally share.
-- Ignore generated Unity folders, builds, local environments, and private session data. Use Git LFS for approved large binaries before their first commit; keep tiny anonymized/synthetic fixtures in `fixtures/`.
+## Conflict hot spots and how to avoid them
+
+| Hot spot | Rule |
+| --- | --- |
+| Shared docs (README, SETUP, ARCHITECTURE, PROJECT_PLAN, stages) | Do not rewrite them in a feature PR. Put your details in your own `docs/<AREA>.md` and add at most one link line. The integrator updates status paragraphs. |
+| `unity/Assets/App/Scenes/*.unity`, `UI/Prefabs/*.prefab` | Never two editors at once. Assessment and its prefabs are generated: change `AssessmentSceneBuilder.cs`, run the menu, commit the result. |
+| `ProjectSettings/*`, `Packages/manifest.json`, `packages-lock.json` | Only in a `chore/` PR that does nothing else. Unity rewrites these files when it imports; do not commit incidental changes from your feature branch (`git restore unity/ProjectSettings unity/Packages` before committing). |
+| `HttpAnalysisClient.cs`, `AnalyzeRequest.cs`, backend `models.py` | Both sides of the HTTP seam: change them together in one contract PR, never separately. |
+| Shared fixtures with copies (`fixtures/analysis_fallback.json`, `scene_config_calm_forest_sunset.json`, `replay/demo_session.json` and their copies in `unity/Assets/StreamingAssets/fixtures/`) | Update the original and the copy in the same commit; a test fails if they drift. |
+| `fixtures/integration/scene_rules.json` | Single source of truth for the chip -> scene mapping. Unity, backend and forest tests all read it; change it with all three implementations in one PR. |
+
+When a conflict happens anyway: read both sides, keep both behaviours where they are independent, ask the owner when they are not, then run that area's tests. After merging, check that nothing disappeared:
+
+```sh
+git diff --name-status --diff-filter=D origin/dev HEAD   # must be empty unless you deleted a file on purpose
+```
+
+## Contract changes
+
+Contracts live in `contracts/v1`. A contract PR changes, in one PR: the schema, the fixtures (valid and invalid), the C# DTOs in `App/Core/Contracts` (or `App/Core/Analysis/AnalyzeRequest.cs`), the Pydantic models in `backend/app/models.py`, and both sides' tests. Prefer additive optional fields with a default; announce the change in chat before merging. Never change a field's meaning silently.
+
+## Unity specifics
+
+- Editor **6000.6.7f1** for everyone. Close it before `git pull`, `git switch` or `git merge`; the first import after a pull may take several minutes (Meta XR SDK).
+- Commit each asset with its `.meta`; never edit GUIDs or YAML by hand.
+- Never commit `unity/Assets/Resources/DevAgentSettings.asset` (Meta SDK writes a machine-local token and LAN IP into it; it is git-ignored). Review `Assets/Resources/*` in every Unity PR.
+- Licensed assets: record them in `docs/ASSETS.md`; never commit paid or unlicensed assets; ask before adding large binaries (Git LFS).
+
+## Before opening a PR (author)
+
+Run the checks for what you touched (full commands in [docs/SETUP.md](docs/SETUP.md)):
+
+| Change | Checks |
+| --- | --- |
+| Backend | `cd backend && uv run pytest -q && uv run ruff check app tests` |
+| Contracts/fixtures | `python contracts/validate_examples.py` |
+| Unity code | EditMode tests (batchmode or Test Runner); PlayMode smoke |
+| Unity <-> backend | backend running on 127.0.0.1:8000, then PlayMode with `VR_SMOKE_BACKEND_URL=http://127.0.0.1:8000 VR_RUN_BACKEND_TESTS=1` |
+| Scene/visual | desktop Play from Consent to the forest; screenshot in the PR; headset check if available |
+
+Secret and private-data scan (must print nothing except `backend/.env.example`):
+
+```sh
+git ls-files | grep -iE "DevAgentSettings|\.env|\.csv$|\.keystore$|\.jks$|session-data/"
+```
+
+Fill in the PR template honestly: what ran, what did not (headset, live Gemini, Android build).
+
+## Review and merge
+
+- One teammate who did not author the change approves. Reviewers check behaviour, honest source labels, missing-data handling, offline fallback, secret handling, ownership, and Unity asset/GUID integrity.
+- Before merging into `dev`: the PR shows "no conflicts" against the current `dev`, its checks pass, and the deleted-files check above is empty.
+- `dev` -> `main` (integrator): all checks above on `dev`, the end-to-end PlayMode run against the backend, and the offline run with the backend stopped. Then merge with a merge commit; `main` and `dev` point to the same commit afterwards.
+- Agents prepare PRs and fixes; merging stays a human action unless the user explicitly authorizes it.
 
 ## Verification by change type
 
@@ -54,4 +112,8 @@ A repository admin should add a `main` ruleset/branch protection: require PRs, o
 | Integration | Capture/replay -> report -> scene, including no-network and unsupported-tracking paths |
 | Docs only | Review links, consistency, whitespace; no claim of runtime or headset testing |
 
-Document unrun checks honestly. Add automated backend/metric and Unity EditMode tests as those modules arrive; add PlayMode checks for scene loading. CI should not call paid APIs or require private eye data. A live Gemini smoke check is manual and must fit the authorized budget.
+CI must not call paid APIs or need private eye data. A live Gemini smoke check is manual and must fit the authorized budget.
+
+## Repository settings (admin, recommended)
+
+Protect `main` and `dev`: require a PR and one approval, block force pushes and deletion, allow only merge commits (disable squash and rebase merging), and require the backend CI check. These are recommendations; the files here do not configure GitHub.
