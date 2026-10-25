@@ -11,10 +11,15 @@ namespace App.UI.Panels
     {
         public Text Body;
         public Button EnterSceneButton;
+        public Button FinishReportButton;
 
         public override FlowState State => FlowState.Summary;
 
-        void Awake() => EnterSceneButton.onClick.AddListener(() => Controller.EnterScene());
+        void Awake()
+        {
+            EnterSceneButton.onClick.AddListener(() => Controller.ChooseRelaxation());
+            FinishReportButton.onClick.AddListener(() => Controller.FinishWithReport());
+        }
 
         public override void OnShow() => Refresh();
 
@@ -22,6 +27,7 @@ namespace App.UI.Panels
         {
             var c = Controller.Flow.Context;
             // stop_session: show the take-a-break message instead of offering the scene.
+            FinishReportButton.interactable = c.Analysis != null && !Controller.AnalysisInProgress;
             EnterSceneButton.interactable = c.Analysis != null && c.Analysis.SafetyNotice != SafetyNotice.StopSession;
             Body.text = (Controller.MetricsFailureMessage == null ? "" : Controller.MetricsFailureMessage + "\n\n")
                 + SummaryFormatter.Format(c, Controller.AnalysisInProgress, Controller.ProbeStatsText);

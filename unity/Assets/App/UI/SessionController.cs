@@ -191,10 +191,18 @@ namespace App.UI
                 Debug.LogWarning($"[SessionController] analysis client threw: {e.Message}");
                 result = new AnalysisResult { Response = LocalFallbackAnalysis.Analyze(request), FallbackReason = "client error" };
             }
-            AnalysisInProgress = false;
             if (this == null || Flow.State != FlowState.Summary || Flow.Context.SessionId != sessionId) return;
+            AnalysisInProgress = false;
             Flow.SetAnalysis(result.Response, result.FallbackReason);
         }
+
+        public void FinishWithReport() => Flow.FinishWithReport();
+        public void ChooseRelaxation() => Flow.ChooseRelaxation();
+        public void CancelRelaxation() => Flow.CancelRelaxation();
+        public void SkipReRating() => Flow.SkipReRating();
+
+        public SceneConfig ScenePreview => Flow.Context.Analysis == null ? null
+            : SceneConfigSanitizer.Sanitize(Flow.Context.Analysis.SceneConfig, Flow.Context.Preferences);
 
         public void EnterScene()
         {
@@ -202,12 +210,19 @@ namespace App.UI
             Flow.EnterScene();
             var config = Flow.Context.Analysis.SceneConfig;
             SceneStatus = "Loading scene...";
-            StartCoroutine(EnterSceneRoutine(config));
+            StartCoroutine(EnterSceneRoutine(config, Flow.Context.SessionId));
         }
 
-        System.Collections.IEnumerator EnterSceneRoutine(SceneConfig config)
+        System.Collections.IEnumerator EnterSceneRoutine(SceneConfig config, string sessionId)
         {
             yield return _scene.Enter(config, Flow.Context.Preferences);
+            if (Flow.Context.SessionId != sessionId || Flow.State != FlowState.Scene)
+            {
+                yield return _scene.Exit();
+                SceneConfigHandoff.Clear();
+                yield break;
+            }
+            if (_scene.ForestLoaded) Flow.MarkSceneParticipated();
             SceneStatus = (_scene.ForestLoaded ? "Forest scene loaded." : "Forest scene not available yet (stub applier): showing the config only.")
                 + "\n\n" + SummaryFormatter.SceneLine(SceneConfigHandoff.Current)
                 + "\n\nYou can mute, pause or exit at any time.";
@@ -243,6 +258,7 @@ namespace App.UI
         {
             MetricsFailureMessage = null;
             _cts.Cancel();
+            _cts.Dispose();
             _cts = new CancellationTokenSource();
             StopCapture();
             StartCoroutine(_scene.Exit());
@@ -251,13 +267,25 @@ namespace App.UI
             _baseline.SelfReport = null;
             _task.Clear();
             AnalysisInProgress = false;
+            SceneStatus = "";
             Flow.Exit();
         }
 
         public void Restart()
         {
+            if (Flow.State != FlowState.Done && Flow.State != FlowState.Exited)
+                throw new InvalidOperationException("finish or exit before restarting");
+            _cts.Cancel();
+            _cts.Dispose();
+            _cts = new CancellationTokenSource();
             MetricsFailureMessage = null;
             StopCapture();
+            _baseline.Recording.Clear();
+            _baseline.SelfReport = null;
+            _task.Clear();
+            SceneConfigHandoff.Clear();
+            SceneStatus = "";
+            AnalysisInProgress = false;
             ProviderNote = null;
             Flow.Restart();
         }

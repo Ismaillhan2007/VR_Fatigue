@@ -46,7 +46,7 @@ namespace App.UI.Editor
             var prefabs = new GameObject[]
             {
                 Save(Consent()), Save(Baseline()), Save(LoadTask()), Save(CheckIn()), Save(Summary()),
-                Save(SceneView()), Save(ReRating()), Save(Done()),
+                Save(RelaxationSetup()), Save(SceneView()), Save(ReRating()), Save(Done()),
             };
             var bar = Save(Bar());
             var pause = Save(Pause());
@@ -114,12 +114,6 @@ namespace App.UI.Editor
             foreach (Chip c in Enum.GetValues(typeof(Chip))) p.ChipToggles.Add(MakeToggle(grid.transform, ReportText.ChipLabel(c), layout: false));
             p.FreeText = MakeInput(root.transform, "Optional: say how you feel (max 300 characters)");
             p.Hint = Label(root.transform, "", 14, 24);
-            p.ChooseSettings = MakeToggle(root.transform, "I want to choose scene settings myself");
-            p.PreferenceGroup = Group(root.transform, "Preferences", horizontal: true);
-            p.Animals = MakeToggle(p.PreferenceGroup.transform, "Animals");
-            p.Silent = MakeToggle(p.PreferenceGroup.transform, "Silent");
-            p.Sunset = MakeToggle(p.PreferenceGroup.transform, "Sunset (off = day)");
-            p.GentleMotion = MakeToggle(p.PreferenceGroup.transform, "Gentle motion");
             p.SubmitButton = MakeButton(ButtonRow(root.transform), "Continue");
             return root;
         }
@@ -133,7 +127,27 @@ namespace App.UI.Editor
             p.Body.resizeTextForBestFit = true;
             p.Body.resizeTextMinSize = 10;
             p.Body.resizeTextMaxSize = 16;
-            p.EnterSceneButton = MakeButton(ButtonRow(root.transform), "Enter calming scene");
+            var row = ButtonRow(root.transform);
+            p.FinishReportButton = MakeButton(row, "Finish with report");
+            p.EnterSceneButton = MakeButton(row, "Try optional relaxation");
+            return root;
+        }
+
+        static GameObject RelaxationSetup()
+        {
+            var root = PanelRoot("RelaxationSetupPanel");
+            var p = root.AddComponent<RelaxationSetupPanel>();
+            Label(root.transform, "Optional relaxation: preferences and preview", 26, 40);
+            p.Body = Label(root.transform, "", 20, flexible: true);
+            p.ChooseSettings = MakeToggle(root.transform, "Choose settings myself");
+            p.PreferenceGroup = Group(root.transform, "Preferences");
+            p.Animals = MakeToggle(p.PreferenceGroup.transform, "Animals");
+            p.Silent = MakeToggle(p.PreferenceGroup.transform, "Silent");
+            p.Sunset = MakeToggle(p.PreferenceGroup.transform, "Sunset (off = day)");
+            p.GentleMotion = MakeToggle(p.PreferenceGroup.transform, "Gentle motion");
+            var row = ButtonRow(root.transform);
+            p.BackButton = MakeButton(row, "Back to report");
+            p.EnterButton = MakeButton(row, "Enter optional forest");
             return root;
         }
 
@@ -158,7 +172,10 @@ namespace App.UI.Editor
             p.EyeStrain = Rating(root.transform, "Eye strain");
             p.MentalFatigue = Rating(root.transform, "Mental fatigue");
             Spacer(root.transform);
-            p.SubmitButton = MakeButton(ButtonRow(root.transform), "Done");
+            Label(root.transform, "Feedback is optional.", 20, 32);
+            var row = ButtonRow(root.transform);
+            p.SkipButton = MakeButton(row, "Finish without feedback");
+            p.SubmitButton = MakeButton(row, "Submit feedback and finish");
             return root;
         }
 
@@ -167,7 +184,10 @@ namespace App.UI.Editor
             var root = PanelRoot("DonePanel");
             var p = root.AddComponent<DonePanel>();
             Label(root.transform, "Finished", 30, 44);
-            p.Body = Label(root.transform, "", 20, flexible: true);
+            p.Body = Label(root.transform, "", 16, flexible: true);
+            p.Body.resizeTextForBestFit = true;
+            p.Body.resizeTextMinSize = 10;
+            p.Body.resizeTextMaxSize = 16;
             p.RestartButton = MakeButton(ButtonRow(root.transform), "New session");
             return root;
         }

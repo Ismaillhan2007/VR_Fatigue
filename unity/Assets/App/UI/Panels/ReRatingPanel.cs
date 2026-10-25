@@ -12,10 +12,15 @@ namespace App.UI.Panels
         public RatingRow EyeStrain;
         public RatingRow MentalFatigue;
         public Button SubmitButton;
+        public Button SkipButton;
 
         public override FlowState State => FlowState.ReRating;
 
-        void Awake() => SubmitButton.onClick.AddListener(() => Controller.SubmitReRating(EyeStrain.Value, MentalFatigue.Value));
+        void Awake()
+        {
+            SubmitButton.onClick.AddListener(() => Controller.SubmitReRating(EyeStrain.Value, MentalFatigue.Value));
+            SkipButton.onClick.AddListener(() => Controller.SkipReRating());
+        }
 
         public override void OnShow()
         {
