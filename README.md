@@ -2,7 +2,7 @@
 
 HackTX prototype: Unity eye-signal capture, a Gemini-assisted wellness summary, and a personalized relaxation scene. Start with one reliable forest demo with optional squirrels and a clearly labeled offline/replay path.
 
-Development has not been scaffolded yet; this repository currently contains project planning, draft data contracts with synthetic fixtures, and contribution rules. Unity is confirmed and the target headset is a Meta Quest Pro; eye-data access in our own build still needs the first-hour check.
+The Unity project in `unity/` has the session flow, contract DTOs and seams with stubs (desktop mode, synthetic data; see [docs/SETUP.md](docs/SETUP.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)). Metrics, backend, forest scene and the headset adapter are still to be built. Unity is confirmed and the target headset is a Meta Quest Pro; eye-data access in our own build still needs the first-hour check.
 
 - [Project objectives, architecture, feature acceptance, and build order](docs/PROJECT_PLAN.md)
 - [Concept: baseline, check-in agent, indicator maths, and scene parameters](docs/CONCEPT.md)

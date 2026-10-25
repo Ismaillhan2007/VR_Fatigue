@@ -1,0 +1,16 @@
+{
+    "name": "App.Metrics",
+    "rootNamespace": "App.Metrics",
+    "references": [
+        "App.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true
+}

@@ -23,11 +23,12 @@ The report is an **experimental wellness summary**, not a medical diagnosis or p
 
 Use the Unity editor that the installed Meta XR SDK supports (verify its release notes); record exact editor, XR package, and SDK versions in the first setup PR. Keep `GEMINI_MODEL` configurable; choose an available stable Flash/Flash-Lite model after checking its structured-output support and project quota. Do not depend on a preview model or assume free quota.
 
-Planned layout (not yet scaffolded):
+Layout (Unity part scaffolded; backend still planned; seams in [ARCHITECTURE.md](ARCHITECTURE.md)):
 
 ```text
 unity/                  # Assets/, Packages/, ProjectSettings/
   Assets/App/
+    Core/               # pure C#: contract DTOs, seams, session flow, local rules
     Capture/            # IEyeTrackingProvider, hardware and replay adapters
     Metrics/            # filtering, window aggregation, deterministic observations
     Reports/            # measured data, AI narrative, fallback, source labels

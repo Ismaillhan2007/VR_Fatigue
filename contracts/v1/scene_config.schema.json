@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/vr-fatigue/contracts/v1/scene_config.schema.json",
+  "title": "SceneConfig",
+  "description": "Allowlisted, bounded scene settings. No URLs, paths, code or free text. Unity validates and clamps again before applying.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "scene_id": {
+      "const": "forest_v1"
+    },
+    "animals_enabled": {
+      "type": "boolean"
+    },
+    "time_of_day": {
+      "enum": [
+        "day",
+        "sunset"
+      ]
+    },
+    "light_warmth": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "0 = cool, 1 = warm."
+    },
+    "brightness": {
+      "type": "number",
+      "minimum": 0.4,
+      "maximum": 1.0,
+      "description": "Global brightness multiplier. Floor keeps the scene usable."
+    },
+    "fog_density": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 0.6
+    },
+    "sound": {
+      "enum": [
+        "forest",
+        "silent"
+      ]
+    },
+    "master_volume": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "sound_layers": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "wind": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "birds": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "water": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "pad": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "wind",
+        "birds",
+        "water",
+        "pad"
+      ],
+      "description": "Per-layer gains. Ignored (treated as 0) when sound is `silent`."
+    },
+    "motion": {
+      "enum": [
+        "none",
+        "gentle"
+      ]
+    },
+    "motion_speed": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 0.5,
+      "description": "Normalised ambient motion speed. 0.5 is the hard ceiling."
+    },
+    "particles": {
+      "type": "array",
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "fireflies",
+          "pollen"
+        ]
+      }
+    },
+    "orb": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "breath_seconds": {
+          "type": "number",
+          "minimum": 4,
+          "maximum": 8,
+          "description": "Full inhale+exhale cycle."
+        }
+      },
+      "required": [
+        "enabled",
+        "breath_seconds"
+      ],
+      "description": "Optional slow breathing/pursuit orb. Smooth, non-flashing, never moves the camera."
+    }
+  },
+  "required": [
+    "schema_version",
+    "scene_id",
+    "animals_enabled",
+    "time_of_day",
+    "light_warmth",
+    "brightness",
+    "fog_density",
+    "sound",
+    "master_volume",
+    "sound_layers",
+    "motion",
+    "motion_speed",
+    "particles",
+    "orb"
+  ]
+}

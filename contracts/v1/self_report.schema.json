@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/vr-fatigue/contracts/v1/self_report.schema.json",
+  "title": "SelfReport",
+  "description": "Participant's own rating and wishes. Self-report is not a sensor measurement.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "phase": {
+      "enum": [
+        "baseline",
+        "pre_task",
+        "post_task",
+        "post_scene"
+      ]
+    },
+    "eye_strain": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 7,
+      "description": "1 = not at all, 7 = extremely."
+    },
+    "mental_fatigue": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 7,
+      "description": "1 = not at all, 7 = extremely."
+    },
+    "chips": {
+      "type": "array",
+      "maxItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "tired_eyes",
+          "tired_mind",
+          "tense",
+          "restless",
+          "overstimulated",
+          "low_energy",
+          "want_quiet",
+          "want_nature",
+          "want_dim",
+          "want_movement"
+        ]
+      }
+    },
+    "free_text": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 300,
+      "description": "Untrusted user text. Sent to a cloud model only with explicit opt-in (see docs/CONCEPT.md, decision D1)."
+    }
+  },
+  "required": [
+    "schema_version",
+    "phase",
+    "eye_strain",
+    "mental_fatigue",
+    "chips",
+    "free_text"
+  ]
+}

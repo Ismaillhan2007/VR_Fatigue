@@ -66,7 +66,7 @@ The target headset is a Meta Quest Pro. Run the first-hour 60 s eye-data log fro
 
 Person 1 owns the assessment scene; person 4 owns the forest scene. Avoid simultaneous edits to the same Unity scene or shared prefab. Each person reviews another person's PR. Split work by deliverables and files so nobody waits for an entire subsystem to be finished.
 
-Before coding independently, agree on example request/response JSON and the minimum shared contracts: `SessionSummary`, `SelfReport`, `Preferences`, `AnalysisResponse`, and `SceneConfig` (drafted in `contracts/v1`). Person 1 connects these boundaries; person 2 supplies metrics, person 3 supplies the explanation/config response, and person 4 consumes the scene configuration. Mocks must use the same shape as the eventual live implementation.
+Before coding independently, agree on example request/response JSON and the minimum shared contracts: `SessionSummary`, `SelfReport`, `Preferences`, `AnalyzeRequest`, `AnalysisResponse`, and `SceneConfig` (in `contracts/v1`; Unity seams in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)). Person 1 connects these boundaries; person 2 supplies metrics, person 3 supplies the explanation/config response, and person 4 consumes the scene configuration. Mocks must use the same shape as the eventual live implementation.
 
 ## 5. Work in stages and integrate early
 

@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/vr-fatigue/contracts/v1/analyze_request.schema.json",
+  "title": "AnalyzeRequest",
+  "description": "Body of POST /api/v1/analyze. reconciliation and safety_notice are computed by the app and are authoritative: the backend may not change reconciliation and may only raise safety_notice. Free text never leaves the device by default (docs/CONCEPT.md decision D1).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "session_summary": {
+      "$ref": "session_summary.schema.json"
+    },
+    "preferences": {
+      "oneOf": [
+        {
+          "$ref": "preferences.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Null when the participant let the app choose."
+    },
+    "reconciliation": {
+      "enum": [
+        "agree_high",
+        "agree_low",
+        "words_only",
+        "signals_only",
+        "unavailable"
+      ]
+    },
+    "safety_notice": {
+      "enum": [
+        "none",
+        "take_break",
+        "stop_session"
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "session_summary",
+    "preferences",
+    "reconciliation",
+    "safety_notice"
+  ],
+  "allOf": [
+    {
+      "description": "D1 default: self-report free text stays local.",
+      "properties": {
+        "session_summary": {
+          "properties": {
+            "self_report": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "free_text": {
+                      "const": null
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "D1 default: preference text stays local.",
+      "properties": {
+        "preferences": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "const": null
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

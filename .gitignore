@@ -43,3 +43,7 @@ private-reports/
 .idea/
 .vs/
 .DS_Store
+
+# Unity extras
+unity/.utmp/
+unity/*.pidb
