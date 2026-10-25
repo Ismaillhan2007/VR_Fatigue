@@ -2,6 +2,8 @@
 
 This is a separate Python app inside the shared repository. Unity remains a separate C# app. They exchange HTTP requests and JSON; neither app needs to run the other's language. No database is required.
 
+The backend supports an **eye-tracking app** whose core outcome is a health/fatigue report presented as an experimental wellness summary. A scene is one optional relaxation use case. V1 currently bundles the report with required `scene_config` and `scene_rationale` fields, even when `preferences` is null; null means no overrides, not a participation decision. A returned config must not imply consent to enter a forest. The current Unity flow still lacks normal report-only completion; see [objectives and implementation gaps](../docs/OBJECTIVES.md). This docs change preserves the wire contract; making scene output optional requires coordinated schema/client/fixture changes.
+
 ```text
 Unity / C#                         FastAPI / Python                   Gemini
 capture + metrics + check-in  ->   validate aggregates + choices  ->  select codes/settings

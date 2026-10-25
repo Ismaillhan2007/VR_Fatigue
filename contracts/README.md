@@ -2,6 +2,8 @@
 
 JSON Schema draft 2020-12 for the objects named in [docs/PROJECT_PLAN.md](../docs/PROJECT_PLAN.md). Unity (C# DTOs), the backend (Pydantic) and the fixtures must all match these files. Change a schema only through a contract PR that updates fixtures and both clients.
 
+Product intent: the eye-tracking report is the core outcome and scene participation is optional; see [OBJECTIVES](../docs/OBJECTIVES.md). **Current v1 coupling:** `AnalysisResponse` requires `scene_config` and `scene_rationale`; the request allows null `preferences`, which means no explicit setting overrides, not a scene opt-in/out flag. A valid config is not consent to render or enter a scene. Report-only UI may ignore it without changing v1. Omitting scene fields from responses needs a coordinated contract PR; no schema is changed by this objectives update.
+
 | Schema | Produced by | Consumed by |
 | --- | --- | --- |
 | `session_summary.schema.json` | Unity metrics code (deterministic) | Backend, report UI |
