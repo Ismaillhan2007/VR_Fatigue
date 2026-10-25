@@ -1,0 +1,20 @@
+{
+    "name": "App.Relaxation.Editor",
+    "rootNamespace": "App.Relaxation.Editor",
+    "references": [
+        "App.Relaxation",
+        "App.Squirrel",
+        "App.UI.Editor"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

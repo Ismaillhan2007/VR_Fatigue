@@ -1,5 +1,7 @@
 # Unity/backend integration check — October 24, 2026
 
+> This is a historical verification record of the scene-oriented flow. The core eye-tracking report and optional relaxation objective is in [OBJECTIVES](OBJECTIVES.md); successful report-only completion remains a separate implementation gap, not a result of these checks.
+
 Integrated Alexandr's Unity app-flow changes from PR #5 (`origin/main` at `4665da0`) with the FastAPI backend on `dev`. The original `feat/app-flow` tip (`cafd696`) has the same tree as that squash commit. Merge conflicts in the root README and the contract README/fixture validator were resolved by retaining both the backend setup and Unity's new request contract and checks.
 
 ## Reconciled boundaries

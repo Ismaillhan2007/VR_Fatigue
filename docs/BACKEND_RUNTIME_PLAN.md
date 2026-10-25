@@ -1,5 +1,7 @@
 # Unity/backend runtime implementation and test plan
 
+> Historical implementation/test checkpoint. The current product objective is an eye-tracking report with optional scene participation; the old scene-handoff acceptance below does not establish normal report-only completion. See [objectives and current implementation gaps](OBJECTIVES.md).
+
 Scope: the current Assessment scene on the local `feat/unity-backend-runtime` branch. Preserve its synthetic source, HTTP mode, 20-second baseline/task, scene assets and GUIDs.
 
 ## Acceptance criteria

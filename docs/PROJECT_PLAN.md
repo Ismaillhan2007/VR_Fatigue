@@ -2,13 +2,15 @@
 
 ## Outcome and scope
 
-Deliver a Unity VR wellness prototype for the Meta Quest Pro: a participant completes a short, comfortable eye-tracking session against a personal baseline, says how they feel (two sliders, chips, optional text), sees measured observations with limitations, chooses relaxation preferences, and enters a personalized forest. [docs/CONCEPT.md](CONCEPT.md) explains the product, baseline policy and indicator; [docs/HARDWARE_QUEST_PRO.md](HARDWARE_QUEST_PRO.md) lists what the headset does and does not provide. Gemini explains supplied metrics and selects supported environment settings. It does not calculate eye measurements or control arbitrary tools.
+Deliver an **eye-tracking app** for the Meta Quest Pro: a participant completes a short, comfortable assessment against a personal baseline, says how they feel (two sliders, chips, optional text), and receives a health/fatigue report with measured observations and limitations. The report is the core outcome; report-only completion is a complete success. The participant may separately opt into a personalized forest as one relaxation use case. [OBJECTIVES.md](OBJECTIVES.md) defines this direction and audits current implementation gaps; [CONCEPT.md](CONCEPT.md) explains the baseline policy and indicator; [HARDWARE_QUEST_PRO.md](HARDWARE_QUEST_PRO.md) lists headset capabilities. Optional Gemini explains supplied metrics and can select supported scene settings. It does not calculate eye measurements or control arbitrary tools.
 
 The report is an **experimental wellness summary**, not a medical diagnosis or proof of fatigue detection. Do not promise a scene is the person's most relaxing environment; ask for their preference and feedback. The headset is a Meta Quest Pro used fully virtual (no passthrough). Eye-data access in our own build is **unverified** until the first-hour test in the hardware document passes. Unity is the team's confirmed engine.
 
-**Must ship:** one local forest with optional squirrels, replay mode, deterministic metrics and report fallback, explicit data/AI source labels, preference controls, and a working end-to-end demo. Add real tracking as soon as hardware support is proven. Add live Gemini without making it necessary for the offline demo.
+**Core must ship:** replay/assessment, deterministic metrics and personal-baseline comparison, check-in, useful report with local fallback, explicit data/AI source and quality labels, and normal completion without a scene or post-scene rating. Add real tracking as soon as hardware support is proven. Add live Gemini without making it necessary for reports or the offline demo.
 
-**Stretch only:** another biome, baseline-vs-follow-up comparison, optional report export, pre-generated decorative assets. Defer model training, diagnosis, accounts, a database, autonomous multi-agent orchestration, and runtime 3D/video generation.
+**Optional use case to demonstrate:** one local forest with optional squirrels, explicit participation choice, preference controls and comfort controls. Delivering this feature does not make scene participation a condition of using the eye-tracking app. The current code shows reports but still couples normal completion to the scene; the report-only branch below is not yet implemented.
+
+**Stretch only:** another biome, multi-session comparisons, optional report export, pre-generated decorative assets. Defer model training, diagnosis, accounts, a database, autonomous multi-agent orchestration, and runtime 3D/video generation.
 
 ## Recommended stack and layout
 
@@ -23,7 +25,7 @@ The report is an **experimental wellness summary**, not a medical diagnosis or p
 
 The team-selected Unity editor is **6000.6.7f1**. Verify the chosen Meta XR SDK supports it and record exact XR package/SDK versions in the setup PR. Meta XR Core SDK **207.0.1** and OpenXR **1.18.0** are pinned; the adapter and device acceptance steps are in [QUEST_PRO_INTEGRATION.md](QUEST_PRO_INTEGRATION.md). Keep `GEMINI_MODEL` configurable; choose an available stable Flash/Flash-Lite model after checking its structured-output support and project quota. Do not depend on a preview model or assume free quota.
 
-Layout (application scaffold and signals module implemented; backend still planned; application seams in [ARCHITECTURE.md](ARCHITECTURE.md)):
+Layout (application scaffold, signals module and backend implemented; report-only completion still planned; application seams in [ARCHITECTURE.md](ARCHITECTURE.md)):
 
 ```text
 unity/                  # Assets/, Packages/, ProjectSettings/
@@ -67,7 +69,7 @@ Acceptance: synthetic fixtures cover steady gaze, known motion, tracking gaps, u
 
 ### 2a. Collect self-report and reconcile it with the signals
 
-Collect `SelfReport` (two 1-7 sliders, up to six chips, optional text of at most 300 characters) at baseline, after the loaded task, and after the scene. The app, not Gemini, computes `reconciliation` (`agree_high`, `agree_low`, `words_only`, `signals_only`, `unavailable`) from the rules in CONCEPT section 6.2: the participant's words decide what scene they get; eye signals can add a gentle offer or a caveat but never override them. Discomfort words or chips raise `safety_notice` through local rules.
+Collect `SelfReport` (two 1-7 sliders, up to six chips, optional text of at most 300 characters) at baseline and after the loaded task. Post-scene feedback is optional and applies only to scene participants. The app, not Gemini, computes `reconciliation` (`agree_high`, `agree_low`, `words_only`, `signals_only`, `unavailable`) from the rules in CONCEPT section 6.2: the report distinguishes words from measurements; eye signals can add a gentle offer or caveat but never override the participant's choices. Scene participation requires a separate choice, and their explicit preferences govern it if chosen. Discomfort words or chips raise `safety_notice` through local rules.
 
 Acceptance: the same self-report and metrics always produce the same `reconciliation` and `safety_notice`; the flow works with eye data unavailable (words only).
 
@@ -75,23 +77,25 @@ Acceptance: the same self-report and metrics always produce the same `reconcilia
 
 Implement `POST /api/v1/analyze` and `GET /health`. The request contains versioned aggregate metrics and deviations, their provenance/quality, the deterministic `reconciliation`, bounded self-report, and bounded preferences. Raw streams and images remain on-device. The backend validates input, builds a fixed prompt, requests JSON-schema output, then validates all returned values with Pydantic. Treat preferences and self-report text as untrusted data, not system instructions. Self-report text describes a person's state: follow decision D1 in CONCEPT before sending it to a cloud model.
 
-Return a short explanation of supplied observations, explicit limitations, and a scene configuration. Keep metric values and `insufficient_data` decisions authoritative in deterministic application code. Gemini may explain supported observations and preference choices; it cannot override measurements, infer diagnoses, or add unmeasured claims. Use an approved fallback if output fails content checks; for the MVP, restrict observation references and suggestions to a small approved vocabulary.
+Return a short explanation of supplied observations and explicit limitations. Current v1 responses also require a scene configuration; this is an implementation coupling, not a requirement for the user to enter a scene. Report-only UI can ignore that config; removing it from responses needs a coordinated contract PR. Keep metric values and `insufficient_data` decisions authoritative in deterministic application code. Gemini may explain supported observations and preference choices; it cannot override measurements, infer diagnoses, or add unmeasured claims. Use an approved fallback if output fails content checks; for the MVP, restrict observation references and suggestions to a small approved vocabulary.
 
 Acceptance: mocked valid output renders; malformed/schema-invalid output, unsupported claims/settings, empty/blocked responses, 429, 5xx, missing key, timeout, and budget exhaustion all yield a usable local report/config. Labels independently show `ai_source: live | cached | fallback` and the data source. No Gemini secret appears in Unity, logs, fixtures, or Git.
 
-### 4. Personalize a prebuilt scene
+### 4. Offer an optional prebuilt relaxation scene
 
 Build `ForestDemo` first with local low-poly trees, baked/static lighting where practical, ambient audio, a stationary starting area, and an optional squirrel prefab using a short fixed animation/path. Save one team-approved demo preset immediately. A script changes allowlisted, bounded settings (`SceneConfig`: time of day, light warmth, brightness, fog density, ambient sound layers and volume, squirrel visibility, ambient motion speed, optional fireflies/pollen, optional slow breathing orb); it does not generate geometry at runtime. A deterministic local mapping from chips and sliders to `SceneConfig` (CONCEPT section 7.3) is the offline path and must work without Gemini.
 
-Offer simple controls (forest, squirrels on/off, day/sunset, sound/volume, little/no animal motion) plus optional short text. Unsupported requests produce the closest supported option with an explanation and an editable preview. Let the participant confirm or adjust before applying. A quiet/animal-free choice must override any AI recommendation.
+After explicit scene opt-in, offer simple controls (forest, squirrels on/off, day/sunset, sound/volume, little/no animal motion) plus optional short text. Unsupported requests produce the closest supported option with an explanation and an editable preview. Let the participant confirm or adjust before applying. A quiet/animal-free choice must override any AI recommendation. A null preferences object only means no overrides; it is not a participation choice. Scene failure must leave the core report usable.
 
 Acceptance: the scene opens offline and settings visibly work; malformed/missing config uses the saved preset. No arbitrary asset downloads, script execution, flashing effects, forced movement, or camera animation. Include pause/exit and mute controls; stop when the participant asks or feels discomfort. Measure frame timing on the actual headset and meet its selected refresh-rate frame budget.
 
 ### 5. Integrate the judging path
 
-Flow: select live/replay source -> consent and capability check -> short session -> measured summary -> AI/local explanation -> preferences/config preview -> forest -> optional self-rated comfort feedback.
+Target core flow: select live/replay source -> consent and capability check -> baseline/assessment -> check-in -> report with AI/local explanation -> Finish with report -> Done. Retain report review until explicit session end/reset.
 
-Acceptance: complete it on the target headset, then repeat with network disabled and tracking unavailable. Show a desktop spectator view for judges. A failed backend request leaves the Unity app usable. Keep a local build, saved config/report, and a short recording as backups, all honestly labeled.
+Optional branch from the report: choose relaxation -> preferences/config preview -> confirm forest entry -> optional self-rated comfort feedback -> Done. No forest load, scene settings or `post_scene` rating is required for report-only completion. Safety can block scene entry without blocking access to the report or exit.
+
+Acceptance: verify both branches on desktop and then the target headset; repeat the core path with network disabled and tracking unavailable. Report-only completion must reach Done without loading `ForestDemo`, requesting scene preferences or submitting a post-scene rating. Preserve privacy on explicit Exit/reset. Add state-machine/UI coverage for these choices and the existing safety block. Show a desktop spectator view for judges. A failed backend request leaves the report usable. Keep a local build, saved synthetic config/report, and a short recording as backups, all honestly labeled. See [OBJECTIVES](OBJECTIVES.md) for current code evidence and gaps.
 
 ## Contract to agree before splitting work
 
@@ -112,7 +116,7 @@ Reject unknown schema versions, nonfinite numbers, extra executable fields, and 
 ## Cost, privacy, and reliability
 
 - Default to mock/offline development. Enable live Gemini explicitly; choose the model and record current prices/quota before calls. Use synthetic, nonpersonal payloads on the unpaid tier: Google's terms say not to submit sensitive or personal information there. Treat self-report (especially free text) as personal until the team decides otherwise (CONCEPT D1); chips and sliders may drive the local mapping without any cloud call. Real eye summaries remain local in the MVP; any later cloud path needs an explicit data-handling decision and participant consent.
-- One text-only request per completed analysis, with report and scene selection together. Cache identical nonpersonal inputs. Never send frames continuously, regenerate 3D worlds, or create an open-ended agent loop.
+- At most one text-only request per completed analysis. V1 bundles report and scene settings, but generating settings never authorizes scene entry. Cache identical nonpersonal inputs. Never send frames continuously, regenerate 3D worlds, or create an open-ended agent loop.
 - Initial engineering caps: <= 2,000 input tokens, <= 1,000 total output/thinking tokens per attempt, <= 100 attempts per development day, one concurrent call per session. Configure thinking/output limits on the selected model and verify accounting. Count retries as attempts; return fallback before exceeding caps.
 - Allow at most one retry for transient errors with backoff/Retry-After if it fits a 15-second total deadline; otherwise fall back. Do not retry invalid requests, blocked content, or bad configurations indefinitely.
 - Paid requests default off. A human sets the dollar limit and verified per-token rates before enabling them. Reserve worst-case cost before each attempt, include thinking tokens when billed, and stop at the cap; record usage without payloads or secrets. Provider budget alerts alone are not a hard spending limit.
@@ -127,9 +131,9 @@ These are suggested roles for teammates, not instructions to launch autonomous a
 | --- | --- | --- |
 | First hour | Integrator + Quest Pro owner: run the 60 s eye-data log (hardware document), pin Unity and SDK, merge contracts | Timestamp statistics recorded; synthetic request/response agreed |
 | Next 2-3 hours | Scene owner: forest/preset; metrics owner: replay/provider; backend owner: mocked API | Offline forest and replay report independently runnable |
-| Next 3-4 hours | Integrator connects Unity -> backend -> scene | One full synthetic session completes; live tracking plugged in if supported |
+| Next 3-4 hours | Integrator connects assessment -> report -> report-only completion, then optional scene branch | Synthetic report-only session completes; scene requires opt-in; live tracking plugged in if supported |
 | After integration | Backend owner adds one bounded Gemini call; hardware owner checks real metrics | Validated live response or honest fallback; same scene contract |
-| Final 2 hours before cutoff | All: freeze features, test device/offline paths, record backup, prepare pitch | Stable tagged demo commit and reproducible instructions |
+| Final 2 hours before cutoff | All: freeze features, test report-only and opt-in scene paths/device/offline behavior, record backup, prepare pitch | Stable tagged demo commit and reproducible instructions; unimplemented choices disclosed |
 
 Scale the roles to the actual team; the same person can own several. Assign files/scene ownership in each task. Build the offline vertical slice before polishing optional signals. Open small PRs by slice: setup/contracts, replay/metrics, forest/prefs, mock backend/report UI, Gemini, hardware adapter, integration/demo. Contract PRs merge first; avoid stacking unreviewed dependencies.
 

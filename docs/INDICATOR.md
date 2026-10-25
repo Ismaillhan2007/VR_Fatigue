@@ -12,6 +12,8 @@ label, baseline limitations and per-metric deviations alongside it. A `high` lev
 engineering indicator's band only. The next check-in/reconciliation layer must still respect what
 the participant says and chooses.
 
+This indicator supports the core report in an eye-tracking app. Its break-offer event is an invitation, never consent to enter a 3D scene. Report-only completion must remain available regardless of the indicator band; scene participation is a separate optional use case. See [product objectives and current flow gaps](OBJECTIVES.md).
+
 ## Fixed signed inputs and policy
 
 Default `indicator-policy.v1` uses the baseline-clipped z-scores from full **20 s** comparison

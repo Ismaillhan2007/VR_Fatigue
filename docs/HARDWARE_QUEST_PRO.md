@@ -1,5 +1,7 @@
 # Meta Quest Pro: what we can rely on
 
+Hardware serves the core eye-tracking assessment and experimental wellness report. A forest is an optional relaxation use case, not a requirement for a completed report. Device acceptance must verify the report-only path as well as any chosen scene; the app still lacks normal report-only completion. See [objectives and current implementation gaps](OBJECTIVES.md).
+
 Target headset: Meta Quest Pro, used fully virtual (no passthrough in the demo). Each statement carries a status:
 
 - **Documented**: from Meta or Unity documentation (recheck against the installed SDK).

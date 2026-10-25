@@ -2,6 +2,8 @@
 
 Pure C# (no `UnityEngine`) wherever possible, so the logic is unit-tested in EditMode and shared rules stay deterministic. Each teammate plugs in behind an interface and edits only their own folder.
 
+The product is an **eye-tracking app** whose core outcome is an experimental wellness report. A report-only session must complete successfully; relaxation is an explicitly chosen use case. The diagram and `SessionFlow` description below document the **current implementation**, which still couples normal completion to Scene/ReRating. [OBJECTIVES](OBJECTIVES.md) records the target branches and code-backed gaps.
+
 ## Assemblies
 
 ```text
@@ -50,6 +52,8 @@ and the native eye adapter. `MetricsEngineFactory` returns `SignalsMetricsEngine
 ```
 
 `SessionFlow` (Core/Flow) owns the order Consent -> Baseline -> LoadTask -> CheckIn -> Summary -> Scene -> ReRating -> Done, plus pause (blocks transitions) and exit (from anywhere, clears data). It rejects summaries/analyses whose session id or data provenance differ from the provider chosen at consent, so nothing can be relabelled as live later.
+
+Required follow-up: add `Summary -> Done` for report-only completion, retaining report review until explicit end/reset; keep `Summary -> Scene` behind a distinct opt-in and make scene feedback optional. Today Summary has only a scene-entry action, the scene settings toggle means preference overrides, and global Exit clears the report. The formatter and v1 response also bundle scene content with the report. An unused v1 config can remain on the wire without loading a scene; any schema change must update both clients and fixtures together. None of these follow-ups is implemented by the objective documentation.
 
 ## Seams and owners
 
