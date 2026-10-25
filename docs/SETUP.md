@@ -1,5 +1,7 @@
 # Setup: full desktop demo
 
+Product direction: the eye-tracking assessment and experimental wellness report are the core; participants may separately choose a relaxation scene. These instructions exercise the **current scene-oriented demo**, not an implemented report-only mode. Normal completion still requires Scene/Re-rating; Exit from Summary clears session data. See [objectives and required flow changes](OBJECTIVES.md) before claiming report-only completion works.
+
 Everything below runs without a headset or a Gemini key. Eye data are synthetic and labelled as such; the backend runs its offline rules by default.
 
 ## Full demo in four commands

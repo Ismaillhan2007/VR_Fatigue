@@ -2,6 +2,8 @@
 
 Goal: four people work in parallel without merge conflicts, lost code or leaked data. The short binding version is in [AGENTS.md](AGENTS.md).
 
+Product scope for reviews: this is an eye-tracking app centered on an experimental wellness report. Report-only completion is a core requirement, and forest participation is optional. [OBJECTIVES](docs/OBJECTIVES.md) distinguishes this target from the current implementation; use it when reviewing flow, UI, contracts or demo claims.
+
 ## Branch model
 
 | Branch | Purpose | Who updates it |
@@ -109,7 +111,7 @@ Fill in the PR template honestly: what ran, what did not (headset, live Gemini, 
 | Capture/metrics | Replay fixtures, missing/invalid samples, timestamp gaps, unit checks for calculations |
 | Gemini/backend | Mocked valid/invalid output, blocked response, timeout/429 handling, budget cutoff, cache provenance |
 | Unity scene | Desktop play check plus headset check when available; local fallback, exit control, and frame timing |
-| Integration | Capture/replay -> report -> scene, including no-network and unsupported-tracking paths |
+| Integration | Capture/replay -> report -> successful report-only completion; separately opt into the scene. Include no-network, unsupported-tracking and safety paths; report-only branching remains unimplemented until a runtime PR supplies evidence |
 | Docs only | Review links, consistency, whitespace; no claim of runtime or headset testing |
 
 CI must not call paid APIs or need private eye data. A live Gemini smoke check is manual and must fit the authorized budget.

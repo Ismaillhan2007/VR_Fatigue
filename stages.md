@@ -2,19 +2,21 @@
 
 Build one complete desktop experience first, then connect real eye tracking when a compatible headset is available. The first milestone is:
 
-**Start a sample session (baseline, loaded task, check-in) -> calculate metrics -> reconcile them with how the participant says they feel -> show a summary -> enter a personalized forest.**
+**Start a sample eye-tracking session (baseline, loaded task, check-in) -> calculate metrics -> reconcile them with how the participant says they feel -> deliver an experimental health/fatigue wellness report -> finish successfully with the report.**
+
+The participant can separately choose a personalized forest after the report. Rendering a 3D relaxation scene is one optional use case of the eye-tracking app. The current demo still requires the scene/re-rating route for normal completion; Exit clears the report. [Product objectives and implementation gaps](docs/OBJECTIVES.md) records the work needed to align it.
 
 This is the team's starting plan, not a claim that these features already exist. Detailed architecture and acceptance criteria live in [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md); the product rationale, baseline policy and scene parameters in [docs/CONCEPT.md](docs/CONCEPT.md); Quest Pro facts and the first-hour test in [docs/HARDWARE_QUEST_PRO.md](docs/HARDWARE_QUEST_PRO.md); collaboration rules in [CONTRIBUTING.md](CONTRIBUTING.md). Shared JSON schemas are in [contracts/v1](contracts/README.md).
 
 ## 1. Define the MVP
 
-Ship five connected features:
+Ship the core assessment/report path, then demonstrate the optional scene branch:
 
 1. **Assessment screen:** start a short session with a baseline and a loaded task, show progress, and identify live, replay or synthetic input.
 2. **Deterministic measurements:** calculate session duration, tracking coverage, gaze movement statistics and gaze-probe results in code, and each metric's deviation from the personal baseline. An experimental indicator may be shown only with that label (never called a fatigue score).
-3. **Gemini explanation:** explain supplied observations and limitations in an experimental wellness summary. Do not claim validated fatigue detection or medical diagnosis.
-4. **Check-in and personalization controls:** two 1-7 sliders, chips and optional short text, plus squirrels on/off, daylight/sunset, ambient sound/silence, and gentle/no animal movement. A local rule mapping turns them into scene settings without Gemini.
-5. **One working parametric forest:** apply the bounded `SceneConfig` settings (light, fog, sound layers, motion, particles, optional breathing orb) to existing objects, lighting, and audio. Keep a saved configuration and local report fallback available if Gemini fails.
+3. **Report and normal completion:** explain supplied observations and limitations in an experimental wellness summary, with local rules and optional Gemini. Let the user finish with the report without loading the forest or providing post-scene ratings. Do not claim validated fatigue detection or medical diagnosis.
+4. **Check-in and separate scene choice:** two 1-7 sliders, chips and optional short text serve the assessment. Only after scene opt-in, offer squirrels on/off, daylight/sunset, sound/silence, and gentle/no animal movement. A local rule mapping supplies scene settings without Gemini; choosing settings is distinct from agreeing to participate.
+5. **One optional parametric forest:** apply bounded `SceneConfig` settings (light, fog, sound layers, motion, particles, optional breathing orb) to existing objects, lighting, and audio for participants who choose it. Keep a saved configuration and local report fallback available if Gemini fails; scene availability must not gate the report.
 
 Defer additional environments, accounts, databases, PDF reports, and runtime world generation until this flow works. Gemini's useful role is explaining observations and translating preferences into supported scene settings.
 
@@ -59,7 +61,7 @@ The target headset is a Meta Quest Pro. Run the first-hour 60 s eye-data log fro
 
 | Person | Owns | First deliverable | Suggested feature branch |
 | --- | --- | --- | --- |
-| 1: Unity integration | Project setup, assessment/report UI, self-report UI (sliders, chips, text), session flow, backend connection; later headset integration | Start button -> sample summary -> forest transition | `feat/app-flow` |
+| 1: Unity integration | Project setup, assessment/report UI, self-report UI (sliders, chips, text), session flow, backend connection; later headset integration | Start -> sample report -> successful report-only completion; separate opt-in forest branch | `feat/app-flow` |
 | 2: Signals and metrics | Replay provider, synthetic fixtures, probes, baseline and deviations, indicator, data-quality handling, tests; Quest Pro eye adapter with whoever holds the headset | A sample session produces repeatable metrics | `feat/replay-metrics` |
 | 3: Backend and Gemini | FastAPI, Pydantic models from `contracts/v1`, reconciliation-aware Gemini prompt, timeout/cache/fallback | Endpoint returns a valid mocked report and scene configuration | `feat/gemini-backend` |
 | 4: Environment and experience | Forest scene, squirrel prefab, audio layers, lighting, breathing orb, `SceneConfig` application and the local chip-to-scene mapping, demo capture | Forest works locally and changes through a configuration object | `feat/forest-scene` |
@@ -74,7 +76,7 @@ Before coding independently, agree on example request/response JSON and the mini
 | --- | --- | --- |
 | First 30 minutes | Agree on one Unity and Meta XR SDK version, create the project, merge the contracts and fixtures, assign owners | Everyone can work against the same examples and package versions |
 | Next two hours | Work in parallel with synthetic metrics, a mocked backend, and placeholder forest objects | Each person's first deliverable runs independently |
-| First integration checkpoint | Connect session -> metrics -> report -> forest on desktop | One complete flow works, even with a ground plane and a few trees |
+| First integration checkpoint | Connect session -> metrics -> report -> Done, then the opt-in forest branch on desktop | Report-only completion works without a forest; optional scene entry requires a deliberate choice |
 | After integration | Connect Gemini, improve the forest, add hardware tracking when available, test failure paths | Live improvements preserve the working offline flow |
 | Final two hours before submission | Freeze features, test offline behavior, record a backup, rehearse | Reproducible demo build, honest source labels, and a prepared pitch |
 
@@ -82,7 +84,8 @@ Treat these as targets and adjust to the actual time remaining. Confirm headset 
 
 ## 6. Verify the demo before adding stretch features
 
-- Complete the full desktop flow from session start to the forest.
+- Complete the desktop report-only path to Done without scene settings, a forest load or post-scene feedback; retain report review until explicit end/reset. This is new acceptance work, not a claim about the current flow.
+- Separately choose the forest from the report, check preference/comfort controls, and complete with or without optional feedback.
 - Confirm the metrics are repeatable and tracking gaps produce an insufficient-data result when appropriate.
 - Change each preference and each self-report chip and verify the corresponding scene behavior (local mapping, no network).
 - Run `python contracts/validate_examples.py` after any contract or fixture change.
@@ -91,7 +94,7 @@ Treat these as targets and adjust to the actual time remaining. Confirm headset 
 - Run the Quest Pro eye-data log and a headset session when hardware is ready; identify anything still unverified.
 - Save a local build and a short backup recording. Tell judges when input is synthetic or a report uses fallback output.
 
-The MVP is complete when this end-to-end experience works reliably. A single demo participant does not establish health improvement or fatigue-detection accuracy.
+The core MVP is complete when the eye-tracking assessment/report path works reliably, including successful report-only completion. The optional scene has its own acceptance checks and cannot substitute for that core path. A single demo participant does not establish health improvement or fatigue-detection accuracy.
 
 ## References
 

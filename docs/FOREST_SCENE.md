@@ -1,5 +1,9 @@
 # ForestDemo: assets, integration plan and hardware checks
 
+## Role in the product
+
+The forest is **one optional relaxation use case of the eye-tracking app**. The core outcome is an experimental health/fatigue wellness report, and users must be able to complete a report-only session without entering `ForestDemo` or selecting scene settings. Only an explicit participation choice should load/apply this experience; receiving a `SceneConfig` is not that choice. The current app still routes normal completion through Scene/Re-rating; see [objectives and implementation gaps](OBJECTIVES.md). The preparation status and asset checks below describe the original scene handoff, not completion of the report-only work.
+
 Owner: environment and experience (`feat/forest-scene`). Status: **prepared without a Unity project**. Nothing here has been compiled, imported or run; the Unity project and version are created by the integration owner. The scripts in `unity/Assets/App/Relaxation/` are unverified until opened in the editor.
 
 ## 1. Asset sources and what was verified
