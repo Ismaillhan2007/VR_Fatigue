@@ -1,5 +1,7 @@
 # Integration review (2026-10-24, `chore/integration`)
 
+> **Historical record.** Since then #7, #10, #8 and #9 were merged into `main` and `dev` (2026-10-24): the probe task and demo replay (#8), the `origin/dev` reconciliation, shared scene rules, forest `RenderSettings` reset and 422 docs (#10) are done. Current open items: real forest art, Quest Pro adapter in the app flow, headset and Android checks, live Gemini. Workflow rules learned here are in `CONTRIBUTING.md`.
+
 Branches found: `feat/signals-metrics-quest-pro` (no PR), `feat/gemini-backend` (no PR; also merged into stale `dev`), `feat/forest-scene` (PR #6). No `feat/replay-metrics` or `feat/quest-eye`: the Quest Pro bridge lives in the signals branch. PR #5 (app flow) was merged without a teammate review and is re-reviewed here. Merge order: signals -> backend -> forest, on top of `origin/main`.
 
 Verification is listed at the end. Nothing here ran on a headset.
