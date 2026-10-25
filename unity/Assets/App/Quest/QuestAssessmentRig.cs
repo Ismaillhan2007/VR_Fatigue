@@ -24,8 +24,7 @@ namespace App.Quest
         public const float PlacementSettleSeconds = 0.5f;
         OVRDisplay _display;
         InputAction _pause;
-        bool _placed;
-        float _trackedFor;
+        readonly PlacementGate _placement = new PlacementGate();
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void Install()
@@ -119,7 +118,11 @@ namespace App.Quest
         void HandleStateChanged(FlowState previous, FlowState next)
         {
             if (next == FlowState.Consent) RequestPlacement();
+            // Capture started while placement was still waiting for stable tracking: cancel it.
+            if (PlacementGate.IsMeasuring(next)) _placement.Cancel();
         }
+
+        FlowState CurrentState => Controller != null && Controller.Flow != null ? Controller.Flow.State : FlowState.Consent;
 
         void Update()
         {
@@ -135,23 +138,14 @@ namespace App.Quest
         // lands where the person is actually looking, not where the headset pointed while being put on.
         void LateUpdate()
         {
-            if (_placed || Head == null) return;
+            if (!_placement.Pending || Head == null) return;
             var tracked = InputDevices.GetDeviceAtXRNode(XRNode.Head)
                 .TryGetFeatureValue(UnityEngine.XR.CommonUsages.isTracked, out var isTracked) && isTracked;
-            _trackedFor = tracked ? _trackedFor + Time.unscaledDeltaTime : 0;
-            if (_trackedFor < PlacementSettleSeconds) return;
-            Presentation.PlaceInFrontOfHead();
-            _placed = true;
+            if (_placement.Tick(tracked, Time.unscaledDeltaTime, CurrentState)) Presentation.PlaceInFrontOfHead();
         }
 
         /// <summary>Places the panel in view again once tracking is stable, except during a measured phase.</summary>
-        public void RequestPlacement()
-        {
-            var state = Controller != null && Controller.Flow != null ? Controller.Flow.State : FlowState.Consent;
-            if (state == FlowState.Baseline || state == FlowState.LoadTask) return; // same conditions for both phases
-            _placed = false;
-            _trackedFor = 0;
-        }
+        public void RequestPlacement() => _placement.Request(CurrentState);
 
         public void PauseAndBringPanel()
         {
@@ -186,6 +180,47 @@ namespace App.Quest
             if (Controller != null && Controller.Flow != null) Controller.Flow.StateChanged -= HandleStateChanged;
             if (_display != null) _display.RecenteredPose -= HandleRecenter;
             _pause?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Timing for placing the panel in view: only after head tracking has been stable for
+    /// <see cref="QuestAssessmentRig.PlacementSettleSeconds"/>, and never during Baseline or LoadTask, so both phases
+    /// keep identical viewing conditions. Pure logic, so the start/capture race is unit-testable.
+    /// </summary>
+    public sealed class PlacementGate
+    {
+        float _trackedFor;
+
+        /// <summary>A placement is waiting. True initially: the first start screen must be placed.</summary>
+        public bool Pending { get; private set; } = true;
+
+        public static bool IsMeasuring(FlowState state) => state == FlowState.Baseline || state == FlowState.LoadTask;
+
+        /// <summary>Ask for a new placement; ignored while a measured phase is running.</summary>
+        public void Request(FlowState state)
+        {
+            if (IsMeasuring(state)) return;
+            Pending = true;
+            _trackedFor = 0;
+        }
+
+        public void Cancel()
+        {
+            Pending = false;
+            _trackedFor = 0;
+        }
+
+        /// <summary>Advance one frame; returns true exactly once, when the panel should be placed now.</summary>
+        public bool Tick(bool headTracked, float deltaSeconds, FlowState state)
+        {
+            if (!Pending) return false;
+            // Re-check at the moment of placing: capture may have started during the settle delay.
+            if (IsMeasuring(state)) { Cancel(); return false; }
+            _trackedFor = headTracked ? _trackedFor + deltaSeconds : 0;
+            if (_trackedFor < QuestAssessmentRig.PlacementSettleSeconds) return false;
+            Pending = false;
+            return true;
         }
     }
 }
