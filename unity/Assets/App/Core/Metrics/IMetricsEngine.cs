@@ -11,6 +11,11 @@ namespace App.Core.Metrics
         public readonly List<ProbeEvent> Probes = new List<ProbeEvent>();
         public double StartTime;
         public double EndTime;
+        /// <summary>Optional acquisition-clock bounds, independent of whether samples arrived.</summary>
+        public double? SensorStartTime;
+        public double? SensorEndTime;
+        /// <summary>Sensor seconds per frame-clock second when extrapolating legacy frame bounds.</summary>
+        public double SensorClockRate = 1;
 
         public double DurationSeconds => EndTime > StartTime ? EndTime - StartTime : 0;
 
@@ -19,6 +24,8 @@ namespace App.Core.Metrics
             Samples.Clear();
             Probes.Clear();
             StartTime = EndTime = 0;
+            SensorStartTime = SensorEndTime = null;
+            SensorClockRate = 1;
         }
     }
 

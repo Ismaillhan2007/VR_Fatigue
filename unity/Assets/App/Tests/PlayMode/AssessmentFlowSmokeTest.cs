@@ -18,6 +18,41 @@ namespace App.Tests
     /// <summary>Desktop smoke test: the generated Assessment scene completes one synthetic session offline.</summary>
     public class AssessmentFlowSmokeTest
     {
+        [UnityTest]
+        public IEnumerator CalculationFailureShowsUnavailableMeasurements()
+        {
+            yield return SceneManager.LoadSceneAsync("Assessment");
+            var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+            c.EyeSource = EyeSourceMode.Synthetic;
+            c.BaselineSeconds = c.TaskSeconds = 1;
+            c.Analysis = AnalysisMode.Local;
+            c.AcceptConsent();
+            yield return WaitUntil(() => !c.IsCapturing);
+            c.SubmitBaseline(2, 2);
+            yield return WaitUntil(() => c.Flow.State == FlowState.CheckIn);
+
+            // A corrupt provider timestamp must not turn a failed calculation into canned measurements.
+            var task = (App.Core.Metrics.PhaseRecording)typeof(SessionController)
+                .GetField("_task", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                .GetValue(c);
+            var row = task.Samples[0]; row.SensorTimestamp = double.NaN; task.Samples[0] = row;
+            c.SubmitCheckIn(new SelfReport { Phase = ReportPhase.PostTask, EyeStrain = 3, MentalFatigue = 3 }, null);
+            yield return WaitUntil(() => c.Flow.Context.Analysis != null);
+
+            var summary = c.Flow.Context.Summary;
+            Assert.AreEqual(QualityStatus.InsufficientData, summary.Quality.Status);
+            Assert.AreEqual("processing-error.v1", summary.MetricVersion);
+            Assert.AreEqual(DataSource.Synthetic, summary.DataSource);
+            Assert.AreEqual(StrainLevel.Unavailable, summary.StrainIndicator.Level);
+            Assert.IsNull(summary.StrainIndicator.Value);
+            foreach (MetricName metric in Enum.GetValues(typeof(MetricName)))
+            { Assert.IsNull(summary.Metrics.Get(metric)); Assert.IsNull(summary.Deviations.Get(metric)); }
+            StringAssert.Contains("could not be calculated", c.MetricsFailureMessage);
+            StringAssert.Contains(c.MetricsFailureMessage, UnityEngine.Object.FindAnyObjectByType<SummaryPanel>().Body.text);
+            c.Exit();
+            Assert.IsNull(c.MetricsFailureMessage);
+        }
+
         static void RequireBackendRun()
         {
             if (Environment.GetEnvironmentVariable("VR_RUN_BACKEND_TESTS") != "1")
@@ -286,6 +321,9 @@ namespace App.Tests
 
             var s = c.Flow.Context.Summary;
             Assert.AreEqual(ReplayOrigin.Synthetic, s.ReplayOrigin);
+            Assert.IsNull(c.MetricsFailureMessage);
+            Assert.AreEqual(QualityStatus.Usable, s.Quality.Status);
+            Assert.AreEqual(190000, s.DurationMs, "loading time and render-frame overshoot are outside the two capture phases");
             Assert.IsNotNull(s.Metrics.ProbeLatencyMs);
             Assert.IsNotNull(s.Deviations.ProbeLatencyMs);
             Assert.AreNotEqual(StrainLevel.Unavailable, s.StrainIndicator.Level, "the demo must show the experimental indicator");
