@@ -154,7 +154,8 @@ namespace App.Core.Flow
         {
             Require(FlowState.RelaxationSetup);
             if (preferences != null) ThrowIfInvalid(preferences);
-            Context.Preferences = preferences;
+            Context.Preferences = preferences == null ? null :
+                ContractJson.Parse<Preferences>(ContractJson.Serialize(preferences));
             ContextChanged?.Invoke();
         }
 

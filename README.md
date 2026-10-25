@@ -13,13 +13,13 @@ Consent -> Baseline (probe targets) -> Task (same probes) -> Check-in (2 sliders
              -> Choose optional forest -> Preferences/preview -> Forest -> Optional feedback -> Done
 ```
 
-This is the intended flow. The current demo still routes normal completion through Forest and Re-rating; Exit clears session data. See [objectives and implementation gaps](docs/OBJECTIVES.md) for the changes needed to support successful report-only completion.
+The desktop app implements both branches. Finish with report retains the report until Exit or New session; optional relaxation has a separate preferences/preview screen and optional feedback. See [report-only flow](docs/REPORT_ONLY_FLOW.md) and [remaining objectives](docs/OBJECTIVES.md).
 
 1. **Capture.** An eye provider delivers timestamped gaze samples: synthetic generator, replay file, or (later) the Quest Pro. A yellow head-locked target jumps every 2 s (same layout in both phases) to measure latency, accuracy and misses.
 2. **Metrics (deterministic, on device).** Quality checks (repeated timestamps dropped, stalls and gaps handled), gaze/head speed, probe metrics, robust deviation from the baseline, and an **experimental baseline-deviation indicator** (never called a fatigue score).
 3. **Reconciliation and safety (on device).** The app compares words and signals and checks for discomfort. Free text never leaves the device.
 4. **Explanation (backend).** FastAPI validates the summary and returns a short explanation plus a bounded scene configuration. It uses deterministic rules by default; Gemini is optional, only for synthetic input, and only picks approved explanation codes and bounded settings.
-5. **Optional scene use case.** When the participant chooses relaxation, Unity re-validates and clamps the configuration, applies their explicit choices (they always win), and the forest fades lighting, fog, sound, particles, a breathing orb and an optional squirrel. The camera never moves; pause, mute and exit are always available. This feature must not gate report access or completion; the current flow does not yet meet that objective.
+5. **Optional scene use case.** When the participant chooses relaxation, Unity re-validates and clamps the configuration, applies their explicit choices (they always win), and the forest fades lighting, fog, sound, particles, a breathing orb and an optional squirrel. The camera never moves; pause, mute and exit are always available. Report access and normal completion do not require this feature.
 
 Every screen shows where the data came from (LIVE / REPLAY / SYNTHETIC) and where the explanation came from (live / cached / fallback AI).
 
@@ -37,15 +37,15 @@ Every screen shows where the data came from (LIVE / REPLAY / SYNTHETIC) and wher
 
 ## Status
 
-**Product alignment gap:** the report is shown before scene entry, but there is no normal "Finish with report" action. The summary offers scene entry, scene preferences appear during the check-in, and v1 responses always include a scene config. Users can exit without entering the forest, but Exit clears the report. These are documented gaps, not evidence of an implemented report-only mode; see [OBJECTIVES](docs/OBJECTIVES.md).
+**Report-first desktop flow:** Finish with report reaches Done without loading the forest or collecting scene settings/feedback. The report remains available until Exit or New session. Try optional relaxation opens a separate settings/preview screen before entry; feedback can be skipped. The required v1 scene config remains on the wire and is ignored when unused. See [verification](docs/REPORT_ONLY_FLOW.md).
 
-**Current desktop demo:** Unity replays a synthetic session with a 130-second baseline, a 60-second loaded task and target probes. The signals engine calculates gaze/head/probe metrics, baseline deviations and an experimental indicator from that replay. Default replay speed is 4x. Unity sends the aggregate summary to FastAPI and applies the returned, validated settings to a placeholder `ForestDemo` scene. The UI identifies synthetic replay and distinguishes backend rules from Unity's local fallback.
+**Current desktop demo:** Unity replays a synthetic session with a 130-second baseline, a 60-second loaded task and target probes. The signals engine calculates gaze/head/probe metrics, baseline deviations and an experimental indicator from that replay. Default replay speed is 4x. Unity sends the aggregate summary to FastAPI for the report. Only an explicit optional-relaxation choice applies validated settings to `ForestDemo`. The UI identifies synthetic replay and distinguishes backend rules from Unity's local fallback.
 
 The backend works offline by default. Interactive check-ins use `cloud_policy: local_only`, including those with synthetic eye samples. The optional Gemini adapter has passed a bounded synthetic-only smoke check; invented test scenarios must explicitly opt in with `synthetic_demo`. The Gemini key stays on the backend.
 
 Remaining work includes the finished forest assets/audio, wiring the Quest Pro capture bridge into the app's hardware provider, and native Editor/network/headset acceptance on the target machines. A working local backend does not establish connectivity from a second laptop. Unity is pinned to **6000.6.7f1**, Meta XR Core SDK to **207.0.1**, and Python to **3.12**. Follow [setup](docs/SETUP.md), [architecture](docs/ARCHITECTURE.md) and the [backend guide](backend/README.md). The [integration review](docs/INTEGRATION_REVIEW.md) records an earlier integration checkpoint; some listed tasks have since been completed.
 
-Automated checks on `dev`: about 290 Unity EditMode tests, PlayMode tests including Unity <-> FastAPI over HTTP, 130 backend tests, and contract fixture checks. Not verified yet: any headset run and an Android build. The demo data are synthetic and labelled as such.
+Integration checks include Unity 6000.6.7f1 EditMode and PlayMode, Unity <-> FastAPI over HTTP, 150 backend tests, and contract fixture checks. Exact report-flow results are recorded in [REPORT_ONLY_FLOW](docs/REPORT_ONLY_FLOW.md). Not verified yet: any headset run and an Android build. The demo data are synthetic and labelled as such.
 
 ## Quick start
 

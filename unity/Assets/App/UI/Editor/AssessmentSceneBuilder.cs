@@ -114,7 +114,7 @@ namespace App.UI.Editor
             foreach (Chip c in Enum.GetValues(typeof(Chip))) p.ChipToggles.Add(MakeToggle(grid.transform, ReportText.ChipLabel(c), layout: false));
             p.FreeText = MakeInput(root.transform, "Optional: say how you feel (max 300 characters)");
             p.Hint = Label(root.transform, "", 14, 24);
-            p.SubmitButton = MakeButton(ButtonRow(root.transform), "Continue");
+            p.SubmitButton = MakeButton(ButtonRow(root.transform), "View report");
             return root;
         }
 

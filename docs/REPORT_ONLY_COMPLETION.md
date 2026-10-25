@@ -30,3 +30,7 @@ Unity 6000.6.7f1 with the repository's pinned packages, in a separate imported c
 - Unity-generated metadata checked for missing/duplicate GUIDs; tracked secret/private-data filename scan returns only `backend/.env.example`.
 
 No screenshot-based testing was used (user instruction). Android build/install, XR interaction, headset readability/comfort and real eye capture are not verified here; they belong to #18/#21. This PR does not claim that the hardware provider is connected or that the app sustains 90 FPS.
+
+## Later integration
+
+The original PR #26 evidence above records its separate run. Consolidation with #19/#24/#25 and the parallel #27 implementation, subsequent desktop results and optional synthetic UI captures are recorded in [REPORT_ONLY_FLOW](REPORT_ONLY_FLOW.md). The combined implementation preserves the participation-aware flow and missing-forest behavior.

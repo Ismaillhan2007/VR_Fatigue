@@ -10,7 +10,7 @@ Draft for the team to edit. Every claim below must stay within [AGENTS.md](../AG
 
 People using VR need a way to review changes in eye movement and how they feel. Gaze alone cannot establish fatigue or replace what a participant reports. Our core objective is a useful health/fatigue report presented as an experimental wellness summary: compare a person with themselves, put their own words first, and show limitations. The participant can choose a calm break as an additional use case; they should also be able to finish with the report alone.
 
-**Direction versus current build:** report-only completion is the intended product behavior and still needs implementation. Today the report is visible before scene entry, but normal completion goes through the forest and re-rating; Exit clears session data. Do not present this docs change as an implemented mode. See [objectives and the code-backed gap audit](OBJECTIVES.md).
+**Current desktop build:** Finish with report completes normally without a forest load, scene preferences or post-scene feedback. Reports remain in memory until Exit or New session. Optional relaxation has a separate preview/entry choice and skippable feedback. See [implementation and verification](REPORT_ONLY_FLOW.md). Headset operation remains unverified.
 
 ## What we built
 
@@ -26,7 +26,7 @@ People using VR need a way to review changes in eye movement and how they feel. 
 2. The metrics bridge turns the baseline and task into one session on the sensor clock and computes quality, metrics, deviations and the experimental indicator. Unavailable values are `null` with a reason, never 0.
 3. The app computes the reconciliation between words and signals and the safety notice locally. Free text never leaves the device.
 4. The backend (or local rules if it is unreachable) returns the explanation and a scene configuration. Unity rejects any response that relabels provenance, changes the reconciliation or lowers safety, then clamps the scene settings again.
-5. If the participant clicks scene entry, the forest applies the settings with slow fades; the camera never moves. The target product also offers successful report-only completion, which is not implemented in this build.
+5. If the participant clicks scene entry, the forest applies the settings with slow fades; the camera never moves. Participants can instead finish with their report without entering a scene.
 
 ## What is real and what is not (say this out loud)
 
@@ -50,7 +50,7 @@ Unity 6, C#, URP, XR Interaction Toolkit, OpenXR, Meta XR Core SDK, Newtonsoft J
 
 ## Honest limitations
 
-- The product is an eye-tracking app with an optional relaxation use case, but the current UI/state machine still ties normal completion to scene participation and a post-scene rating. V1 also bundles scene settings into every report response. Report-only completion and separate scene opt-in UX remain follow-up work.
+- The desktop UI supports report-only completion and explicit optional relaxation with skippable feedback. V1 still bundles scene settings into every response; the report-only UI ignores them. Headset and native-eye acceptance remain pending.
 - Experimental wellness prototype. **Not a medical device, not a diagnosis, not validated fatigue detection.** The indicator's constants are initial guesses.
 - No headset test yet: eye-data access, timing and comfort on the Quest Pro are unverified. The demo uses synthetic replay data.
 - Baseline is a single short session; a baseline taken while tired is flagged and the claims shrink.
@@ -75,7 +75,7 @@ If live Gemini is configured and shown, replace the fallback sentence with: "**T
 
 - [ ] Repository is public (or judges have access); `main` contains the merged, reviewed demo; no secrets (`git ls-files | grep -iE "DevAgentSettings|\.env$"` returns only `backend/.env.example`).
 - [ ] README status matches reality; `docs/SETUP.md` steps work on a fresh clone.
-- [ ] Describe eye tracking and the report as the product; describe the forest as optional. Disclose the missing report-only completion path until it is implemented and verified.
+- [ ] Describe eye tracking and the report as the product; describe the forest as optional. Use the recorded desktop report-only evidence and disclose the remaining headset/native-eye limitations.
 - [ ] Demo video (about 3 minutes) recorded from the desktop build, with the synthetic/fallback labels visible and narrated.
 - [ ] Devpost: description from this file, screenshots (summary screen with labels, forest), built-with list, AI-use disclosure, team members.
 - [ ] Tracks / prizes selected (check the HackTX track list; do not claim medical or clinical categories).

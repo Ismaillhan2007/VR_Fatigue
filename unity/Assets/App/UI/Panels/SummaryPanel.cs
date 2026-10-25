@@ -29,6 +29,7 @@ namespace App.UI.Panels
             // stop_session: show the take-a-break message instead of offering the scene.
             FinishReportButton.interactable = c.Analysis != null && !Controller.AnalysisInProgress;
             EnterSceneButton.interactable = c.Analysis != null && c.Analysis.SafetyNotice != SafetyNotice.StopSession;
+            FinishReportButton.interactable = c.Analysis != null && !Controller.AnalysisInProgress;
             Body.text = (Controller.MetricsFailureMessage == null ? "" : Controller.MetricsFailureMessage + "\n\n")
                 + SummaryFormatter.Format(c, Controller.AnalysisInProgress, Controller.ProbeStatsText);
         }

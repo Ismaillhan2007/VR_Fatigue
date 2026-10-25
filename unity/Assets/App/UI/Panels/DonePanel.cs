@@ -22,9 +22,12 @@ namespace App.UI.Panels
                 return;
             }
             var c = flow.Context;
-            Body.text = (c.SceneParticipated ? "Session completed with optional relaxation." : "Session completed with your report.")
-                + (c.PostSceneReport == null ? "" : $"\nAfter the scene (1-7): eye strain {c.PostSceneReport.EyeStrain}, mental fatigue {c.PostSceneReport.MentalFatigue}.\nA single before/after rating is not evidence that the scene helps.")
-                + "\n\n" + (Controller.MetricsFailureMessage == null ? "" : Controller.MetricsFailureMessage + "\n\n")
+            var participation = !c.SceneParticipated ? "Report complete. No relaxation scene was entered."
+                : c.PostSceneReport == null ? "Report complete. Optional relaxation ended; feedback was skipped."
+                : $"Report complete. After optional relaxation you reported (1-7): eye strain {c.PostSceneReport.EyeStrain}, "
+                    + $"mental fatigue {c.PostSceneReport.MentalFatigue}. A single rating is not evidence that the scene helps.";
+            Body.text = participation + "\nYour report remains available until Exit or New session.\n\n"
+                + (Controller.MetricsFailureMessage == null ? "" : Controller.MetricsFailureMessage + "\n\n")
                 + SummaryFormatter.Format(c, false, Controller.ProbeStatsText);
         }
     }

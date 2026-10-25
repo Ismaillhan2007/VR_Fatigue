@@ -63,99 +63,6 @@ namespace App.Tests
             StringAssert.Contains("LOCAL FALLBACK", ProvenanceLabels.Ai(f.Context));
         }
 
-        static SessionFlow WithReport(bool stop = false)
-        {
-            var f = ToSummary();
-            var s = SummaryFor(f);
-            f.SetSummary(s);
-            var request = AnalyzeRequest.Create(s, f.Context.BaselineReport, null);
-            if (stop) request.SafetyNotice = SafetyNotice.StopSession;
-            f.SetAnalysis(LocalFallbackAnalysis.Analyze(request), "offline test");
-            return f;
-        }
-
-        [TestCase(false)]
-        [TestCase(true)]
-        public void ReportOnlyKeepsFullReportUntilResetOrExit(bool stop)
-        {
-            var f = WithReport(stop);
-            var context = f.Context;
-            f.FinishWithReport();
-            Assert.AreEqual(FlowState.Done, f.State);
-            Assert.AreSame(context, f.Context);
-            Assert.NotNull(f.Context.Analysis);
-            Assert.IsNull(f.Context.Preferences);
-            Assert.IsNull(f.Context.PostSceneReport);
-            Assert.IsFalse(f.Context.SceneParticipated);
-            f.Restart();
-            Assert.IsNull(f.Context.Summary);
-            Assert.AreNotEqual(context.SessionId, f.Context.SessionId);
-        }
-
-        [Test]
-        public void ReportNeedsAnalysisAndCannotFinishWhilePaused()
-        {
-            var f = ToSummary();
-            Assert.Throws<InvalidOperationException>(() => f.FinishWithReport());
-            f = WithReport();
-            f.Pause();
-            Assert.Throws<InvalidOperationException>(() => f.FinishWithReport());
-            f.Exit();
-            Assert.IsNull(f.Context.Analysis);
-            Assert.IsNull(f.Context.Summary);
-        }
-
-        [Test]
-        public void ExplicitChoicePrecedesPreferencesAndSceneEntry()
-        {
-            var f = WithReport();
-            var summary = f.Context.Summary;
-            Assert.Throws<InvalidOperationException>(() => f.EnterScene());
-            Assert.Throws<InvalidOperationException>(() => f.SetScenePreferences(new Preferences()));
-            f.ChooseRelaxation();
-            Assert.IsFalse(f.Context.SceneParticipated);
-            f.SetScenePreferences(new Preferences { AnimalsEnabled = false });
-            f.CancelRelaxation();
-            Assert.AreSame(summary, f.Context.Summary);
-            Assert.IsNull(f.Context.Preferences);
-            f.FinishWithReport();
-        }
-
-        [Test]
-        public void SceneFeedbackCanBeSkippedWithoutInventedValues()
-        {
-            var f = WithReport();
-            f.ChooseRelaxation();
-            f.EnterScene();
-            f.MarkSceneParticipated();
-            f.FinishScene();
-            f.SkipReRating();
-            Assert.AreEqual(FlowState.Done, f.State);
-            Assert.IsTrue(f.Context.SceneParticipated);
-            Assert.IsNull(f.Context.PostSceneReport);
-        }
-
-        [Test]
-        public void UnavailableForestCompletesWithoutPostSceneFeedback()
-        {
-            var f = WithReport();
-            f.ChooseRelaxation();
-            f.EnterScene();
-            f.FinishScene();
-            Assert.AreEqual(FlowState.Done, f.State);
-            Assert.IsFalse(f.Context.SceneParticipated);
-            Assert.IsNull(f.Context.PostSceneReport);
-        }
-
-        [Test]
-        public void StopSessionBlocksOptionalChoice()
-        {
-            var f = WithReport(true);
-            Assert.Throws<InvalidOperationException>(() => f.ChooseRelaxation());
-            f.FinishWithReport();
-            Assert.NotNull(f.Context.Analysis);
-        }
-
         [Test]
         public void SkippingAStateThrows()
         {
@@ -272,6 +179,110 @@ namespace App.Tests
             var p = new Problems();
             p.Uuid("id", SessionContext.NewSessionId());
             Assert.IsFalse(p.Any);
+        }
+
+        static SessionFlow WithAnalysis(bool stop = false)
+        {
+            var flow = ToSummary();
+            var summary = SummaryFor(flow);
+            flow.SetSummary(summary);
+            var request = AnalyzeRequest.Create(summary, flow.Context.BaselineReport, null);
+            if (stop) request.SafetyNotice = SafetyNotice.StopSession;
+            flow.SetAnalysis(LocalFallbackAnalysis.Analyze(request), "test");
+            return flow;
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ReportOnlyCompletesAndRetainsReportUntilExplicitReset(bool stop)
+        {
+            var flow = WithAnalysis(stop);
+            var context = flow.Context;
+            flow.FinishWithReport();
+            Assert.AreEqual(FlowState.Done, flow.State);
+            Assert.AreSame(context, flow.Context);
+            Assert.NotNull(context.Summary);
+            Assert.NotNull(context.Analysis);
+            Assert.IsNull(context.Preferences);
+            Assert.IsNull(context.PostSceneReport);
+            Assert.IsFalse(context.SceneParticipated);
+            flow.Restart();
+            Assert.IsNull(flow.Context.Summary);
+            Assert.IsNull(flow.Context.Analysis);
+            Assert.AreNotEqual(context.SessionId, flow.Context.SessionId);
+        }
+
+        [Test]
+        public void ReportCompletionWaitsForAnalysisAndRespectsPause()
+        {
+            Assert.Throws<InvalidOperationException>(() => ToSummary().FinishWithReport());
+            var flow = WithAnalysis();
+            flow.Pause();
+            Assert.Throws<InvalidOperationException>(() => flow.FinishWithReport());
+            Assert.Throws<InvalidOperationException>(() => flow.ChooseRelaxation());
+            flow.Resume();
+            flow.FinishWithReport();
+        }
+
+        [Test]
+        public void SceneNeedsSeparateChoiceAndCanBeDeclinedAfterPreview()
+        {
+            var flow = WithAnalysis();
+            Assert.Throws<InvalidOperationException>(() => flow.EnterScene());
+            Assert.Throws<InvalidOperationException>(() => flow.SetScenePreferences(new Preferences()));
+            flow.ChooseRelaxation();
+            Assert.AreEqual(FlowState.RelaxationSetup, flow.State);
+            Assert.IsFalse(flow.Context.SceneParticipated);
+            flow.CancelRelaxation();
+            Assert.AreEqual(FlowState.Summary, flow.State);
+            Assert.IsNull(flow.Context.Preferences);
+            flow.FinishWithReport();
+            Assert.IsFalse(flow.Context.SceneParticipated);
+        }
+
+        [Test]
+        public void ScenePreferencesApplyOnlyAfterChoiceAndFeedbackCanBeSkipped()
+        {
+            var flow = WithAnalysis();
+            Assert.Throws<InvalidOperationException>(() => flow.SkipReRating());
+            flow.ChooseRelaxation();
+            var preferences = new Preferences { Sound = SoundMode.Silent, AnimalsEnabled = false };
+            flow.SetScenePreferences(preferences);
+            flow.EnterScene();
+            preferences.Sound = SoundMode.Forest;
+            Assert.IsFalse(flow.Context.SceneParticipated, "entry is not participation until the forest actually loads");
+            Assert.AreEqual(SoundMode.Silent, flow.Context.Preferences.Sound);
+            flow.MarkSceneParticipated();
+            Assert.IsTrue(flow.Context.SceneParticipated);
+            flow.FinishScene();
+            flow.SkipReRating();
+            Assert.AreEqual(FlowState.Done, flow.State);
+            Assert.IsNull(flow.Context.PostSceneReport);
+            Assert.NotNull(flow.Context.Analysis);
+        }
+
+        [Test]
+        public void UnavailableForestCompletesWithoutPostSceneFeedback()
+        {
+            var flow = WithAnalysis();
+            flow.ChooseRelaxation();
+            flow.EnterScene();
+            flow.FinishScene();
+            Assert.AreEqual(FlowState.Done, flow.State);
+            Assert.IsFalse(flow.Context.SceneParticipated);
+            Assert.IsNull(flow.Context.PostSceneReport);
+        }
+
+        [Test]
+        public void StopSessionBlocksRelaxationChoiceAndExitClearsRetainedReport()
+        {
+            var flow = WithAnalysis(true);
+            Assert.Throws<InvalidOperationException>(() => flow.ChooseRelaxation());
+            flow.FinishWithReport();
+            flow.Exit();
+            Assert.IsNull(flow.Context.Summary);
+            Assert.IsNull(flow.Context.Analysis);
+            Assert.IsNull(flow.Context.PostTaskReport);
         }
     }
 }

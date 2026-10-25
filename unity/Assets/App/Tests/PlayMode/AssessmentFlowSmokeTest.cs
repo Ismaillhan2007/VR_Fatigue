@@ -19,6 +19,194 @@ namespace App.Tests
     /// <summary>Desktop smoke test: the generated Assessment scene completes one synthetic session offline.</summary>
     public class AssessmentFlowSmokeTest
     {
+        static IEnumerator CaptureEvidence(string name)
+        {
+            var directory = Environment.GetEnvironmentVariable("VR_UI_SCREENSHOT_DIR");
+            if (string.IsNullOrEmpty(directory)) yield break;
+            System.IO.Directory.CreateDirectory(directory);
+            var path = System.IO.Path.Combine(directory, name + ".png");
+            var canvas = GameObject.Find("Canvas").GetComponent<Canvas>();
+            var camera = Camera.main;
+            var previousMode = canvas.renderMode;
+            var previousCamera = canvas.worldCamera;
+            var previousDistance = canvas.planeDistance;
+            var previousTarget = camera.targetTexture;
+            var previousActive = RenderTexture.active;
+            var target = new RenderTexture(1920, 1080, 24);
+            var pixels = new Texture2D(1920, 1080, TextureFormat.RGB24, false);
+            try
+            {
+                camera.targetTexture = target;
+                canvas.renderMode = RenderMode.ScreenSpaceCamera;
+                canvas.worldCamera = camera;
+                canvas.planeDistance = 1;
+                yield return null;
+                Canvas.ForceUpdateCanvases();
+                UnityEngine.Rendering.RenderPipeline.SubmitRenderRequest(camera,
+                    new UnityEngine.Rendering.RenderPipeline.StandardRequest { destination = target });
+                RenderTexture.active = target;
+                pixels.ReadPixels(new Rect(0, 0, 1920, 1080), 0, 0);
+                pixels.Apply();
+                System.IO.File.WriteAllBytes(path, pixels.EncodeToPNG());
+            }
+            finally
+            {
+                RenderTexture.active = previousActive;
+                camera.targetTexture = previousTarget;
+                canvas.renderMode = previousMode;
+                canvas.worldCamera = previousCamera;
+                canvas.planeDistance = previousDistance;
+                UnityEngine.Object.Destroy(target);
+                UnityEngine.Object.Destroy(pixels);
+            }
+        }
+
+        static IEnumerator ShortSession(SessionController controller, int eye = 3,
+            AnalysisMode mode = AnalysisMode.Local, bool waitForAnalysis = true)
+        {
+            controller.EyeSource = EyeSourceMode.Synthetic;
+            controller.BaselineSeconds = controller.TaskSeconds = 1;
+            controller.Analysis = mode;
+            controller.AcceptConsent();
+            yield return WaitUntil(() => !controller.IsCapturing);
+            controller.SubmitBaseline(2, 2);
+            yield return WaitUntil(() => controller.Flow.State == FlowState.CheckIn);
+            var checkIn = controller.Panels.OfType<CheckInPanel>().Single();
+            checkIn.EyeStrain.Slider.value = eye;
+            checkIn.MentalFatigue.Slider.value = 3;
+            if (eye == 7) checkIn.FreeText.text = "I feel nauseous";
+            yield return CaptureEvidence("check-in");
+            checkIn.SubmitButton.onClick.Invoke();
+            if (waitForAnalysis) yield return WaitUntil(() => controller.Flow.Context.Analysis != null);
+        }
+
+        [UnityTest]
+        public IEnumerator ExitDuringPendingAnalysisDoesNotReviveReportAfterRestart()
+        {
+            var portProbe = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+            portProbe.Start();
+            var port = ((System.Net.IPEndPoint)portProbe.LocalEndpoint).Port;
+            portProbe.Stop();
+            using (var listener = new System.Net.HttpListener())
+            {
+                var url = $"http://127.0.0.1:{port}";
+                listener.Prefixes.Add(url + "/");
+                listener.Start();
+                var received = new System.Threading.Tasks.TaskCompletionSource<bool>();
+                var release = new System.Threading.Tasks.TaskCompletionSource<bool>();
+                var serving = System.Threading.Tasks.Task.Run(async () =>
+                {
+                    var context = await listener.GetContextAsync();
+                    received.TrySetResult(true);
+                    await release.Task;
+                    try { context.Response.Close(); }
+                    catch (System.Net.HttpListenerException) { } // The cancelled client may already be gone.
+                });
+                try
+                {
+                    yield return SceneManager.LoadSceneAsync("Assessment");
+                    var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+                    c.BackendBaseUrl = url;
+                    yield return ShortSession(c, mode: AnalysisMode.Http, waitForAnalysis: false);
+                    yield return WaitUntil(() => received.Task.IsCompleted);
+                    Assert.IsTrue(c.AnalysisInProgress);
+                    Assert.IsFalse(c.Panels.OfType<SummaryPanel>().Single().FinishReportButton.interactable);
+                    Assert.IsFalse(c.Panels.OfType<SummaryPanel>().Single().EnterSceneButton.interactable);
+                    Assert.Throws<InvalidOperationException>(() => c.FinishWithReport());
+                    var previousId = c.Flow.Context.SessionId;
+                    c.Exit();
+                    c.Restart();
+                    release.TrySetResult(true);
+                    yield return WaitUntil(() => serving.IsCompleted);
+                    yield return null;
+                    Assert.IsFalse(serving.IsFaulted);
+                    Assert.AreEqual(FlowState.Consent, c.Flow.State);
+                    Assert.AreNotEqual(previousId, c.Flow.Context.SessionId);
+                    Assert.IsNull(c.Flow.Context.Analysis);
+                    Assert.IsNull(c.Flow.Context.Summary);
+                    Assert.IsFalse(c.AnalysisInProgress);
+                }
+                finally { release.TrySetResult(true); }
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator ReportOnlyButtonsCompleteOfflineInsufficientSessionAndKeepReport()
+        {
+            yield return SceneManager.LoadSceneAsync("Assessment");
+            var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+            yield return ShortSession(c);
+            var panel = c.Panels.OfType<SummaryPanel>().Single();
+            var original = panel.Body.text;
+            Assert.IsTrue(panel.FinishReportButton.interactable);
+            Assert.IsNull(c.Flow.Context.Preferences);
+            Assert.IsNull(c.Flow.Context.PostSceneReport);
+            Assert.AreEqual(StrainLevel.Unavailable, c.Flow.Context.Summary.StrainIndicator.Level);
+            StringAssert.DoesNotContain("Scene preview", original);
+            Assert.IsFalse(SceneManager.GetSceneByName("ForestDemo").isLoaded);
+            yield return CaptureEvidence("report");
+            panel.FinishReportButton.onClick.Invoke();
+            Assert.AreEqual(FlowState.Done, c.Flow.State);
+            var done = c.Panels.OfType<DonePanel>().Single();
+            StringAssert.Contains("No relaxation scene was entered", done.Body.text);
+            StringAssert.Contains(original, done.Body.text);
+            yield return CaptureEvidence("report-complete");
+            Assert.IsFalse(SceneManager.GetSceneByName("ForestDemo").isLoaded);
+            done.RestartButton.onClick.Invoke();
+            Assert.IsNull(c.Flow.Context.Summary);
+            Assert.IsNull(c.Flow.Context.Analysis);
+            Assert.IsNull(c.Flow.Context.PostTaskReport);
+            c.Exit();
+        }
+
+        [UnityTest]
+        public IEnumerator OptionalForestRequiresPreviewChoiceAndAllowsSkippingFeedback()
+        {
+            yield return SceneManager.LoadSceneAsync("Assessment");
+            var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+            yield return ShortSession(c);
+            var summary = c.Panels.OfType<SummaryPanel>().Single();
+            summary.EnterSceneButton.onClick.Invoke();
+            Assert.AreEqual(FlowState.RelaxationSetup, c.Flow.State);
+            Assert.IsFalse(SceneManager.GetSceneByName("ForestDemo").isLoaded);
+            var options = c.Panels.OfType<RelaxationSetupPanel>().Single();
+            options.BackButton.onClick.Invoke();
+            Assert.AreEqual(FlowState.Summary, c.Flow.State);
+            summary.EnterSceneButton.onClick.Invoke();
+            options.ChooseSettings.isOn = true;
+            options.Silent.isOn = true;
+            options.Animals.isOn = false;
+            yield return CaptureEvidence("optional-forest");
+            options.EnterButton.onClick.Invoke();
+            yield return WaitUntil(() => c.SceneStatus.Contains("brightness"));
+            Assert.AreEqual(SoundMode.Silent, App.Relaxation.SceneConfigHandoff.Current.Sound);
+            Assert.IsFalse(App.Relaxation.SceneConfigHandoff.Current.AnimalsEnabled);
+            c.FinishScene();
+            c.Panels.OfType<ReRatingPanel>().Single().SkipButton.onClick.Invoke();
+            Assert.AreEqual(FlowState.Done, c.Flow.State);
+            Assert.IsNull(c.Flow.Context.PostSceneReport);
+            StringAssert.Contains("feedback was skipped", c.Panels.OfType<DonePanel>().Single().Body.text);
+            c.Exit();
+            yield return WaitUntil(() => !SceneManager.GetSceneByName("ForestDemo").isLoaded);
+        }
+
+        [UnityTest]
+        public IEnumerator StopSessionCanFinishWithReportButCannotChooseForest()
+        {
+            yield return SceneManager.LoadSceneAsync("Assessment");
+            var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+            yield return ShortSession(c, 7);
+            Assert.AreEqual(SafetyNotice.StopSession, c.Flow.Context.Analysis.SafetyNotice);
+            var summary = c.Panels.OfType<SummaryPanel>().Single();
+            Assert.IsFalse(summary.EnterSceneButton.interactable);
+            Assert.IsTrue(summary.FinishReportButton.interactable);
+            summary.FinishReportButton.onClick.Invoke();
+            Assert.AreEqual(FlowState.Done, c.Flow.State);
+            StringAssert.Contains(SafetyRules.BreakMessage, c.Panels.OfType<DonePanel>().Single().Body.text);
+            Assert.IsFalse(SceneManager.GetSceneByName("ForestDemo").isLoaded);
+            c.Exit();
+        }
+
         [UnityTest]
         public IEnumerator CalculationFailureShowsUnavailableMeasurements()
         {
@@ -52,161 +240,6 @@ namespace App.Tests
             StringAssert.Contains(c.MetricsFailureMessage, UnityEngine.Object.FindAnyObjectByType<SummaryPanel>().Body.text);
             c.Exit();
             Assert.IsNull(c.MetricsFailureMessage);
-        }
-
-        [UnityTest]
-        public IEnumerator OfflineInsufficientDataCompletesThroughActualReportButtons()
-        {
-            yield return SceneManager.LoadSceneAsync("Assessment");
-            var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
-            c.EyeSource = EyeSourceMode.Synthetic;
-            c.BaselineSeconds = c.TaskSeconds = 1;
-            c.Analysis = AnalysisMode.Http;
-            c.BackendBaseUrl = "http://127.0.0.1:9";
-            c.AcceptConsent();
-            yield return WaitUntil(() => !c.IsCapturing);
-            c.SubmitBaseline(2, 2);
-            yield return WaitUntil(() => c.Flow.State == FlowState.CheckIn);
-            var checkIn = UnityEngine.Object.FindAnyObjectByType<CheckInPanel>();
-            Assert.IsEmpty(checkIn.GetComponentsInChildren<UnityEngine.UI.Toggle>()
-                .Where(t => t.name.Contains("settings")), "no scene preferences at check-in");
-            checkIn.SubmitButton.onClick.Invoke();
-            var panel = UnityEngine.Object.FindAnyObjectByType<SummaryPanel>();
-            yield return WaitUntil(() => c.Flow.Context.Analysis != null, 20);
-            Assert.AreEqual(StrainLevel.Unavailable, c.Flow.Context.Summary.StrainIndicator.Level);
-            StringAssert.DoesNotContain("Scene preview", panel.Body.text);
-            var report = c.Flow.Context.Summary;
-            panel.FinishReportButton.onClick.Invoke();
-            Assert.AreEqual(FlowState.Done, c.Flow.State);
-            Assert.AreSame(report, c.Flow.Context.Summary);
-            Assert.IsNull(c.Flow.Context.Preferences);
-            Assert.IsNull(c.Flow.Context.PostSceneReport);
-            Assert.IsFalse(SceneManager.GetSceneByName("ForestDemo").isLoaded);
-            var done = UnityEngine.Object.FindAnyObjectByType<DonePanel>();
-            StringAssert.Contains("completed with your report", done.Body.text);
-            StringAssert.Contains("Limitations:", done.Body.text);
-            StringAssert.Contains("Self-report after the task (1-7)", done.Body.text);
-            StringAssert.Contains("LOCAL FALLBACK", done.Body.text);
-            StringAssert.DoesNotContain("after the scene:", done.Body.text);
-            done.RestartButton.onClick.Invoke();
-            Assert.IsNull(c.Flow.Context.Summary);
-            Assert.AreEqual(0, ((App.Core.Metrics.PhaseRecording)typeof(SessionController)
-                .GetField("_task", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(c)).Samples.Count);
-        }
-
-        [UnityTest]
-        public IEnumerator RelaxationButtonsRequirePreviewAndPermitSkippingFeedback()
-        {
-            yield return SceneManager.LoadSceneAsync("Assessment");
-            var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
-            c.EyeSource = EyeSourceMode.Synthetic;
-            c.BaselineSeconds = c.TaskSeconds = 1;
-            c.Analysis = AnalysisMode.Local;
-            c.AcceptConsent();
-            yield return WaitUntil(() => !c.IsCapturing);
-            c.SubmitBaseline(2, 2);
-            yield return WaitUntil(() => c.Flow.State == FlowState.CheckIn);
-            c.SubmitCheckIn(new SelfReport { Phase = ReportPhase.PostTask, EyeStrain = 2, MentalFatigue = 2 }, null);
-            yield return WaitUntil(() => c.Flow.Context.Analysis != null);
-            UnityEngine.Object.FindAnyObjectByType<SummaryPanel>().EnterSceneButton.onClick.Invoke();
-            Assert.AreEqual(FlowState.RelaxationSetup, c.Flow.State);
-            Assert.IsFalse(SceneManager.GetSceneByName("ForestDemo").isLoaded);
-            var setup = UnityEngine.Object.FindAnyObjectByType<RelaxationSetupPanel>();
-            setup.BackButton.onClick.Invoke();
-            Assert.AreEqual(FlowState.Summary, c.Flow.State);
-            c.ChooseRelaxation();
-            setup = UnityEngine.Object.FindAnyObjectByType<RelaxationSetupPanel>();
-            setup.ChooseSettings.isOn = true;
-            setup.Silent.isOn = true;
-            Assert.AreEqual(SoundMode.Silent, c.ScenePreview.Sound);
-            setup.EnterButton.onClick.Invoke();
-            yield return WaitUntil(() => c.SceneStatus.Contains("brightness"));
-            c.FinishScene();
-            UnityEngine.Object.FindAnyObjectByType<ReRatingPanel>().SkipButton.onClick.Invoke();
-            Assert.AreEqual(FlowState.Done, c.Flow.State);
-            Assert.IsNull(c.Flow.Context.PostSceneReport);
-            c.Exit();
-            yield return WaitUntil(() => !SceneManager.GetSceneByName("ForestDemo").isLoaded);
-        }
-
-        [UnityTest]
-        public IEnumerator PendingExplanationCannotCompleteAndLateResponseCannotRestoreExitedData()
-        {
-            var probe = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
-            probe.Start();
-            var port = ((System.Net.IPEndPoint)probe.LocalEndpoint).Port;
-            probe.Stop();
-            using (var listener = new System.Net.HttpListener())
-            {
-                listener.Prefixes.Add($"http://127.0.0.1:{port}/");
-                listener.Start();
-                var received = new System.Threading.Tasks.TaskCompletionSource<bool>();
-                var release = new System.Threading.Tasks.TaskCompletionSource<bool>();
-                var serving = System.Threading.Tasks.Task.Run(async () =>
-                {
-                    var context = await listener.GetContextAsync();
-                    received.SetResult(true);
-                    await release.Task;
-                    try { context.Response.Close(); }
-                    catch (System.Net.HttpListenerException) { } // client may have cancelled on Exit
-                });
-                try
-                {
-                    yield return SceneManager.LoadSceneAsync("Assessment");
-                    var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
-                    c.EyeSource = EyeSourceMode.Synthetic;
-                    c.BaselineSeconds = c.TaskSeconds = 1;
-                    c.Analysis = AnalysisMode.Http;
-                    c.BackendBaseUrl = $"http://127.0.0.1:{port}";
-                    c.AcceptConsent();
-                    yield return WaitUntil(() => !c.IsCapturing);
-                    c.SubmitBaseline(2, 2);
-                    yield return WaitUntil(() => c.Flow.State == FlowState.CheckIn);
-                    c.SubmitCheckIn(new SelfReport { Phase = ReportPhase.PostTask, EyeStrain = 2, MentalFatigue = 2 }, null);
-                    yield return WaitUntil(() => received.Task.IsCompleted);
-                    var panel = UnityEngine.Object.FindAnyObjectByType<SummaryPanel>();
-                    Assert.IsFalse(panel.FinishReportButton.interactable);
-                    Assert.IsFalse(panel.EnterSceneButton.interactable);
-                    Assert.Throws<InvalidOperationException>(() => c.FinishWithReport());
-                    c.Exit();
-                    c.Restart();
-                    release.TrySetResult(true);
-                    yield return WaitUntil(() => serving.IsCompleted);
-                    yield return null;
-                    Assert.IsFalse(serving.IsFaulted);
-                    Assert.AreEqual(FlowState.Consent, c.Flow.State);
-                    Assert.IsNull(c.Flow.Context.Analysis);
-                    Assert.IsNull(c.Flow.Context.Summary);
-                    Assert.IsFalse(c.AnalysisInProgress);
-                }
-                finally { release.TrySetResult(true); }
-            }
-        }
-
-        [UnityTest]
-        public IEnumerator StopSessionStillOffersReportCompletionWithoutRelaxation()
-        {
-            yield return SceneManager.LoadSceneAsync("Assessment");
-            var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
-            c.EyeSource = EyeSourceMode.Synthetic;
-            c.BaselineSeconds = c.TaskSeconds = 1;
-            c.Analysis = AnalysisMode.Local;
-            c.AcceptConsent();
-            yield return WaitUntil(() => !c.IsCapturing);
-            c.SubmitBaseline(2, 2);
-            yield return WaitUntil(() => c.Flow.State == FlowState.CheckIn);
-            c.SubmitCheckIn(new SelfReport { Phase = ReportPhase.PostTask, EyeStrain = 7, MentalFatigue = 7, FreeText = "synthetic test: nauseous" }, null);
-            yield return WaitUntil(() => c.Flow.Context.Analysis != null);
-            Assert.AreEqual(SafetyNotice.StopSession, c.Flow.Context.Analysis.SafetyNotice);
-            var panel = UnityEngine.Object.FindAnyObjectByType<SummaryPanel>();
-            Assert.IsFalse(panel.EnterSceneButton.interactable);
-            Assert.IsTrue(panel.FinishReportButton.interactable);
-            panel.FinishReportButton.onClick.Invoke();
-            Assert.AreEqual(FlowState.Done, c.Flow.State);
-            Assert.IsFalse(SceneManager.GetSceneByName("ForestDemo").isLoaded);
-            StringAssert.Contains(SafetyRules.BreakMessage, UnityEngine.Object.FindAnyObjectByType<DonePanel>().Body.text);
-            c.Exit();
-            Assert.IsNull(c.Flow.Context.Analysis);
         }
 
         static void RequireBackendRun()
@@ -291,11 +324,12 @@ namespace App.Tests
             StringAssert.Contains("REPLAY of synthetic data", bar.DataLabel.text);
             // The backend's rules answered (local_only header above), so the label names the backend, not Unity.
             StringAssert.Contains("FALLBACK from backend rules", bar.AiLabel.text);
+            Assert.IsNull(ctx.Preferences, "preferences are not collected before relaxation is chosen");
             c.ChooseRelaxation();
             c.Flow.SetScenePreferences(new Preferences { AnimalsEnabled = false, Sound = SoundMode.Silent, Motion = MotionMode.None });
-            Assert.IsFalse(c.ScenePreview.AnimalsEnabled);
-            Assert.AreEqual(SoundMode.Silent, c.ScenePreview.Sound);
             c.EnterScene();
+            Assert.IsFalse(App.Relaxation.SceneConfigHandoff.Current.AnimalsEnabled);
+            Assert.AreEqual(SoundMode.Silent, App.Relaxation.SceneConfigHandoff.Current.Sound);
             yield return WaitUntil(() => c.SceneStatus.Contains("brightness"));
             c.FinishScene();
             c.SubmitReRating(2, 2);
@@ -403,14 +437,10 @@ namespace App.Tests
             StringAssert.Contains("SYNTHETIC", bar.DataLabel.text);
             StringAssert.Contains("LOCAL FALLBACK", bar.AiLabel.text);
 
-            c.ChooseRelaxation();
-            c.EnterScene();
-            yield return WaitUntil(() => c.SceneStatus.Contains("brightness"));
-            StringAssert.Contains("Forest scene loaded", c.SceneStatus, "ForestDemo must be in Build Settings");
-            Assert.NotNull(UnityEngine.Object.FindAnyObjectByType<App.Relaxation.ForestSceneApplier>());
-            c.FinishScene();
-            c.SubmitReRating(3, 3);
+            c.FinishWithReport();
             Assert.AreEqual(FlowState.Done, c.Flow.State);
+            Assert.IsFalse(SceneManager.GetSceneByName("ForestDemo").isLoaded);
+            Assert.IsNull(c.Flow.Context.PostSceneReport);
 
             c.Exit();
             Assert.AreEqual(FlowState.Exited, c.Flow.State);
@@ -489,10 +519,8 @@ namespace App.Tests
             Assert.AreNotEqual(StrainLevel.Unavailable, s.StrainIndicator.Level, "the demo must show the experimental indicator");
             StringAssert.Contains("Probe trials", c.ProbeStatsText);
 
-            var report = c.Flow.Context.Analysis;
-            UnityEngine.Object.FindAnyObjectByType<SummaryPanel>().FinishReportButton.onClick.Invoke();
+            c.FinishWithReport();
             Assert.IsFalse(SceneManager.GetSceneByName("ForestDemo").isLoaded);
-            Assert.AreSame(report, c.Flow.Context.Analysis);
             Assert.IsNull(c.Flow.Context.PostSceneReport);
             Assert.AreEqual(FlowState.Done, c.Flow.State);
         }

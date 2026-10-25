@@ -1,6 +1,6 @@
 # Product objectives and current alignment
 
-Updated October 25, 2026. This is the product direction for the eye-tracking app. The implementation audit below describes `origin/dev` at `aa21658`; this documentation branch does not change runtime behavior.
+Updated October 25, 2026. This is the product direction for the eye-tracking app. The desktop report-only flow is now implemented; [REPORT_ONLY_FLOW](REPORT_ONLY_FLOW.md) records its code and checks. The original audit described `origin/dev` at `aa21658`; native-eye/headset acceptance remains pending.
 
 ## Core purpose
 
@@ -31,20 +31,19 @@ Consent + capability/source check
 Pause/exit remain available throughout; stop-session safety prevents scene entry.
 ```
 
-This is the target flow. The current flow below still needs implementation changes.
+The desktop state machine and generated UI now implement this flow.
 
-## Current implementation gaps
+## Current implementation alignment
 
-| Area | Evidence in the current app | Difference from the objective / required follow-up |
-| --- | --- | --- |
-| Successful completion | [`SessionFlow`](../unity/Assets/App/Core/Flow/SessionFlow.cs) has `Summary -> Scene -> ReRating -> Done`; only `SubmitReRating` moves to `Done`. | Add a normal report-only completion transition from Summary. Keep the optional scene branch, and let scene users finish without requiring feedback. |
-| Report UI | [`SummaryPanel`](../unity/Assets/App/UI/Panels/SummaryPanel.cs) exposes `EnterSceneButton`; [`AssessmentSceneBuilder`](../unity/Assets/App/UI/Editor/AssessmentSceneBuilder.cs) labels it "Enter calming scene". | Add equally clear report-only completion and optional-scene choices. Update the builder and regenerate its UI assets in an implementation PR. The current app waits for a click; it does not automatically enter the scene. |
-| Exit versus completion | [`SessionFlow.Exit`](../unity/Assets/App/Core/Flow/SessionFlow.cs) replaces the session context; [`SessionController.Exit`](../unity/Assets/App/UI/SessionController.cs) also clears recordings and scene handoff. | Global Exit lets a user decline the forest today, but clears the report and is not successful report-only completion. Keep this privacy behavior for explicit Exit; add a distinct completion action. |
-| Preferences versus participation | [`CheckInPanel`](../unity/Assets/App/UI/Panels/CheckInPanel.cs) collects scene preferences during the check-in. "I want to choose scene settings myself" only controls overrides; otherwise `Preferences` is null. | Null preferences mean default settings, not refusal or acceptance of the scene. Move scene controls behind an explicit participation choice. |
-| Report/config coupling | [`SummaryFormatter`](../unity/Assets/App/UI/SummaryFormatter.cs) always includes a scene preview/rationale. [`AnalysisResponse`](../backend/app/models.py) and the [response schema](../contracts/v1/analysis_response.schema.json) require `scene_config` and `scene_rationale`. | Make the report useful independently of scene content. An unused valid v1 config can be ignored by the UI; omitting it from the wire requires a coordinated contract change. A returned config is never consent to load a scene. |
-| End screen and feedback | [`DonePanel`](../unity/Assets/App/UI/Panels/DonePanel.cs) assumes after-task and after-scene ratings. | Show a report-only completion without invented post-scene values. Treat scene feedback as optional and display it only when collected. |
-| Verification | Existing flow checks under [`App/Tests`](../unity/Assets/App/Tests) follow the current scene-oriented flow. | Add coverage for successful report-only completion, explicit scene opt-in, optional feedback and safety/exit behavior. Verify the report with the backend unavailable and with no forest scene loaded. This branch supplies no runtime verification. |
-| Eye-tracking readiness | [`EyeProviderFactory` in `HardwareEyeProvider.cs`](../unity/Assets/App/Capture/HardwareEyeProvider.cs) still uses the app hardware placeholder; the [Quest Pro bridge](QUEST_PRO_INTEGRATION.md) has pending device acceptance. The desktop demo uses labelled synthetic replay. | Wire and verify live capture before claiming a working headset eye-tracking product. Keep replay labels visible; rendering a forest does not demonstrate live tracking or validated fatigue detection. |
+| Area | Desktop implementation / remaining acceptance |
+| --- | --- |
+| Successful completion | `SessionFlow.FinishWithReport` moves Summary -> Done without a forest or feedback. Done retains the report until explicit Exit/reset. |
+| Explicit optional relaxation | Summary offers a separate choice, then `RelaxationSetupPanel` collects optional preferences and previews the result before deliberate entry. Back returns to the report. |
+| Report/config separation | SummaryFormatter shows measurements, quality, safety, explanation, limitations and provenance. Scene preview/rationale appears only after opting in; the v1 wire contract remains unchanged. |
+| Feedback | Scene participants may submit or skip post-scene feedback. Done describes actual participation without inventing ratings. |
+| Verification | See [desktop state/UI/HTTP checks](REPORT_ONLY_FLOW.md), including offline, insufficient-data, safety, reset and both participation branches. |
+| Live eyes and headset | App hardware provider/rig integration and device acceptance remain #18/#21. Synthetic replay labels stay visible. Rendering/foveation is not evidence of live assessment tracking. |
+| Hosted transfer | Runtime endpoint/auth and pre-upload participant-transfer controls remain #20. `cloud_policy: local_only` prevents Gemini forwarding, not HTTP upload. Hosted staging remains synthetic-only. |
 
 ## Delivery priorities and acceptance
 

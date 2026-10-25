@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1 &3895796694845830278
+--- !u!1 &378134899404019720
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -8,10 +8,10 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 2362875990281578684}
-  - component: {fileID: 150971673510250030}
-  - component: {fileID: 2233432881781369268}
-  - component: {fileID: 3226407951512697776}
+  - component: {fileID: 7846277988313209240}
+  - component: {fileID: 3466915206549195984}
+  - component: {fileID: 8715037086044942929}
+  - component: {fileID: 7022006263051507919}
   m_Layer: 0
   m_Name: Text
   m_TagString: Untagged
@@ -19,13 +19,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!224 &2362875990281578684
+--- !u!224 &7846277988313209240
 RectTransform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3895796694845830278}
+  m_GameObject: {fileID: 378134899404019720}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
@@ -38,21 +38,21 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!222 &150971673510250030
+--- !u!222 &3466915206549195984
 CanvasRenderer:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3895796694845830278}
+  m_GameObject: {fileID: 378134899404019720}
   m_CullTransparentMesh: 1
---- !u!114 &2233432881781369268
+--- !u!114 &8715037086044942929
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3895796694845830278}
+  m_GameObject: {fileID: 378134899404019720}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
@@ -80,13 +80,13 @@ MonoBehaviour:
     m_VerticalOverflow: 0
     m_LineSpacing: 1
   m_Text: 
---- !u!114 &3226407951512697776
+--- !u!114 &7022006263051507919
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3895796694845830278}
+  m_GameObject: {fileID: 378134899404019720}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 306cc8c2b49d7114eaa3623786fc2126, type: 3}
@@ -214,7 +214,7 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 5225285844192117641}
-  - {fileID: 2362875990281578684}
+  - {fileID: 7846277988313209240}
   - {fileID: 7409234275184807046}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -299,7 +299,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4229e504e6929423ba2b7c4d10d2d35c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: App.UI::App.UI.Panels.LoadTaskPanel
-  Status: {fileID: 2233432881781369268}
+  Status: {fileID: 8715037086044942929}
   SkipButton: {fileID: 1629092554322621157}
 --- !u!1 &7047377778205429586
 GameObject:

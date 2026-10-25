@@ -4,7 +4,7 @@ Build one complete desktop experience first, then connect real eye tracking when
 
 **Start a sample eye-tracking session (baseline, loaded task, check-in) -> calculate metrics -> reconcile them with how the participant says they feel -> deliver an experimental health/fatigue wellness report -> finish successfully with the report.**
 
-The participant can separately choose a personalized forest after the report. Rendering a 3D relaxation scene is one optional use case of the eye-tracking app. The current demo still requires the scene/re-rating route for normal completion; Exit clears the report. [Product objectives and implementation gaps](docs/OBJECTIVES.md) records the work needed to align it.
+The participant can separately choose a personalized forest after the report. Rendering a 3D relaxation scene is one optional use case of the eye-tracking app. The desktop app supports report-only completion and explicit optional relaxation; Exit clears data while Done retains the report. [Implementation and verification](docs/REPORT_ONLY_FLOW.md) records the desktop checks.
 
 This is the team's starting plan, not a claim that these features already exist. Detailed architecture and acceptance criteria live in [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md); the product rationale, baseline policy and scene parameters in [docs/CONCEPT.md](docs/CONCEPT.md); Quest Pro facts and the first-hour test in [docs/HARDWARE_QUEST_PRO.md](docs/HARDWARE_QUEST_PRO.md); collaboration rules in [CONTRIBUTING.md](CONTRIBUTING.md). Shared JSON schemas are in [contracts/v1](contracts/README.md).
 
@@ -84,7 +84,7 @@ Treat these as targets and adjust to the actual time remaining. Confirm headset 
 
 ## 6. Verify the demo before adding stretch features
 
-- Complete the desktop report-only path to Done without scene settings, a forest load or post-scene feedback; retain report review until explicit end/reset. This is new acceptance work, not a claim about the current flow.
+- Complete the desktop report-only path to Done without scene settings, a forest load or post-scene feedback; retain report review until explicit end/reset. The desktop implementation and evidence are recorded in [REPORT_ONLY_FLOW](docs/REPORT_ONLY_FLOW.md); device acceptance is separate.
 - Separately choose the forest from the report, check preference/comfort controls, and complete with or without optional feedback.
 - Confirm the metrics are repeatable and tracking gaps produce an insufficient-data result when appropriate.
 - Change each preference and each self-report chip and verify the corresponding scene behavior (local mapping, no network).

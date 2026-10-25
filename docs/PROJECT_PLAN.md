@@ -8,7 +8,7 @@ The report is an **experimental wellness summary**, not a medical diagnosis or p
 
 **Core must ship:** replay/assessment, deterministic metrics and personal-baseline comparison, check-in, useful report with local fallback, explicit data/AI source and quality labels, and normal completion without a scene or post-scene rating. Add real tracking as soon as hardware support is proven. Add live Gemini without making it necessary for reports or the offline demo.
 
-**Optional use case to demonstrate:** one local forest with optional squirrels, explicit participation choice, preference controls and comfort controls. Delivering this feature does not make scene participation a condition of using the eye-tracking app. The current code shows reports but still couples normal completion to the scene; the report-only branch below is not yet implemented.
+**Optional use case to demonstrate:** one local forest with optional squirrels, explicit participation choice, preference controls and comfort controls. Delivering this feature does not make scene participation a condition of using the eye-tracking app. The desktop app implements report-only completion and separate optional relaxation; device acceptance remains pending.
 
 **Stretch only:** another biome, multi-session comparisons, optional report export, pre-generated decorative assets. Defer model training, diagnosis, accounts, a database, autonomous multi-agent orchestration, and runtime 3D/video generation.
 
@@ -25,7 +25,7 @@ The report is an **experimental wellness summary**, not a medical diagnosis or p
 
 The team-selected Unity editor is **6000.6.7f1**. Verify the chosen Meta XR SDK supports it and record exact XR package/SDK versions in the setup PR. Meta XR Core SDK **207.0.1** and OpenXR **1.18.0** are pinned; the adapter and device acceptance steps are in [QUEST_PRO_INTEGRATION.md](QUEST_PRO_INTEGRATION.md). Keep `GEMINI_MODEL` configurable; choose an available stable Flash/Flash-Lite model after checking its structured-output support and project quota. Do not depend on a preview model or assume free quota.
 
-Layout (application scaffold, signals module and backend implemented; report-only completion still planned; application seams in [ARCHITECTURE.md](ARCHITECTURE.md)):
+Layout (application scaffold, signals module and backend implemented; desktop report-only completion implemented; application seams in [ARCHITECTURE.md](ARCHITECTURE.md)):
 
 ```text
 unity/                  # Assets/, Packages/, ProjectSettings/

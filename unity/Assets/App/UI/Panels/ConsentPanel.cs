@@ -19,7 +19,7 @@ namespace App.UI.Panels
         public override void OnShow() => Body.text =
             "Experimental wellness prototype. Not a medical device and not a diagnosis.\n\n"
             + "We record eye-movement aggregates for this session only. Nothing leaves this computer except a summary "
-            + "without your free text (and only if a backend is configured). Data are cleared when the session ends.\n\n"
+            + "without your free text (and only if a backend is configured). Your report stays in memory until Exit or New session.\n\n"
             + $"Eye data source: {Controller.EyeSourceDescription}\n\nYou can pause or exit at any time.";
     }
 }

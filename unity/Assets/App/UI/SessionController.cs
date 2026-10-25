@@ -188,7 +188,7 @@ namespace App.UI
             }
             catch (Exception e)
             {
-                Debug.LogWarning($"[SessionController] analysis client threw: {e.Message}");
+                Debug.LogWarning($"[SessionController] analysis client threw: {e.GetType().Name}");
                 result = new AnalysisResult { Response = LocalFallbackAnalysis.Analyze(request), FallbackReason = "client error" };
             }
             if (this == null || Flow.State != FlowState.Summary || Flow.Context.SessionId != sessionId) return;

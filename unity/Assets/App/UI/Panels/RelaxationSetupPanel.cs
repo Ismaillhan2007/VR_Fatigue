@@ -51,9 +51,13 @@ namespace App.UI.Panels
         {
             var a = Controller.Flow.Context.Analysis;
             EnterButton.interactable = a != null && a.SafetyNotice != SafetyNotice.StopSession;
-            Body.text = "You can return to the report without entering.\n\n"
-                + (Controller.ScenePreview == null ? "" : SummaryFormatter.SceneLine(Controller.ScenePreview))
-                + "\n\n" + a?.SceneRationale;
+            var config = Controller.ScenePreview;
+            Body.text = config == null ? "Preparing preview..." : "Optional forest preview\n\n"
+                + $"Lighting: {config.TimeOfDay.ToString().ToLowerInvariant()}\n"
+                + $"Sound: {(config.Sound == SoundMode.Silent ? "silent" : "forest ambience")}\n"
+                + $"Ambient movement: {(config.Motion == MotionMode.None ? "off" : "gentle")}\n"
+                + $"Animals: {(config.AnimalsEnabled ? "shown" : "hidden")}"
+                + "\n\n" + a?.SceneRationale + "\n\nYou may return to your report without entering.";
         }
     }
 }
