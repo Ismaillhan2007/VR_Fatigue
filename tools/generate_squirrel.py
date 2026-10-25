@@ -1,22 +1,25 @@
-"""Generate a simple low-poly stylized squirrel (OBJ + MTL) from scaled ellipsoids.
+"""Generate a stylized low-poly squirrel (OBJ + MTL) from scaled ellipsoids.
 
-This is an original placeholder model, built because the Sketchfab "Squirrel" by Rifat3D could not be
-downloaded (it needs a signed-in account). It is NOT derived from that model's geometry.
+This is an original model, built because the Sketchfab "Squirrel" by Rifat3D could not be downloaded (it needs a
+signed-in account). It is NOT derived from that model's geometry. Parts have different tessellation so the silhouette
+(head, tail) is smooth while tiny parts stay cheap (about 6.8k triangles in total).
 
-Units: metres. +Y up, +Z forward, model origin at the ground between the hind feet. Sitting pose, ~0.32 m tall.
+Units: metres. +Y up, +Z forward, model origin at the ground between the hind feet. Sitting pose, ~0.4 m tall.
 Run: python tools/generate_squirrel.py  (writes unity/Assets/App/Squirrel/Squirrel.obj and .mtl)
 """
 import math
 import pathlib
 
 OUT = pathlib.Path(__file__).resolve().parent.parent / "unity" / "Assets" / "App" / "Squirrel"
-LAT, LON = 8, 12
 
 MATERIALS = {
     "SquirrelFur": (0.55, 0.31, 0.15),
     "SquirrelBelly": (0.88, 0.78, 0.64),
     "SquirrelDark": (0.05, 0.04, 0.04),
 }
+
+# Tail base in model space; SquirrelIdle pivots the "Tail" object around this point.
+TAIL_BASE = (0.0, 0.07, -0.07)
 
 
 def rot_x(p, deg):
@@ -25,14 +28,14 @@ def rot_x(p, deg):
     return (x, y * math.cos(a) - z * math.sin(a), y * math.sin(a) + z * math.cos(a))
 
 
-def ellipsoid(center, radii, material, tilt_x=0.0, base=(0.0, 0.0, 0.0)):
-    """Return (verts, normals, faces) for a UV ellipsoid. Normals are smooth. Positions are relative to `base`."""
+def ellipsoid(center, radii, material, tilt_x=0.0, lat=12, lon=20):
+    """Return (verts, normals, faces, material) for a UV ellipsoid with smooth normals."""
     rx, ry, rz = radii
     verts, norms = [], []
-    for i in range(LAT + 1):
-        th = math.pi * i / LAT
-        for j in range(LON):
-            ph = 2 * math.pi * j / LON
+    for i in range(lat + 1):
+        th = math.pi * i / lat
+        for j in range(lon):
+            ph = 2 * math.pi * j / lon
             u = (math.sin(th) * math.cos(ph), math.cos(th), math.sin(th) * math.sin(ph))
             p = (u[0] * rx, u[1] * ry, u[2] * rz)
             n = (u[0] / rx, u[1] / ry, u[2] / rz)
@@ -40,57 +43,60 @@ def ellipsoid(center, radii, material, tilt_x=0.0, base=(0.0, 0.0, 0.0)):
             n = tuple(c / ln for c in n)
             if tilt_x:
                 p, n = rot_x(p, tilt_x), rot_x(n, tilt_x)
-            verts.append((center[0] + p[0] - base[0], center[1] + p[1] - base[1], center[2] + p[2] - base[2]))
+            verts.append((center[0] + p[0], center[1] + p[1], center[2] + p[2]))
             norms.append(n)
     faces = []
-    for i in range(LAT):
-        for j in range(LON):
-            a = i * LON + j
-            b = i * LON + (j + 1) % LON
-            c = (i + 1) * LON + j
-            d = (i + 1) * LON + (j + 1) % LON
+    for i in range(lat):
+        for j in range(lon):
+            a = i * lon + j
+            b = i * lon + (j + 1) % lon
+            c = (i + 1) * lon + j
+            d = (i + 1) * lon + (j + 1) % lon
             if i != 0:
                 faces.append((a, c, b))
-            if i != LAT - 1:
+            if i != lat - 1:
                 faces.append((b, c, d))
     return verts, norms, faces, material
 
 
 def tail_parts():
+    """A fluffy S-curved tail: 11 overlapping ellipsoids, widest near the middle, cream-coloured tip."""
     parts = []
-    n = 7
+    n = 11
     for k in range(n):
         t = k / (n - 1)
-        y = 0.07 + 0.27 * t
-        z = -0.07 - 0.09 * math.sin(math.pi * t * 0.85)
-        r = 0.028 + 0.034 * math.sin(math.pi * (0.15 + 0.75 * t))
-        parts.append(((0.0, y, z), (r, r * 1.45, r * 1.05), "SquirrelFur", -20.0 + 40.0 * t))
+        y = 0.07 + 0.30 * t
+        z = -0.07 - 0.10 * math.sin(math.pi * t * 0.85) + 0.025 * math.sin(math.pi * 2 * t)
+        r = 0.026 + 0.038 * math.sin(math.pi * (0.12 + 0.78 * t))
+        material = "SquirrelBelly" if k >= n - 2 else "SquirrelFur"
+        parts.append(((0.0, y, z), (r, r * 1.35, r * 1.05), material, -20.0 + 40.0 * t, 10, 18))
     return parts
 
 
-# (name, [(center, radii, material, tilt)])
+# (center, radii, material, tilt_x, lat, lon)
 BODY = [
-    ((0.0, 0.135, -0.01), (0.068, 0.105, 0.072), "SquirrelFur", 12.0),
-    ((0.0, 0.125, 0.045), (0.045, 0.075, 0.035), "SquirrelBelly", 12.0),
-    ((0.0, 0.255, 0.045), (0.042, 0.038, 0.047), "SquirrelFur", 0.0),
-    ((0.0, 0.243, 0.088), (0.021, 0.019, 0.026), "SquirrelBelly", 0.0),
-    ((0.0, 0.248, 0.112), (0.007, 0.006, 0.006), "SquirrelDark", 0.0),
-    ((-0.026, 0.268, 0.078), (0.007, 0.008, 0.005), "SquirrelDark", 0.0),
-    ((0.026, 0.268, 0.078), (0.007, 0.008, 0.005), "SquirrelDark", 0.0),
-    ((-0.026, 0.305, 0.03), (0.011, 0.019, 0.008), "SquirrelFur", 0.0),
-    ((0.026, 0.305, 0.03), (0.011, 0.019, 0.008), "SquirrelFur", 0.0),
-    ((-0.052, 0.042, 0.02), (0.026, 0.042, 0.058), "SquirrelFur", 0.0),
-    ((0.052, 0.042, 0.02), (0.026, 0.042, 0.058), "SquirrelFur", 0.0),
-    ((-0.03, 0.14, 0.085), (0.012, 0.032, 0.012), "SquirrelBelly", -20.0),
-    ((0.03, 0.14, 0.085), (0.012, 0.032, 0.012), "SquirrelBelly", -20.0),
+    ((0.0, 0.135, -0.01), (0.068, 0.105, 0.072), "SquirrelFur", 12.0, 12, 20),      # torso
+    ((0.0, 0.125, 0.045), (0.045, 0.075, 0.035), "SquirrelBelly", 12.0, 10, 16),    # chest
+    ((0.0, 0.255, 0.045), (0.042, 0.038, 0.047), "SquirrelFur", 0.0, 12, 20),       # head
+    ((-0.030, 0.240, 0.060), (0.020, 0.020, 0.024), "SquirrelBelly", 0.0, 8, 12),   # cheeks
+    ((0.030, 0.240, 0.060), (0.020, 0.020, 0.024), "SquirrelBelly", 0.0, 8, 12),
+    ((0.0, 0.243, 0.088), (0.021, 0.019, 0.026), "SquirrelBelly", 0.0, 10, 14),     # snout
+    ((0.0, 0.248, 0.112), (0.007, 0.006, 0.006), "SquirrelDark", 0.0, 6, 8),        # nose
+    ((-0.026, 0.268, 0.078), (0.007, 0.008, 0.005), "SquirrelDark", 0.0, 6, 8),     # eyes
+    ((0.026, 0.268, 0.078), (0.007, 0.008, 0.005), "SquirrelDark", 0.0, 6, 8),
+    ((-0.026, 0.305, 0.03), (0.011, 0.019, 0.008), "SquirrelFur", 0.0, 8, 12),      # ears
+    ((0.026, 0.305, 0.03), (0.011, 0.019, 0.008), "SquirrelFur", 0.0, 8, 12),
+    ((-0.052, 0.042, 0.02), (0.026, 0.042, 0.058), "SquirrelFur", 0.0, 10, 16),      # hind legs
+    ((0.052, 0.042, 0.02), (0.026, 0.042, 0.058), "SquirrelFur", 0.0, 10, 16),
+    ((-0.03, 0.14, 0.085), (0.012, 0.032, 0.012), "SquirrelBelly", -20.0, 8, 12),    # forepaws
+    ((0.03, 0.14, 0.085), (0.012, 0.032, 0.012), "SquirrelBelly", -20.0, 8, 12),
 ]
-TAIL_BASE = (0.0, 0.07, -0.07)
 
 
 def write_obj(path, mtl_name, objects):
-    lines = ["# Generated by tools/generate_squirrel.py (original placeholder, not the Sketchfab model)", f"mtllib {mtl_name}"]
+    lines = ["# Generated by tools/generate_squirrel.py (original model, not the Sketchfab one)", f"mtllib {mtl_name}"]
     vo = 0
-    for name, parts, base in objects:
+    for name, parts in objects:
         lines.append(f"o {name}")
         for verts, norms, faces, mat in parts:
             for v in verts:
@@ -107,15 +113,15 @@ def write_obj(path, mtl_name, objects):
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    body = [ellipsoid(c, r, m, t) for c, r, m, t in BODY]
-    # Tail is exported in world space; SquirrelIdle creates a pivot at TAIL_BASE at runtime to sway it.
-    tail = [ellipsoid(c, r, m, t) for c, r, m, t in tail_parts()]
-    write_obj(OUT / "Squirrel.obj", "Squirrel.mtl", [("Body", body, None), ("Tail", tail, None)])
+    body = [ellipsoid(*part) for part in BODY]
+    tail = [ellipsoid(*part) for part in tail_parts()]
+    write_obj(OUT / "Squirrel.obj", "Squirrel.mtl", [("Body", body), ("Tail", tail)])
     mtl = []
     for name, (r, g, b) in MATERIALS.items():
         mtl += [f"newmtl {name}", f"Kd {r} {g} {b}", "Ka 0 0 0", "Ks 0 0 0", "d 1", "illum 1", ""]
     (OUT / "Squirrel.mtl").write_text("\n".join(mtl), encoding="ascii")
-    print("wrote", OUT, "tail base", TAIL_BASE)
+    tris = sum(len(f) for _, _, f, _ in body + tail)
+    print("wrote", OUT, "triangles", tris, "tail base", TAIL_BASE)
 
 
 if __name__ == "__main__":
