@@ -13,6 +13,7 @@ namespace App.UI
         public RectTransform CanvasRect;
         public RectTransform Target;
         public Camera HeadCamera;
+        public bool WorldSpaceHeadRelative;
 
         public bool Visible => Target != null && Target.gameObject.activeSelf;
 
@@ -22,6 +23,12 @@ namespace App.UI
             if (cam == null || Target == null) return;
             var dir = new Vector3(headLocalDirection.X, headLocalDirection.Y, headLocalDirection.Z);
             var world = cam.transform.position + cam.transform.rotation * (dir * ProbeSchedule.DistanceMetres);
+            if (WorldSpaceHeadRelative)
+            {
+                Target.SetPositionAndRotation(world, cam.transform.rotation);
+                Target.gameObject.SetActive(true);
+                return;
+            }
             var screen = cam.WorldToScreenPoint(world);
             if (screen.z <= 0) { Hide(); return; }
             RectTransformUtility.ScreenPointToLocalPointInRectangle(CanvasRect, screen, null, out var local);

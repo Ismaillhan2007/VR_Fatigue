@@ -116,7 +116,9 @@ namespace App.Core.Flow
 
         public void SetAnalysis(AnalysisResponse analysis, string fallbackReason)
         {
-            Require(FlowState.Summary);
+            // Completing an in-flight explanation updates context, not the flow state. Keep the
+            // pause overlay active; subsequent participant transitions still require Resume.
+            if (State != FlowState.Summary) throw new InvalidOperationException("analysis requires Summary");
             if (Context.Summary == null) throw new InvalidOperationException("set the summary first");
             ThrowIfInvalid(analysis);
             if (analysis.SessionId != Context.SessionId || analysis.DataSource != Context.DataSource

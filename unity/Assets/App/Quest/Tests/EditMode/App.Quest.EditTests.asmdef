@@ -1,0 +1,28 @@
+{
+  "name": "App.Quest.EditTests",
+  "references": [
+    "App.Quest",
+    "App.Quest.Editor",
+    "App.UI",
+    "App.Core",
+    "Oculus.VR",
+    "Unity.XR.Interaction.Toolkit",
+    "Unity.InputSystem",
+    "UnityEngine.UI",
+    "Unity.XR.OpenXR",
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner",
+    "Unity.XR.OpenXR.Features.MetaQuestSupport"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ]
+}

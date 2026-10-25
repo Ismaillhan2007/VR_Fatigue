@@ -1,0 +1,17 @@
+{
+  "name": "App.Quest.Editor",
+  "rootNamespace": "App.Quest.Editor",
+  "references": [
+    "App.Quest",
+    "App.UI",
+    "App.UI.Editor",
+    "Oculus.VR",
+    "VRFatigue.QuestPro.Editor",
+    "Unity.XR.OpenXR",
+    "Unity.XR.OpenXR.Features.MetaQuestSupport"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "autoReferenced": true
+}
