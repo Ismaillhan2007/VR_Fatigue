@@ -28,6 +28,17 @@ __pycache__/
 session-data/
 private-reports/
 
+# Raw gaze/session exports and recordings are private; only reviewed synthetic fixtures are allowed
+*.csv
+!fixtures/**/*.csv
+
+# Android / Quest builds and signing material
+*.apk
+*.aab
+*.obb
+*.keystore
+*.jks
+
 # Editor / OS files
 .idea/
 .vs/
