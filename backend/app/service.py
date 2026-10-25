@@ -10,6 +10,7 @@ from typing import Protocol
 
 from google.genai.errors import APIError
 
+from app.allowance import AllowanceLedger
 from app.config import Settings
 from app.fallback import constrain_scene, local_response, narrative_for, rationale_for
 from app.gemini import MAX_INPUT_TOKENS, MAX_OUTPUT_TOKENS, PROMPT_VERSION, GeminiAdapter
@@ -39,21 +40,62 @@ class AnalysisService:
         self.attempts = 0
         self.reserved_usd = Decimal("0")
         self.cache: OrderedDict[str, tuple[float, AnalysisResponse]] = OrderedDict()
+        self.ledger = AllowanceLedger(settings) if settings.gemini_ledger_path else None
+        self.total_attempts = 0
+
+    def attempt_cost(self) -> Decimal:
+        return (
+            MAX_INPUT_TOKENS * self.settings.input_price_per_million
+            + MAX_OUTPUT_TOKENS * self.settings.output_price_per_million
+        ) / Decimal("1000000")
+
+    def readiness_reason(self) -> str | None:
+        if not self.settings.allow_participant_cloud:
+            return "participant_cloud_disabled"
+        if not self.settings.gemini_enabled:
+            return "gemini_disabled"
+        if not self.settings.live_ready:
+            return "gemini_not_configured"
+        return self.allowance_reason()
+
+    def allowance_reason(self) -> str | None:
+        if self.ledger:
+            try:
+                return self.ledger.check(self.attempt_cost())
+            except Exception:
+                return "allowance_unavailable"
+        total = self.settings.gemini_max_total_attempts
+        if total is not None and self.total_attempts >= total:
+            return "attempt_limit"
+        day = datetime.now(timezone.utc).date().isoformat()
+        if self.day == day and self.attempts >= self.settings.gemini_max_attempts_per_day:
+            return "attempt_limit"
+        if self.settings.gemini_max_attempts_per_day == 0:
+            return "attempt_limit"
+        if self.reserved_usd + self.attempt_cost() > self.settings.gemini_budget_usd:
+            return "budget_limit"
+        return None
 
     def reserve_attempt(self) -> str | None:
+        if self.ledger:
+            try:
+                return self.ledger.check(self.attempt_cost(), reserve=True)
+            except Exception:
+                return "allowance_unavailable"
+        denied = self.allowance_reason()
+        if denied:
+            return denied
         day = datetime.now(timezone.utc).date().isoformat()
         if day != self.day:
             self.day, self.attempts = day, 0
         if self.attempts >= self.settings.gemini_max_attempts_per_day:
             return "attempt_limit"
-        cost = (
-            MAX_INPUT_TOKENS * self.settings.input_price_per_million
-            + MAX_OUTPUT_TOKENS * self.settings.output_price_per_million
-        ) / Decimal("1000000")
+        cost = self.attempt_cost()
         if self.reserved_usd + cost > self.settings.gemini_budget_usd:
             return "budget_limit"
         # Keep the worst-case reservation even on failure; do not undercount retries/errors.
         self.attempts += 1
+        self.total_attempts += 1
         self.reserved_usd += cost
         return None
 

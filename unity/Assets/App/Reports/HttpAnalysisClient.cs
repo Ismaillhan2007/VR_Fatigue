@@ -119,6 +119,7 @@ namespace App.Reports
                 case "gemini_not_configured": return "Gemini configuration incomplete";
                 case "attempt_limit": return "AI attempt limit reached";
                 case "budget_limit": return "AI budget limit reached";
+                case "allowance_unavailable": return "AI allowance storage unavailable";
                 case "timeout": return "AI request timed out";
                 case "provider_rate_limited": return "AI service rate limited";
                 case "provider_unavailable": return "AI service temporarily unavailable";

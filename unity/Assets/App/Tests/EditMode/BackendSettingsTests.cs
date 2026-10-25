@@ -30,6 +30,8 @@ namespace App.Tests
         [TestCase("http://10.0.0.1:8000", true, "http://10.0.0.1:8000")]
         [TestCase("http://172.16.0.1:8000", true, "http://172.16.0.1:8000")]
         [TestCase("http://192.168.1.2:8000", true, "http://192.168.1.2:8000")]
+        [TestCase("http://100.64.127.140:8147", true, "http://100.64.127.140:8147")]
+        [TestCase("http://100.127.255.254:8147", true, "http://100.127.255.254:8147")]
         public void AcceptsAndNormalizesExplicitOrigins(string url, bool local, string expected)
         {
             Assert.IsTrue(BackendSettings.TryCreate(url, "invented-token", local, out var s, out var error), error);
@@ -44,6 +46,9 @@ namespace App.Tests
         [TestCase("http://example.com", true)]
         [TestCase("http://8.8.8.8", true)]
         [TestCase("http://172.32.0.1", true)]
+        [TestCase("http://100.63.255.255", true)]
+        [TestCase("http://100.128.0.1", true)]
+        [TestCase("http://100.64.127.140:8147", false)]
         [TestCase("http://127.0.0.1:8000", false)]
         [TestCase("https://localhost:8000", false)]
         [TestCase("https://user:private-marker@example.com", false)]

@@ -91,6 +91,16 @@ def create_app(settings: Settings | None = None, adapter: Adapter | None = None)
             response.headers["X-VR-Fallback-Reason"] = outcome.fallback_reason
         return outcome.response
 
+    @app.get("/api/v1/readiness", dependencies=[Depends(require_access)])
+    async def readiness():
+        reason = service.readiness_reason()
+        return {
+            "ready_for_consented_summary": reason is None,
+            "reason": reason,
+            "provider_verified": False,
+            "persistent_allowance": service.ledger is not None,
+        }
+
     return app
 
 
