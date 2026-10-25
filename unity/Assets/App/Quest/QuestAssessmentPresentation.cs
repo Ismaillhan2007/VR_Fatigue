@@ -68,9 +68,9 @@ namespace App.Quest
             foreach (var button in Canvas.GetComponentsInChildren<Button>(true))
             {
                 var size = button.GetComponent<LayoutElement>();
-                if (size != null) { size.preferredWidth = Mathf.Max(330, size.preferredWidth); size.preferredHeight = 60; }
+                if (size != null) { size.preferredWidth = Mathf.Max(330, size.preferredWidth); size.preferredHeight = Mathf.Max(60, size.preferredHeight); }
                 var row = button.transform.parent.GetComponent<LayoutElement>();
-                if (row != null) row.preferredHeight = 64;
+                if (row != null) row.preferredHeight = Mathf.Max(64, row.preferredHeight);
             }
             _status = new GameObject("Quest status", typeof(RectTransform), typeof(Text)).GetComponent<Text>();
             _status.transform.SetParent(Canvas.transform, false);
@@ -79,7 +79,7 @@ namespace App.Quest
             statusRect.anchorMax = new Vector2(0.95f, 0.07f);
             statusRect.offsetMin = statusRect.offsetMax = Vector2.zero;
             _status.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            _status.fontSize = 22;
+            _status.fontSize = 22; _status.fontStyle = FontStyle.Bold;
             _status.color = Color.white;
             _status.alignment = TextAnchor.MiddleLeft;
             _status.raycastTarget = false;
