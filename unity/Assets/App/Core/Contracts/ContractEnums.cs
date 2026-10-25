@@ -8,6 +8,7 @@ namespace App.Core.Contracts
     {
         [EnumMember(Value = "local_only")] LocalOnly,
         [EnumMember(Value = "synthetic_demo")] SyntheticDemo,
+        [EnumMember(Value = "consented_summary")] ConsentedSummary,
     }
 
     public enum DataSource

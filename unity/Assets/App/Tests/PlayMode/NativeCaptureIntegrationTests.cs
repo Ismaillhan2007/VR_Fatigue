@@ -116,6 +116,28 @@ public class NativeCaptureIntegrationTests
     }
 
     [UnityTest]
+    public IEnumerator NativeAdapterCanExplicitlyOptIntoCloudSummaryWithoutRelabellingTheTestSource()
+    {
+        using (var receiver = new App.Tests.BackendRuntimeTests.Receiver(wait: true))
+        {
+            _controller.ConfigureBackend(receiver.Url, "invented-native-token", true, false, false);
+            Prepare(); yield return Until(() => !_controller.IsCapturing);
+            _controller.SubmitBaseline(2, 2);
+            yield return Until(() => _controller.Flow.State == FlowState.CheckIn);
+            _controller.SubmitCheckIn(new SelfReport { Phase = ReportPhase.PostTask, EyeStrain = 3, MentalFatigue = 3 },
+                null, consentedCloud: true);
+            yield return Until(() => receiver.Received.Task.IsCompleted);
+            var request = ContractJson.Parse<App.Core.Analysis.AnalyzeRequest>(receiver.Body);
+            Assert.AreEqual(CloudPolicy.ConsentedSummary, request.CloudPolicy);
+            Assert.AreEqual(DataSource.Synthetic, request.SessionSummary.DataSource, "fake source stays synthetic");
+            Assert.NotNull(_controller.Flow.Context.Analysis);
+            _controller.FinishWithReport();
+            Assert.AreEqual(FlowState.Done, _controller.Flow.State);
+            receiver.Release.TrySetResult(true);
+        }
+    }
+
+    [UnityTest]
     public IEnumerator PermissionLossBetweenPhasesClearsReferenceAndCannotProduceReport()
     {
         Prepare(); yield return Until(() => !_controller.IsCapturing);

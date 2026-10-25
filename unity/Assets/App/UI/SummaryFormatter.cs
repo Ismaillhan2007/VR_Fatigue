@@ -17,7 +17,7 @@ namespace App.UI
             if (s == null) return "Computing measurements...";
             var b = new StringBuilder();
             b.AppendLine(ProvenanceLabels.Data(c));
-            b.AppendLine(analysisInProgress ? "AI: waiting for the explanation (local fallback on failure)..." : ProvenanceLabels.Ai(c));
+            b.AppendLine(analysisInProgress ? "Report ready on-device. Optional explanation pending; you can finish now." : ProvenanceLabels.Ai(c));
             b.AppendLine();
 
             var a = c.Analysis;

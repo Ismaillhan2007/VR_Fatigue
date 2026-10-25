@@ -77,7 +77,7 @@ namespace App.Tests
             if (eye == 7) checkIn.FreeText.text = "I feel nauseous";
             yield return CaptureEvidence("check-in");
             checkIn.SubmitButton.onClick.Invoke();
-            if (waitForAnalysis) yield return WaitUntil(() => controller.Flow.Context.Analysis != null);
+            if (waitForAnalysis) yield return WaitUntil(() => controller.Flow.Context.Analysis != null && !controller.AnalysisInProgress);
         }
 
         [UnityTest]
@@ -110,9 +110,9 @@ namespace App.Tests
                     yield return ShortSession(c, mode: AnalysisMode.Http, waitForAnalysis: false);
                     yield return WaitUntil(() => received.Task.IsCompleted);
                     Assert.IsTrue(c.AnalysisInProgress);
-                    Assert.IsFalse(c.Panels.OfType<SummaryPanel>().Single().FinishReportButton.interactable);
-                    Assert.IsFalse(c.Panels.OfType<SummaryPanel>().Single().EnterSceneButton.interactable);
-                    Assert.Throws<InvalidOperationException>(() => c.FinishWithReport());
+                    Assert.IsTrue(c.Panels.OfType<SummaryPanel>().Single().FinishReportButton.interactable);
+                    Assert.IsTrue(c.Panels.OfType<SummaryPanel>().Single().EnterSceneButton.interactable);
+                    Assert.NotNull(c.Flow.Context.Analysis, "local report is available while optional HTTP is pending");
                     var previousId = c.Flow.Context.SessionId;
                     c.Exit();
                     c.Restart();
@@ -226,7 +226,7 @@ namespace App.Tests
                 .GetValue(c);
             var row = task.Samples[0]; row.SensorTimestamp = double.NaN; task.Samples[0] = row;
             c.SubmitCheckIn(new SelfReport { Phase = ReportPhase.PostTask, EyeStrain = 3, MentalFatigue = 3 }, null);
-            yield return WaitUntil(() => c.Flow.Context.Analysis != null);
+            yield return WaitUntil(() => c.Flow.Context.Analysis != null && !c.AnalysisInProgress);
 
             var summary = c.Flow.Context.Summary;
             Assert.AreEqual(QualityStatus.InsufficientData, summary.Quality.Status);
@@ -311,7 +311,7 @@ namespace App.Tests
                 Phase = ReportPhase.PostTask, EyeStrain = 3, MentalFatigue = 3,
                 Chips = new List<Chip> { Chip.WantQuiet }, FreeText = "private check-in stays here",
             }, null);
-            yield return WaitUntil(() => c.Flow.Context.Analysis != null, 20);
+            yield return WaitUntil(() => c.Flow.Context.Analysis != null && !c.AnalysisInProgress, 20);
             var ctx = c.Flow.Context;
             Assert.AreEqual(AiSource.Fallback, ctx.Analysis.AiSource);
             Assert.AreEqual("cloud use disabled for this check-in", ctx.AnalysisFallbackReason,
@@ -426,7 +426,7 @@ namespace App.Tests
                 Phase = ReportPhase.PostTask, EyeStrain = 5, MentalFatigue = 4,
                 Chips = new List<Chip> { Chip.TiredEyes, Chip.WantQuiet }, FreeText = "a bit dizzy",
             }, null);
-            yield return WaitUntil(() => c.Flow.Context.Analysis != null, 20);
+            yield return WaitUntil(() => c.Flow.Context.Analysis != null && !c.AnalysisInProgress, 20);
 
             var ctx = c.Flow.Context;
             Assert.AreEqual(DataSource.Synthetic, ctx.Summary.DataSource);
@@ -473,7 +473,7 @@ namespace App.Tests
                 Phase = ReportPhase.PostTask, EyeStrain = 5, MentalFatigue = 5,
                 Chips = new List<Chip> { Chip.TiredEyes, Chip.WantQuiet }, FreeText = "private text stays local",
             }, null);
-            yield return WaitUntil(() => c.Flow.Context.Analysis != null, 20);
+            yield return WaitUntil(() => c.Flow.Context.Analysis != null && !c.AnalysisInProgress, 20);
 
             var a = c.Flow.Context.Analysis;
             StringAssert.StartsWith("local-", a.PromptVersion, "the backend's offline rules must have answered: " + c.Flow.Context.AnalysisFallbackReason);
@@ -507,7 +507,7 @@ namespace App.Tests
             c.SubmitBaseline(2, 2);
             yield return WaitUntil(() => c.Flow.State == FlowState.CheckIn, 20);
             c.SubmitCheckIn(new SelfReport { Phase = ReportPhase.PostTask, EyeStrain = 5, MentalFatigue = 4, Chips = new List<Chip> { Chip.TiredEyes } }, null);
-            yield return WaitUntil(() => c.Flow.Context.Analysis != null, 20);
+            yield return WaitUntil(() => c.Flow.Context.Analysis != null && !c.AnalysisInProgress, 20);
 
             var s = c.Flow.Context.Summary;
             Assert.AreEqual(ReplayOrigin.Synthetic, s.ReplayOrigin);

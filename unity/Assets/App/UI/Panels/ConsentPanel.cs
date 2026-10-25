@@ -47,8 +47,8 @@ namespace App.UI.Panels
         {
             Body.text = "Experimental wellness prototype. Not a medical device or diagnosis. Pause or exit at any time. "
                 + "Reports stay in memory until Exit or New session. Free text stays on-device. "
-                + "Backend upload sends aggregates and ratings to the configured server. Networked demos accept wholly invented data only; "
-                + "participant sessions use the on-device report. Gemini stays disabled for interactive check-ins.\n\n"
+                + "A local report is always available. An optional choice at check-in can send aggregate measurements and ratings "
+                + "to the configured backend and Google Gemini. Raw gaze and free text stay on-device.\n\n"
                 + $"Eye data source: {Controller.EyeSourceDescription}"
                 + (Controller.ReplayLoadStatus == null ? "" : "\n\n" + Controller.ReplayLoadStatus)
                 + (Controller.EyeSource == App.Capture.EyeSourceMode.Hardware ? "\n\n" + Controller.HardwareReadinessText : "");

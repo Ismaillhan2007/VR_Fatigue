@@ -7,6 +7,21 @@ namespace App.Tests
 {
     public class BackendSettingsTests
     {
+        [Test]
+        public void ConsentedSummaryContractRoundTripsAndNeedsSeparateParticipantChoice()
+        {
+            var request = TestFixtures.Load<AnalyzeRequest>("analyze_request_consented_summary.json");
+            CollectionAssert.IsEmpty(request.Validate());
+            Assert.AreEqual(CloudPolicy.ConsentedSummary, ContractJson.Parse<AnalyzeRequest>(ContractJson.Serialize(request)).CloudPolicy);
+            Assert.IsTrue(BackendSettings.TryCreate("https://example.com", "", false, out var settings, out _));
+            request.SessionSummary.DataSource = DataSource.Live;
+            Assert.NotNull(settings.TransferBlockReason(request, true, true));
+            Assert.IsNull(settings.TransferBlockReason(request, false, false, consentedSummary: true));
+            request.CloudPolicy = CloudPolicy.LocalOnly;
+            Assert.NotNull(settings.TransferBlockReason(request, false, false, consentedSummary: true),
+                "request policy and participant choice must both opt in");
+        }
+
         [TestCase("https://example.com/", false, "https://example.com")]
         [TestCase("  https://example.com:8443/  ", false, "https://example.com:8443")]
         [TestCase("http://127.0.0.1:8000/", true, "http://127.0.0.1:8000")]

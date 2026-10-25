@@ -16,6 +16,7 @@ namespace App.UI.Panels
         public InputField FreeText;
         public Text Hint;
         public Button SubmitButton;
+        public Toggle CloudExplanation { get; private set; }
 
         public override FlowState State => FlowState.CheckIn;
 
@@ -24,6 +25,19 @@ namespace App.UI.Panels
             FreeText.characterLimit = SelfReport.MaxFreeText;
             foreach (var t in ChipToggles) t.onValueChanged.AddListener(_ => EnforceChipLimit());
             SubmitButton.onClick.AddListener(Submit);
+            var choice = DefaultControls.CreateToggle(new DefaultControls.Resources());
+            choice.name = "Optional Gemini summary consent";
+            choice.transform.SetParent(SubmitButton.transform.parent.parent, false);
+            choice.transform.SetSiblingIndex(SubmitButton.transform.parent.GetSiblingIndex());
+            choice.AddComponent<LayoutElement>().preferredHeight = 90;
+            CloudExplanation = choice.GetComponent<Toggle>();
+            CloudExplanation.isOn = false;
+            var label = choice.GetComponentInChildren<Text>();
+            label.font = UnityEngine.Resources.GetBuiltinResource<UnityEngine.Font>("LegacyRuntime.ttf");
+            label.fontSize = 22; label.supportRichText = false; label.color = UnityEngine.Color.white;
+            label.text = "Optional: send aggregate eye measurements and ratings to the configured backend and Google Gemini for an experimental explanation. Raw gaze and free text stay on-device. Google processes the summary under its Gemini terms. You can finish with a local report.";
+            foreach (var node in choice.GetComponentsInChildren<UnityEngine.Transform>(true))
+                node.gameObject.layer = UnityEngine.LayerMask.NameToLayer("UI");
         }
 
         public override void OnShow()
@@ -32,6 +46,7 @@ namespace App.UI.Panels
             MentalFatigue.ResetValue();
             foreach (var t in ChipToggles) t.isOn = false;
             FreeText.text = "";
+            CloudExplanation.SetIsOnWithoutNotify(false);
             Hint.text = "Text stays on this device (it is not sent to the AI).";
         }
 
@@ -53,7 +68,7 @@ namespace App.UI.Panels
                 Chips = chips,
                 FreeText = string.IsNullOrWhiteSpace(FreeText.text) ? null : FreeText.text.Trim(),
             };
-            Controller.SubmitCheckIn(report, null);
+            Controller.SubmitCheckIn(report, null, CloudExplanation.isOn);
         }
     }
 }

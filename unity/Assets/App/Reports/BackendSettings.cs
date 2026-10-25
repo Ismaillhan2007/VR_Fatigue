@@ -53,8 +53,10 @@ namespace App.Reports
             return true;
         }
 
-        public string TransferBlockReason(AnalyzeRequest request, bool inventedSession, bool allowUpload)
+        public string TransferBlockReason(AnalyzeRequest request, bool inventedSession, bool allowUpload, bool consentedSummary = false)
         {
+            if (request.CloudPolicy == CloudPolicy.ConsentedSummary)
+                return consentedSummary ? null : "cloud summary consent missing: using on-device report";
             if (!allowUpload) return "backend upload not permitted: using on-device report";
             var s = request.SessionSummary;
             if (!inventedSession || !(s.DataSource == DataSource.Synthetic
@@ -69,20 +71,21 @@ namespace App.Reports
     {
         readonly BackendSettings settings;
         readonly string invalidReason;
-        readonly bool invented, allowUpload;
+        readonly bool invented, allowUpload, consentedSummary;
 
-        public ConfiguredBackendClient(string url, string token, bool localDevelopment, bool invented, bool allowUpload)
+        public ConfiguredBackendClient(string url, string token, bool localDevelopment, bool invented, bool allowUpload, bool consentedSummary = false)
         {
             BackendSettings.TryCreate(url, token, localDevelopment, out settings, out invalidReason);
             this.invented = invented;
             this.allowUpload = allowUpload;
+            this.consentedSummary = consentedSummary;
         }
 
         public string Name => "configured backend";
 
         public Task<AnalysisResult> AnalyzeAsync(AnalyzeRequest request, CancellationToken cancellationToken)
         {
-            var reason = invalidReason ?? settings.TransferBlockReason(request, invented, allowUpload);
+            var reason = invalidReason ?? settings.TransferBlockReason(request, invented, allowUpload, consentedSummary);
             return reason == null
                 ? new HttpAnalysisClient(settings.BaseUrl, settings.AccessToken).AnalyzeAsync(request, cancellationToken)
                 : Task.FromResult(new AnalysisResult { Response = LocalFallbackAnalysis.Analyze(request), FallbackReason = reason });

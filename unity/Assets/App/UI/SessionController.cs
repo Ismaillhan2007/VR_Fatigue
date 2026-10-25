@@ -432,8 +432,11 @@ namespace App.UI
             BeginCapture(_task, TaskSeconds, "l", loaded: true);
         }
 
-        public async void SubmitCheckIn(SelfReport report, Preferences preferences)
+        CancellationTokenSource _analysisRequest;
+
+        public async void SubmitCheckIn(SelfReport report, Preferences preferences, bool consentedCloud = false)
         {
+            if (Flow.State != FlowState.CheckIn || Flow.IsPaused) return;
             Flow.SubmitCheckIn(report, preferences);
             var sessionId = Flow.Context.SessionId;
             var succeeded = MetricsEngineFactory.TryCompute(_metrics, _task, _baseline, ContextForMetrics(report), out var summary);
@@ -441,25 +444,40 @@ namespace App.UI
             Flow.SetSummary(summary);
 
             var request = AnalyzeRequest.Create(summary, Flow.Context.BaselineReport, preferences);
+            // The report is complete locally before optional HTTP/AI work starts.
+            Flow.SetAnalysis(LocalFallbackAnalysis.Analyze(request), "on-device report ready");
+            if (consentedCloud) request.CloudPolicy = CloudPolicy.ConsentedSummary;
             AnalysisInProgress = true;
             RefreshVisible();
+            var pending = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
+            _analysisRequest = pending;
             AnalysisResult result;
             try
             {
-                result = await CreateClient().AnalyzeAsync(request, _cts.Token);
+                result = await CreateClient(consentedCloud).AnalyzeAsync(request, pending.Token);
             }
             catch (Exception e)
             {
                 Debug.LogWarning($"[SessionController] analysis client threw: {e.GetType().Name}");
                 result = new AnalysisResult { Response = LocalFallbackAnalysis.Analyze(request), FallbackReason = "client error" };
             }
+            finally
+            {
+                if (_analysisRequest == pending) _analysisRequest = null;
+                pending.Dispose();
+            }
             if (this == null || Flow.State != FlowState.Summary || Flow.Context.SessionId != sessionId) return;
             AnalysisInProgress = false;
             Flow.SetAnalysis(result.Response, result.FallbackReason);
         }
 
-        public void FinishWithReport() => Flow.FinishWithReport();
-        public void ChooseRelaxation() => Flow.ChooseRelaxation();
+        void CancelOptionalAnalysis()
+        {
+            _analysisRequest?.Cancel();
+            AnalysisInProgress = false;
+        }
+        public void FinishWithReport() { CancelOptionalAnalysis(); Flow.FinishWithReport(); }
+        public void ChooseRelaxation() { CancelOptionalAnalysis(); Flow.ChooseRelaxation(); }
         public void CancelRelaxation() => Flow.CancelRelaxation();
         public void SkipReRating() => Flow.SkipReRating();
 
@@ -687,8 +705,10 @@ namespace App.UI
                 : (double?)null,
         };
 
-        IAnalysisClient CreateClient()
+        IAnalysisClient CreateClient(bool consentedCloud = false)
         {
+            if (consentedCloud) return new ConfiguredBackendClient(BackendBaseUrl, BackendToken,
+                BackendLocalDevelopment, false, false, consentedSummary: true);
             if (_provider is App.Capture.HardwareEyeProvider) return new LocalAnalysisClient();
             switch (Analysis)
             {

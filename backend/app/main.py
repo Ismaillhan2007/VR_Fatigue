@@ -15,10 +15,11 @@ from app.service import Adapter, AnalysisService
 def create_app(settings: Settings | None = None, adapter: Adapter | None = None) -> FastAPI:
     settings = settings or Settings()
     if (
-        settings.runtime_mode == "hosted"
-        and not settings.backend_access_token.get_secret_value().strip()
-    ):
-        raise RuntimeError("VR_BACKEND_ACCESS_TOKEN is required in hosted mode")
+        settings.runtime_mode == "hosted" or settings.allow_participant_cloud
+    ) and not settings.backend_access_token.get_secret_value().strip():
+        raise RuntimeError(
+            "VR_BACKEND_ACCESS_TOKEN is required in hosted mode or participant-cloud mode"
+        )
     service = AnalysisService(settings, adapter)
     app = FastAPI(
         title="VR Fatigue Backend",
@@ -79,9 +80,11 @@ def create_app(settings: Settings | None = None, adapter: Adapter | None = None)
         if settings.runtime_mode == "hosted" and not (
             session.data_source == "synthetic"
             or (session.data_source == "replay" and session.replay_origin == "synthetic")
+            or (settings.allow_participant_cloud and body.cloud_policy == "consented_summary")
         ):
             raise HTTPException(
-                status_code=403, detail="Hosted staging accepts synthetic eye data only"
+                status_code=403,
+                detail="Participant summaries require explicit cloud consent and server enablement",
             )
         outcome = await service.analyze_with_diagnostics(body)
         if outcome.fallback_reason:

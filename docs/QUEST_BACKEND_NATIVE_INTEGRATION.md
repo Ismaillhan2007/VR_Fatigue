@@ -1,5 +1,7 @@
 # Runtime settings and native-eye integration checkpoint
 
+Current report/cloud policy: [immediate reports and explicit participant-consented Gemini summaries](CONSENTED_GEMINI_REPORT.md) supersede this checkpoint's original unconditional native-local restriction.
+
 This branch starts at `origin/dev` `4aa9bea` and retains the original commits from
 the independently owned task branches. It is a reviewable integration candidate;
 it does not merge anything into remote `dev` or close a device issue.

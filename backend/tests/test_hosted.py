@@ -72,7 +72,9 @@ def test_hosted_rejects_participant_eye_input_before_analysis(source, origin):
         assert not client.app.state.analysis_service.cache
         assert client.app.state.analysis_service.attempts == 0
     assert result.status_code == 403
-    assert result.json() == {"detail": "Hosted staging accepts synthetic eye data only"}
+    assert result.json() == {
+        "detail": "Participant summaries require explicit cloud consent and server enablement"
+    }
     assert adapter.calls == 0
 
 
@@ -102,8 +104,11 @@ def test_container_entrypoint_uses_platform_port_and_one_worker(monkeypatch, por
         (
             ("app.main:app",),
             {
-                "host": "0.0.0.0", "port": int(port or 8000), "workers": 1,
-                "access_log": False, "proxy_headers": False,
+                "host": "0.0.0.0",
+                "port": int(port or 8000),
+                "workers": 1,
+                "access_log": False,
+                "proxy_headers": False,
             },
         )
     ]

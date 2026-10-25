@@ -40,6 +40,7 @@ VALID = {
     "scene_config_calm_forest_sunset.json": "scene_config",
     "analysis_fallback.json": "analysis_response",
     "analyze_request_synthetic.json": "analyze_request",
+    "analyze_request_consented_summary.json": "analyze_request",
 }
 INVALID = {
     "invalid/scene_config_unknown_field.json": "scene_config",

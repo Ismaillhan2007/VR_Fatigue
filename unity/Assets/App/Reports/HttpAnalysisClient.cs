@@ -112,6 +112,7 @@ namespace App.Reports
             {
                 case "local_only": return "cloud use disabled for this check-in";
                 case "non_synthetic_input": return "participant eye data not sent to Gemini";
+                case "participant_cloud_disabled": return "participant cloud explanations disabled on backend";
                 case "safety_stop": return "session stopped for comfort";
                 case "insufficient_data": return "insufficient comparable measurements";
                 case "gemini_disabled": return "Gemini disabled";
