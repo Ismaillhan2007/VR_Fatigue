@@ -51,6 +51,7 @@ namespace App.UI.Panels
                 + "to the configured backend and Google Gemini. Raw gaze and free text stay on-device.\n\n"
                 + $"Eye data source: {Controller.EyeSourceDescription}"
                 + (Controller.ReplayLoadStatus == null ? "" : "\n\n" + Controller.ReplayLoadStatus)
+                + (Controller.HasOperatorBackendDefaults ? "\n\nLaptop-provisioned backend: " + Controller.BackendConnectionStatus : "")
                 + (Controller.EyeSource == App.Capture.EyeSourceMode.Hardware ? "\n\n" + Controller.HardwareReadinessText : "");
             ConnectionStatus.text = Controller.BackendConnectionStatus;
             StartButton.interactable = !Controller.ReplayLoading;

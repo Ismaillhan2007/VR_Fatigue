@@ -53,6 +53,32 @@ namespace App.UI
         public bool AllowBackendUpload { get; private set; }
         public string BackendConnectionStatus { get; private set; } = "On-device report available. Backend has not been checked.";
         public bool BackendCheckInProgress { get; private set; }
+        public bool HasOperatorBackendDefaults { get; private set; }
+        string _operatorDefaultsPath;
+
+        public bool LoadOperatorBackendDefaults(string privatePath)
+        {
+            if (Flow != null && Flow.State != FlowState.Consent) return false;
+            if (Flow != null) CancelBackendCheck();
+            _operatorDefaultsPath = privatePath;
+            BackendToken = "";
+            BackendLocalDevelopment = InventedDemoSession = AllowBackendUpload = false;
+            var loaded = OperatorBackendDefaults.TryLoad(privatePath, out var settings, out var status);
+            HasOperatorBackendDefaults = loaded;
+            BackendConnectionStatus = status;
+            if (loaded)
+            {
+                BackendBaseUrl = settings.BaseUrl;
+                BackendToken = settings.AccessToken;
+                BackendLocalDevelopment = settings.BaseUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                    || settings.IsLoopback;
+                InventedDemoSession = AllowBackendUpload = false;
+            }
+            if (Flow != null)
+                foreach (var panel in Panels)
+                    if (panel is ConsentPanel consent && panel.gameObject.activeSelf) consent.OnShow();
+            return loaded;
+        }
 
         public void ConfigureBackend(string url, string token, bool localDevelopment, bool invented, bool allowUpload)
         {
@@ -91,8 +117,7 @@ namespace App.UI
                 var result = await client.AnalyzeAsync(request, check.Token);
                 if (this == null || revision != _backendRevision || Flow.State != FlowState.Consent) return;
                 BackendConnectionStatus = client.BackendResponseAccepted
-                    ? "Connected: analyze/auth/contract accepted. Explanation: " + result.Response.AiSource.ToString().ToLowerInvariant()
-                        + (result.FallbackReason == null ? "." : " (" + result.FallbackReason + ").")
+                    ? "Connected: analyze/auth/contract accepted. This was a local-only connection test. Gemini is requested separately with your session consent."
                     : "Connection check failed: " + result.FallbackReason + ". On-device report remains available.";
             }
             catch (Exception)
@@ -204,6 +229,8 @@ namespace App.UI
                 desktop ? Environment.GetEnvironmentVariable("VR_BACKEND_URL") : null,
                 desktop ? CommandLineValue("-backendUrl") : null, desktop);
             BackendToken = desktop ? Environment.GetEnvironmentVariable("VR_BACKEND_ACCESS_TOKEN") ?? "" : "";
+            if (Application.platform == RuntimePlatform.Android && !Application.isEditor)
+                LoadOperatorBackendDefaults(OperatorBackendDefaults.AndroidPrivatePath());
             Flow = new SessionFlow();
             Flow.StateChanged += (_, __) => ShowCurrent();
             Flow.PauseChanged += paused =>
@@ -227,6 +254,11 @@ namespace App.UI
             _cts.Cancel();
             _cts.Dispose();
             _provider?.Stop();
+        }
+
+        void Start()
+        {
+            if (HasOperatorBackendDefaults) CheckBackendConnection(); // Invented/local-only probe; no Gemini charge.
         }
 
         void Update()
@@ -597,6 +629,11 @@ namespace App.UI
             ProviderNote = null; HardwareSetupStatus = null;
             NativeDiagnostic = NativeDiagnosticComplete = false;
             Flow.Restart();
+            if (!string.IsNullOrEmpty(_operatorDefaultsPath))
+            {
+                LoadOperatorBackendDefaults(_operatorDefaultsPath);
+                ShowCurrent();
+            }
         }
 
         // ----- internals -----
