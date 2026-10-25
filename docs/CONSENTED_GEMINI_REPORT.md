@@ -94,3 +94,41 @@ Ismail owns backend/Gemini/auth/transport/fallback and this contract update.
 The optional forest PR still needs its own Unity generation/visual/device checks.
 Do not accept fabricated live labels, raw/free-text uploads, unknown credentials,
 unbounded spending or claims that desktop tests establish hardware performance.
+
+## Verification checkpoint
+
+Runtime/UI head: `203de76bc697710229fca0f4aaf6bd46a752b480`. It preserves the latest
+Alexander #35 head `962583f`, including the OVRInput trigger fallback and #37's
+theme, with native setup retained before both rays. The Assessment scene/prefabs
+and theme sprites were regenerated through BuildAll in one isolated checkout.
+A dark-overlay/light-input colour conflict and the runtime consent checkbox's
+contrast were fixed; metadata/GUID checks found no missing files or duplicates.
+
+- Latest combined Unity 6000.6.7f1 EditMode: **396 passed**, zero failures/skips.
+- Latest full PlayMode: **47 passed, zero failures, one intentional skip** for
+  the separately budgeted live-Gemini check. The earlier complete cloud-flow run
+  passed all **48** with that check enabled. After the final checkbox styling,
+  the focused actual-toggle -> View report -> pending HTTP -> Finish/reset test
+  passed again; the [invented-data screenshot](images/gemini-consent.png) was inspected.
+- **Two real Gemini HTTP round trips from Unity passed** with the invented probe
+  and consented_summary. No participant eye data or free text was used. The first
+  complete run had one stale paused-analysis wait assertion (47 pass/1 fail);
+  correcting it to wait for optional request completion yielded 48/48. This was
+  a test expectation issue, not a failed Gemini call.
+- Backend: **158 tests passed**; Ruff passed; shared contract validation passed
+  including the new synthetic consent fixture and free-text exclusion.
+- Source/docs whitespace and private-filename checks passed; incidental OpenXR
+  settings were restored. Generated Unity YAML retains normal serializer whitespace.
+
+The authenticated local/LAN verification receiver on port 8147 reports Gemini
+enabled and participant-cloud opt-in enabled. Its process is capped at three
+generation attempts and $0.05 reserved cost; two invented attempts were used.
+The unrelated old port-8000 receiver and the user's dirty checkout were untouched.
+In-memory reservations reset on restart; do not restart/replenish this receiver
+to exceed the approved total. A future demo window needs its own explicit limits.
+
+The user instructed the team to move the validated integration forward and
+approve the work. #32 and latest #35 received code approvals; #34 received a
+changes request for its missing generated/verified forest and sky provenance.
+This authorizes development integration after current CI; it does not mark
+physical #18/#20/#21/#23 acceptance complete or authorize a public deployment.
