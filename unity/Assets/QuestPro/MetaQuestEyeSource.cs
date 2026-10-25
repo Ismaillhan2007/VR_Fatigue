@@ -93,8 +93,16 @@ namespace VRFatigue.QuestPro
             frame = null;
 #if VR_FATIGUE_META_207
             if (!OnDevice || !OVRPlugin.GetEyeGazesState(OVRPlugin.Step.Render, -1, ref eyes) || eyes.EyeGazes == null || eyes.EyeGazes.Length < 2) return false;
+            if (double.IsNaN(eyes.Time) || double.IsInfinity(eyes.Time) || eyes.Time < 0)
+            {
+                frame = new HardwareEyeFrame(eyes.Time, Invalid(eyes.EyeGazes[0]), Invalid(eyes.EyeGazes[1]), null, null);
+                return true; // The provider counts the bad timestamp; never pass it to native head-pose lookup.
+            }
             var headState = OVRPlugin.GetNodePoseStateAtTime(eyes.Time, OVRPlugin.Node.Head);
-            if (!OVRPlugin.GetNodeOrientationTracked(OVRPlugin.Node.Head))
+            if (!OVRPlugin.GetNodeOrientationTracked(OVRPlugin.Node.Head) ||
+                !OVRPlugin.GetNodeOrientationValid(OVRPlugin.Node.Head) ||
+                !OVRPlugin.GetNodePositionTracked(OVRPlugin.Node.Head) ||
+                !OVRPlugin.GetNodePositionValid(OVRPlugin.Node.Head))
             {
                 frame = new HardwareEyeFrame(eyes.Time, Invalid(eyes.EyeGazes[0]), Invalid(eyes.EyeGazes[1]), null, null);
                 return true;
@@ -102,20 +110,20 @@ namespace VRFatigue.QuestPro
             // Meta's conversion flips handedness into Unity axes. Never subtract a scene Transform
             // or use a current predicted head pose to compensate an older eye sample.
             OVRPose head = headState.Pose.ToOVRPose();
-            Quaternion inverse = Quaternion.Inverse(head.orientation);
             var pose = new HeadPose(new Direction3(head.position.x, head.position.y, head.position.z),
                 head.orientation.x, head.orientation.y, head.orientation.z, head.orientation.w);
-            frame = new HardwareEyeFrame(eyes.Time, Reading(eyes.EyeGazes[0], inverse), Reading(eyes.EyeGazes[1], inverse), pose, headState.Time);
+            frame = new HardwareEyeFrame(eyes.Time, Reading(eyes.EyeGazes[0], head.orientation), Reading(eyes.EyeGazes[1], head.orientation), pose, headState.Time);
             return true;
 #else
             return false;
 #endif
         }
 #if VR_FATIGUE_META_207
-        private static EyeReading Reading(OVRPlugin.EyeGazeState eye, Quaternion inverseHead)
+        private static EyeReading Reading(OVRPlugin.EyeGazeState eye, Quaternion head)
         {
-            if (!eye.IsValid) return Invalid(eye);
-            Vector3 direction = (inverseHead * eye.Pose.ToOVRPose().orientation) * Vector3.forward;
+            Vector3 direction;
+            if (!eye.IsValid || !QuestGazeGeometry.TryHeadLocalDirection(
+                eye.Pose.ToOVRPose().orientation, head, out direction)) return Invalid(eye);
             return new EyeReading(true, new Direction3(direction.x, direction.y, direction.z), eye.Confidence);
         }
         private static EyeReading Invalid(OVRPlugin.EyeGazeState eye) { return new EyeReading(false, null, eye.Confidence); }
