@@ -234,6 +234,9 @@ namespace App.UI.Editor
             var row = ButtonRow(root.transform);
             p.EnterSceneButton = MakeButton(row, "Try optional relaxation", ButtonKind.Secondary);
             p.FinishReportButton = MakeButton(row, "Finish with report");
+            // Three actions share this row once the Gemini button is added at runtime (SummaryPanel), so they are narrower.
+            SizeButton(p.EnterSceneButton, 420, SmallSize + 2);
+            SizeButton(p.FinishReportButton, 460, SmallSize + 2);
             return root;
         }
 
@@ -578,6 +581,12 @@ namespace App.UI.Editor
             le.preferredWidth = Mathf.Max(ButtonWidth, text.Length * 21 + 64); // long labels stay on one line
             le.preferredHeight = le.minHeight = ButtonHeight;
             return button;
+        }
+
+        static void SizeButton(Button button, float width, int fontSize)
+        {
+            button.GetComponent<LayoutElement>().preferredWidth = width;
+            button.GetComponentInChildren<Text>().fontSize = fontSize;
         }
 
         /// <summary>Selectable pill: the whole pill turns accent when on (chips, 1-7 numbers, preferences).</summary>
