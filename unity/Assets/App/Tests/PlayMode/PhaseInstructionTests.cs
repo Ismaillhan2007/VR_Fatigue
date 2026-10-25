@@ -85,6 +85,31 @@ namespace App.Tests
         }
 
         [UnityTest]
+        public IEnumerator SummaryShowsGeminiControlsWhenCheckInConsentWasSkipped()
+        {
+            _c.ShowPhaseInstructions = false;
+            _c.Analysis = AnalysisMode.Local;
+            _c.AcceptConsent();
+            yield return Until(() => !_c.IsCapturing);
+            _c.SubmitBaseline(2, 2);
+            yield return Until(() => _c.Flow.State == FlowState.CheckIn);
+            _c.SubmitCheckIn(new App.Core.Contracts.SelfReport
+            {
+                Phase = App.Core.Contracts.ReportPhase.PostTask, EyeStrain = 3, MentalFatigue = 3,
+                Chips = new System.Collections.Generic.List<App.Core.Contracts.Chip>(), FreeText = null,
+            }, null, false);
+            yield return Until(() => _c.Flow.Context.Analysis != null && !_c.AnalysisInProgress);
+            var summary = _c.Panels.OfType<SummaryPanel>().Single();
+            Assert.IsTrue(summary.CloudExplanation.gameObject.activeInHierarchy);
+            Assert.IsTrue(summary.GenerateGeminiButton.gameObject.activeInHierarchy);
+            Assert.IsFalse(summary.GenerateGeminiButton.interactable);
+            yield return AssessmentFlowSmokeTest.CaptureEvidence("summary-gemini-controls");
+            summary.CloudExplanation.isOn = true;
+            Assert.IsTrue(summary.GenerateGeminiButton.interactable);
+            Assert.AreEqual(FlowState.Summary, _c.Flow.State, "no task repeat is needed");
+        }
+
+        [UnityTest]
         public IEnumerator PauseBlocksStartAndExitDiscardsTheWaitingPhase()
         {
             _c.AcceptConsent();

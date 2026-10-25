@@ -160,6 +160,65 @@ public class QuestPresentationTests
     }
 
     [UnityTest]
+    public IEnumerator MissedCheckInConsentCanBeGivenOnTheSummaryWithoutRepeatingTheTask()
+    {
+        _controller.EyeSource = EyeSourceMode.Synthetic;
+        _controller.BaselineSeconds = _controller.TaskSeconds = 1;
+        _controller.Analysis = AnalysisMode.Local;
+        _controller.AcceptConsent();
+        var deadline = Time.realtimeSinceStartup + 10;
+        while (_controller.IsCapturing && Time.realtimeSinceStartup < deadline) yield return null;
+        _controller.SubmitBaseline(2, 2);
+        while (_controller.Flow.State != FlowState.CheckIn && Time.realtimeSinceStartup < deadline) yield return null;
+        // The participant skipped the optional Gemini choice at check-in.
+        _controller.SubmitCheckIn(new SelfReport { Phase = ReportPhase.PostTask, EyeStrain = 3, MentalFatigue = 3 }, null, false);
+        while ((_controller.Flow.Context.Analysis == null || _controller.AnalysisInProgress) && Time.realtimeSinceStartup < deadline)
+            yield return null;
+        Assert.AreEqual(FlowState.Summary, _controller.Flow.State);
+        yield return null;
+        Canvas.ForceUpdateCanvases();
+
+        var summary = Object.FindAnyObjectByType<SummaryPanel>();
+        var panel = (RectTransform)summary.transform;
+        Assert.NotNull(summary.CloudExplanation, "Summary offers its own Gemini consent");
+        Assert.NotNull(summary.GenerateGeminiButton);
+        foreach (var control in new Selectable[] { summary.CloudExplanation, summary.GenerateGeminiButton,
+                     summary.FinishReportButton, summary.EnterSceneButton })
+        {
+            Assert.IsTrue(control.gameObject.activeInHierarchy, control.name + " is shown");
+            AssertInside((RectTransform)control.transform, panel, control.name);
+            var label = control.GetComponentInChildren<Text>();
+            Assert.AreEqual(label.text.Length, label.cachedTextGenerator.characterCountVisible, control.name + " label is not cut off");
+        }
+        Assert.IsFalse(summary.CloudExplanation.isOn, "consent is never preselected");
+        Assert.IsFalse(summary.GenerateGeminiButton.interactable, "Generate needs explicit consent first");
+
+        var pointer = new Pointer(_module, _view.Head);
+        _module.RegisterInteractor(pointer);
+        try
+        {
+            yield return Click(pointer, summary.CloudExplanation);
+            Assert.IsTrue(summary.CloudExplanation.isOn, "the ray reaches the consent control");
+            Assert.IsTrue(summary.GenerateGeminiButton.interactable, "Generate is available without repeating the task");
+            Assert.AreEqual(FlowState.Summary, _controller.Flow.State);
+        }
+        finally { _module.UnregisterInteractor(pointer); }
+    }
+
+    static void AssertInside(RectTransform inner, RectTransform outer, string name)
+    {
+        var corners = new Vector3[4];
+        inner.GetWorldCorners(corners);
+        var bounds = outer.rect;
+        foreach (var corner in corners)
+        {
+            var local = (Vector2)outer.InverseTransformPoint(corner);
+            Assert.IsTrue(local.x >= bounds.xMin - 0.5f && local.x <= bounds.xMax + 0.5f
+                && local.y >= bounds.yMin - 0.5f && local.y <= bounds.yMax + 0.5f, name + " lies inside the panel");
+        }
+    }
+
+    [UnityTest]
     public IEnumerator ReportOnlyCompletesThroughTrackedRayWithReportDependency()
     {
         if (typeof(SessionController).GetMethod("FinishWithReport") == null)
