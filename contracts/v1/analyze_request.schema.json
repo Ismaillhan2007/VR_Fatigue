@@ -38,6 +38,14 @@
         "take_break",
         "stop_session"
       ]
+    },
+    "cloud_policy": {
+      "enum": [
+        "local_only",
+        "synthetic_demo"
+      ],
+      "default": "local_only",
+      "description": "Optional additive v1 field. Omission and interactive check-ins stay local. synthetic_demo declares that ALL input, including self-report and preferences, is invented test data; never use for participant check-ins."
     }
   },
   "required": [

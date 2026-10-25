@@ -39,6 +39,7 @@ def body():
     session["self_report"]["free_text"] = None
     return {
         "schema_version": "1.0",
+        "cloud_policy": "synthetic_demo",
         "session_summary": session,
         "preferences": fixture("preferences_default.json"),
         "reconciliation": "agree_high",

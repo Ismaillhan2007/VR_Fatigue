@@ -13,6 +13,8 @@ JSON Schema draft 2020-12 for the objects named in [docs/PROJECT_PLAN.md](../doc
 
 Rules enforced by the schemas (clients must enforce them too):
 
+- Additive v1 request field `cloud_policy` defaults to `local_only` when absent. Interactive Unity check-ins always use `local_only`, including those with synthetic eye samples. `synthetic_demo` explicitly declares that the entire request (including sliders, chips and preferences) is invented test data. It does not authorize participant data; real/recorded eye input remains excluded. The backend also returns an optional allowlisted `X-VR-Fallback-Reason` HTTP header; response JSON is unchanged. Upgrade the backend before clients that send the new request field.
+
 - `additionalProperties: false` everywhere; unknown `schema_version` is rejected.
 - Unavailable signals are `null` with an entry in `quality.unavailable`, never `0`.
 - Data provenance (`data_source`, `replay_origin`) and AI provenance (`ai_source`, `model_id`) are separate fields. Synthetic data can never claim `native_eye_gaze`; a fallback response never names a model; `insufficient_data` forces the strain indicator to `unavailable`.

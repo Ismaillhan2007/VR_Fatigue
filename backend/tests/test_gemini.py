@@ -20,6 +20,7 @@ def request():
     return AnalysisRequest.model_validate(
         {
             "schema_version": "1.0",
+            "cloud_policy": "synthetic_demo",
             "session_summary": session,
             "preferences": json.loads((ROOT / "fixtures/preferences_default.json").read_text()),
             "reconciliation": "agree_high",
