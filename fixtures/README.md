@@ -2,6 +2,8 @@
 
 Everything here is **synthetic**: hand-written values that match the v1 contracts. None of it is a measurement of a person, and no file comes from a lab or participant recording.
 
+These fixtures support the eye-tracking report and the optional relaxation use case. Existing v1 analysis fixtures include required scene settings; null preferences test default settings, not refusal or acceptance of a scene. Fixture/schema validation does not establish successful report-only completion or scene opt-in UX. Those implementation gaps and required checks are in [OBJECTIVES](../docs/OBJECTIVES.md).
+
 - Valid examples: `session_synthetic_*.json`, `self_report_*.json`, `preferences_default.json`, `scene_config_calm_forest_sunset.json` (the saved offline demo preset), `analysis_fallback.json`.
 - `invalid/` holds inputs that must be rejected. `contracts/validate_examples.py` checks both groups.
 - `integration/scene_rules.json` holds synthetic scene-rule expectations shared by Python and C# tests. It covers null preferences, chip order, explicit overrides, full silence and stop-session behavior; it is a test-case list rather than a top-level v1 contract object.

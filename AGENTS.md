@@ -3,7 +3,7 @@
 Read by every person and coding agent before changing anything. Details: [CONTRIBUTING.md](CONTRIBUTING.md) (workflow, ownership, conflicts), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (seams), [docs/SETUP.md](docs/SETUP.md) (run and test).
 
 ## Objective
-Build a Unity VR prototype for HackTX: eye-signal capture -> deterministic metrics -> Gemini wellness summary -> a personalized, prebuilt relaxation scene. Ship one reliable forest demo with optional squirrels before adding more environments.
+Build an eye-tracking app for HackTX: eye-signal capture -> deterministic metrics and personal-baseline comparison -> an experimental health/fatigue wellness report, with local fallback and optional Gemini explanation. A report-only session is a complete success. A personalized, prebuilt relaxation scene is one optional use case, entered only by explicit participant choice; ship one forest for that use case before adding environments. See [product objectives and current implementation gaps](docs/OBJECTIVES.md). The current app still needs a normal report-only completion path; do not claim this documentation implements it.
 
 ## Development
 - Use Unity/C# (6000.6.7f1) for VR and Python/FastAPI with the Google Gen AI SDK for the backend. Keep the Gemini key on the backend.
@@ -35,4 +35,4 @@ Build a Unity VR prototype for HackTX: eye-signal capture -> deterministic metri
 - Replace the working offline demo with an untested live-generation dependency.
 
 ## Done
-Acceptance criteria met; checks recorded (what ran and what did not); data/AI provenance visible; offline demo still works; the PR merges cleanly into the current `dev`; a human teammate approves before merge.
+Acceptance criteria met; checks recorded (what ran and what did not); data/AI provenance visible; offline demo still works; the PR merges cleanly into the current `dev`; a human teammate approves before merge. Product alignment additionally requires successful report-only completion and a separately chosen scene path as defined in [OBJECTIVES](docs/OBJECTIVES.md); scene rendering alone does not complete the core product.
