@@ -75,6 +75,8 @@ namespace VrFatigue.Relaxation
         FogMode savedFogMode;
         Color savedFogColor;
         float savedFogDensity, savedAmbientIntensity;
+        Material savedSkybox;
+        UnityEngine.Rendering.AmbientMode savedAmbientMode;
 
         void Awake()
         {
@@ -89,7 +91,16 @@ namespace VrFatigue.Relaxation
             savedFogColor = RenderSettings.fogColor;
             savedFogDensity = RenderSettings.fogDensity;
             savedAmbientIntensity = RenderSettings.ambientIntensity;
+            savedSkybox = RenderSettings.skybox;
+            savedAmbientMode = RenderSettings.ambientMode;
             savedRender = true;
+            // ForestDemo is loaded additively, so its own lighting settings are ignored: install the sky here.
+            if (skyboxMaterial != null)
+            {
+                RenderSettings.skybox = skyboxMaterial;
+                RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Skybox;
+                DynamicGI.UpdateEnvironment();
+            }
         }
 
         void OnDestroy() => RestoreRenderSettings();
@@ -102,6 +113,8 @@ namespace VrFatigue.Relaxation
             RenderSettings.fogColor = savedFogColor;
             RenderSettings.fogDensity = savedFogDensity;
             RenderSettings.ambientIntensity = savedAmbientIntensity;
+            RenderSettings.skybox = savedSkybox;
+            RenderSettings.ambientMode = savedAmbientMode;
         }
 
         // Safe entry point for text coming from the backend or a file. Invalid input -> saved preset.
