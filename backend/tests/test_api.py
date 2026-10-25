@@ -342,3 +342,21 @@ def test_prompt_omits_identifiers_and_free_text(body):
     assert "private-free-text-marker" not in prompt
     assert "ignore-all-rules-marker" not in prompt
     assert request.session_summary.session_id not in prompt
+
+
+def test_null_preferences_are_accepted(body, response_validator):
+    # Unity sends null when the participant lets the app choose (analyze_request.schema.json).
+    body["preferences"] = None
+    with client_for() as client:
+        response = client.post("/api/v1/analyze", json=body)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["ai_source"] == "fallback"
+    response_validator.validate(result)
+
+
+def test_shared_analyze_request_fixture_is_accepted(response_validator):
+    with client_for() as client:
+        response = client.post("/api/v1/analyze", json=fixture("analyze_request_synthetic.json"))
+    assert response.status_code == 200, response.text
+    response_validator.validate(response.json())

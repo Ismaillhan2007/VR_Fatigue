@@ -56,7 +56,8 @@ def observations_for(request: AnalysisRequest) -> list[Observation]:
 def safety_for(request: AnalysisRequest) -> SafetyNotice:
     # Only raise the caller's explicit notice. These are conservative demo keywords.
     report = request.session_summary.self_report
-    text = " ".join(filter(None, [report.free_text if report else None, request.preferences.text]))
+    prefs_text = request.preferences.text if request.preferences else None
+    text = " ".join(filter(None, [report.free_text if report else None, prefs_text]))
     if re.search(r"\b(dizziness|dizzy|nausea|nauseous|pain)\b", text, re.IGNORECASE):
         return "stop_session"
     return request.safety_notice
@@ -68,16 +69,24 @@ def constrain_scene(scene: SceneConfig, request: AnalysisRequest) -> SceneConfig
     prefs = request.preferences
     report = request.session_summary.self_report
     chips = set(report.chips if report else [])
-    scene.time_of_day = prefs.time_of_day
-    scene.animals_enabled = prefs.animals_enabled and "overstimulated" not in chips
-    scene.sound = "silent" if prefs.sound == "silent" or "want_quiet" in chips else "forest"
+    # Without explicit preferences the scene's own values stand; chips and safety still apply.
+    if prefs is not None:
+        scene.time_of_day = prefs.time_of_day
+    animals = prefs.animals_enabled if prefs is not None else scene.animals_enabled
+    scene.animals_enabled = animals and "overstimulated" not in chips
+    silent = (prefs is not None and prefs.sound == "silent") or scene.sound == "silent"
+    scene.sound = "silent" if silent or "want_quiet" in chips else "forest"
     if scene.sound == "silent":
         scene.master_volume = 0
         scene.sound_layers.wind = 0
         scene.sound_layers.birds = 0
         scene.sound_layers.water = 0
         scene.sound_layers.pad = 0
-    no_motion = prefs.motion == "none" or bool(chips & {"tired_eyes", "overstimulated"})
+    no_motion = (
+        (prefs is not None and prefs.motion == "none")
+        or scene.motion == "none"
+        or bool(chips & {"tired_eyes", "overstimulated"})
+    )
     scene.motion = "none" if no_motion else "gentle"
     if no_motion:
         scene.motion_speed = 0

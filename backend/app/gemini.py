@@ -49,7 +49,9 @@ def build_prompt(request: AnalysisRequest, observations: list[Observation]) -> s
             if report
             else None
         ),
-        "preferences": request.preferences.model_dump(exclude={"text"}),
+        "preferences": (
+            request.preferences.model_dump(exclude={"text"}) if request.preferences else None
+        ),
         "allowed_observation_codes": [item.code for item in observations],
     }
     return (

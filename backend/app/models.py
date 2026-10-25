@@ -234,7 +234,8 @@ class Observation(ContractModel):
 class AnalysisRequest(ContractModel):
     schema_version: Version
     session_summary: SessionSummary
-    preferences: Preferences
+    # Null when the participant let the app choose (contracts/v1/analyze_request.schema.json).
+    preferences: Preferences | None
     reconciliation: Reconciliation
     safety_notice: SafetyNotice
 
