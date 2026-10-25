@@ -34,7 +34,7 @@ namespace App.UI.Panels
             CloudExplanation.isOn = false;
             var label = choice.GetComponentInChildren<Text>();
             label.font = UnityEngine.Resources.GetBuiltinResource<UnityEngine.Font>("LegacyRuntime.ttf");
-            label.fontSize = 22; label.supportRichText = false; label.color = UnityEngine.Color.white;
+            label.fontSize = 22; label.supportRichText = false; label.color = Hint.color;
             label.text = "Optional: send aggregate eye measurements and ratings to the configured backend and Google Gemini for an experimental explanation. Raw gaze and free text stay on-device. Google processes the summary under its Gemini terms. You can finish with a local report.";
             foreach (var node in choice.GetComponentsInChildren<UnityEngine.Transform>(true))
                 node.gameObject.layer = UnityEngine.LayerMask.NameToLayer("UI");
