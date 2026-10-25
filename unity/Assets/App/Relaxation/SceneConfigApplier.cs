@@ -70,9 +70,38 @@ namespace VrFatigue.Relaxation
 
         public SceneConfig Current => target;
 
+        // RenderSettings belong to the active scene (Assessment when loaded additively): restore them on unload.
+        bool savedRender, savedFog;
+        FogMode savedFogMode;
+        Color savedFogColor;
+        float savedFogDensity, savedAmbientIntensity;
+
         void Awake()
         {
+            CaptureRenderSettings();
             ApplyJson(savedPresetJson != null ? savedPresetJson.text : null, snap: true);
+        }
+
+        public void CaptureRenderSettings()
+        {
+            savedFog = RenderSettings.fog;
+            savedFogMode = RenderSettings.fogMode;
+            savedFogColor = RenderSettings.fogColor;
+            savedFogDensity = RenderSettings.fogDensity;
+            savedAmbientIntensity = RenderSettings.ambientIntensity;
+            savedRender = true;
+        }
+
+        void OnDestroy() => RestoreRenderSettings();
+
+        public void RestoreRenderSettings()
+        {
+            if (!savedRender) return;
+            RenderSettings.fog = savedFog;
+            RenderSettings.fogMode = savedFogMode;
+            RenderSettings.fogColor = savedFogColor;
+            RenderSettings.fogDensity = savedFogDensity;
+            RenderSettings.ambientIntensity = savedAmbientIntensity;
         }
 
         // Safe entry point for text coming from the backend or a file. Invalid input -> saved preset.
