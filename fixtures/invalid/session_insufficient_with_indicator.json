@@ -1,0 +1,75 @@
+{
+  "schema_version": "1.0",
+  "session_id": "00000000-0000-4000-8000-000000000002",
+  "data_source": "synthetic",
+  "replay_origin": null,
+  "duration_ms": 180000,
+  "metric_version": "metrics-0.1",
+  "capabilities": {
+    "gaze_pose": true,
+    "native_eye_gaze": false,
+    "openness": false,
+    "pupil": false,
+    "confidence_informative": false
+  },
+  "quality": {
+    "status": "insufficient_data",
+    "valid_coverage": 0.41,
+    "valid_duration_ms": 73800,
+    "gap_duration_ms": 106200,
+    "max_gap_ms": 4200,
+    "repeated_sample_fraction": 0.2,
+    "median_dt_ms": 11.1,
+    "unavailable": [
+      {
+        "signal": "openness",
+        "reason": "not_exposed_by_runtime"
+      },
+      {
+        "signal": "pupil",
+        "reason": "not_exposed_by_runtime"
+      },
+      {
+        "signal": "blink",
+        "reason": "not_exposed_by_runtime"
+      },
+      {
+        "signal": "gaze",
+        "reason": "tracking_lost"
+      }
+    ],
+    "policy_version": "quality-0.1"
+  },
+  "baseline": {
+    "state": "absent",
+    "duration_ms": 0,
+    "windows": 0,
+    "low_confidence": true,
+    "low_confidence_reason": "too_short"
+  },
+  "metrics": {
+    "gaze_speed_median_deg_s": null,
+    "gaze_speed_p95_deg_s": null,
+    "gaze_dispersion_deg": null,
+    "probe_latency_ms": null,
+    "probe_rms_error_deg": null,
+    "probe_miss_fraction": null,
+    "head_speed_deg_s": null
+  },
+  "deviations": {
+    "gaze_speed_median_deg_s": null,
+    "gaze_speed_p95_deg_s": null,
+    "gaze_dispersion_deg": null,
+    "probe_latency_ms": null,
+    "probe_rms_error_deg": null,
+    "probe_miss_fraction": null,
+    "head_speed_deg_s": null
+  },
+  "strain_indicator": {
+    "kind": "experimental_baseline_deviation",
+    "level": "moderate",
+    "value": 0.52,
+    "method_version": "strain-0.1"
+  },
+  "self_report": null
+}
