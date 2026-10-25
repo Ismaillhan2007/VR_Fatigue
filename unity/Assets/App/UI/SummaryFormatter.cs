@@ -32,6 +32,10 @@ namespace App.UI
             b.AppendLine($"Data quality: {s.Quality.Status}, valid coverage {s.Quality.ValidCoverage:P0}, metrics {s.MetricVersion}");
             if (c.PostTaskReport != null)
                 b.AppendLine($"Self-report after the task (1-7): eye strain {c.PostTaskReport.EyeStrain}, mental fatigue {c.PostTaskReport.MentalFatigue}.");
+            if (c.PostTaskReport?.Chips != null && c.PostTaskReport.Chips.Count > 0)
+                b.AppendLine("You noted: " + string.Join(", ", c.PostTaskReport.Chips.ConvertAll(ReportText.ChipLabel)) + ".");
+            if (!string.IsNullOrWhiteSpace(c.PostTaskReport?.FreeText))
+                b.AppendLine($"In your words (kept on this headset, never sent): \"{c.PostTaskReport.FreeText}\"");
             b.AppendLine();
             b.AppendLine("Per-metric deviation from your baseline (robust z, clamped to +/-4):");
             foreach (MetricName m in Enum.GetValues(typeof(MetricName)))

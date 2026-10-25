@@ -67,13 +67,27 @@ namespace App.Tests
             controller.EyeSource = EyeSourceMode.Synthetic;
             controller.BaselineSeconds = controller.TaskSeconds = 1;
             controller.Analysis = mode;
+            // The participant path: each phase waits on its instruction screen until Start is pressed.
+            controller.ShowPhaseInstructions = true;
             controller.AcceptConsent();
+            Assert.IsTrue(controller.AwaitingPhaseStart, "baseline instructions first");
+            Assert.IsFalse(controller.IsCapturing);
+            controller.Panels.OfType<BaselinePanel>().Single().StartButton.onClick.Invoke();
+            Assert.IsTrue(controller.IsCapturing);
             yield return WaitUntil(() => !controller.IsCapturing);
             controller.SubmitBaseline(2, 2);
+            Assert.AreEqual(FlowState.LoadTask, controller.Flow.State);
+            Assert.IsTrue(controller.AwaitingPhaseStart, "task instructions first");
+            controller.Panels.OfType<LoadTaskPanel>().Single().StartButton.onClick.Invoke();
             yield return WaitUntil(() => controller.Flow.State == FlowState.CheckIn);
             var checkIn = controller.Panels.OfType<CheckInPanel>().Single();
-            checkIn.EyeStrain.Slider.value = eye;
-            checkIn.MentalFatigue.Slider.value = 3;
+            Assert.IsFalse(checkIn.NextButton.interactable, "both ratings are required");
+            checkIn.EyeStrain.Select(eye);
+            checkIn.MentalFatigue.Select(3);
+            Assert.IsTrue(checkIn.NextButton.interactable);
+            checkIn.NextButton.onClick.Invoke();
+            checkIn.NextButton.onClick.Invoke();
+            Assert.AreEqual(2, checkIn.Step);
             if (eye == 7) checkIn.FreeText.text = "I feel nauseous";
             yield return CaptureEvidence("check-in");
             checkIn.SubmitButton.onClick.Invoke();
@@ -106,6 +120,7 @@ namespace App.Tests
                 {
                     yield return SceneManager.LoadSceneAsync("Assessment");
                     var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+                    c.ShowPhaseInstructions = false; // flow and capture tests; PhaseInstructionTests cover the gate
                     c.ConfigureBackend(url, Environment.GetEnvironmentVariable("VR_BACKEND_ACCESS_TOKEN") ?? "", true, true, true);
                     yield return ShortSession(c, mode: AnalysisMode.Http, waitForAnalysis: false);
                     yield return WaitUntil(() => received.Task.IsCompleted);
@@ -135,6 +150,7 @@ namespace App.Tests
         {
             yield return SceneManager.LoadSceneAsync("Assessment");
             var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+            c.ShowPhaseInstructions = false; // flow and capture tests; PhaseInstructionTests cover the gate
             yield return ShortSession(c);
             var panel = c.Panels.OfType<SummaryPanel>().Single();
             var original = panel.Body.text;
@@ -164,6 +180,7 @@ namespace App.Tests
         {
             yield return SceneManager.LoadSceneAsync("Assessment");
             var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+            c.ShowPhaseInstructions = false; // flow and capture tests; PhaseInstructionTests cover the gate
             yield return ShortSession(c);
             var summary = c.Panels.OfType<SummaryPanel>().Single();
             summary.EnterSceneButton.onClick.Invoke();
@@ -195,6 +212,7 @@ namespace App.Tests
         {
             yield return SceneManager.LoadSceneAsync("Assessment");
             var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+            c.ShowPhaseInstructions = false; // flow and capture tests; PhaseInstructionTests cover the gate
             yield return ShortSession(c, 7);
             Assert.AreEqual(SafetyNotice.StopSession, c.Flow.Context.Analysis.SafetyNotice);
             var summary = c.Panels.OfType<SummaryPanel>().Single();
@@ -212,6 +230,7 @@ namespace App.Tests
         {
             yield return SceneManager.LoadSceneAsync("Assessment");
             var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+            c.ShowPhaseInstructions = false; // flow and capture tests; PhaseInstructionTests cover the gate
             c.EyeSource = EyeSourceMode.Synthetic;
             c.BaselineSeconds = c.TaskSeconds = 1;
             c.Analysis = AnalysisMode.Local;
@@ -296,6 +315,7 @@ namespace App.Tests
             RequireBackendRun();
             yield return SceneManager.LoadSceneAsync("Assessment");
             var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+            c.ShowPhaseInstructions = false; // flow and capture tests; PhaseInstructionTests cover the gate
             Assert.NotNull(c);
             // The scene's desktop demo default: the synthetic 130 s replay with probes (labelled as replay).
             Assert.AreEqual(App.Capture.EyeSourceMode.Replay, c.EyeSource);
@@ -344,6 +364,7 @@ namespace App.Tests
             RequireBackendRun();
             yield return SceneManager.LoadSceneAsync("Assessment");
             var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+            c.ShowPhaseInstructions = false; // flow and capture tests; PhaseInstructionTests cover the gate
             var request = ContractJson.Parse<AnalyzeRequest>(System.IO.File.ReadAllText(
                 System.IO.Path.Combine(Application.dataPath, "..", "..", "fixtures", "analyze_request_synthetic.json")));
             var url = ConfiguredUrl(c);
@@ -407,6 +428,7 @@ namespace App.Tests
         {
             yield return SceneManager.LoadSceneAsync("Assessment");
             var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+            c.ShowPhaseInstructions = false; // flow and capture tests; PhaseInstructionTests cover the gate
             Assert.NotNull(c, "SessionController missing: run App > Build Assessment Scene");
             c.EyeSource = EyeSourceMode.Synthetic;
             c.BaselineSeconds = 1;
@@ -458,6 +480,7 @@ namespace App.Tests
             if (string.IsNullOrEmpty(url)) Assert.Ignore("VR_SMOKE_BACKEND_URL not set (backend not running for this run)");
             yield return SceneManager.LoadSceneAsync("Assessment");
             var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+            c.ShowPhaseInstructions = false; // flow and capture tests; PhaseInstructionTests cover the gate
             c.EyeSource = EyeSourceMode.Synthetic;
             c.BaselineSeconds = 2;
             c.TaskSeconds = 2;
@@ -496,6 +519,7 @@ namespace App.Tests
         {
             yield return SceneManager.LoadSceneAsync("Assessment");
             var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+            c.ShowPhaseInstructions = false; // flow and capture tests; PhaseInstructionTests cover the gate
             Assert.AreEqual(EyeSourceMode.Replay, c.EyeSource, "desktop demo default");
             c.ReplaySpeed = 40;
             c.Analysis = AnalysisMode.Local;

@@ -28,6 +28,7 @@ namespace App.Tests
         static SessionController Setup()
         {
             var controller = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+            controller.ShowPhaseInstructions = false; // flow and capture tests; PhaseInstructionTests cover the gate
             controller.ReplayCsvPath = FixtureUrl;
             controller.ReplaySpeed = 40;
             controller.Analysis = AnalysisMode.Local;

@@ -1,12 +1,13 @@
 using System.Collections.Generic;
 using System.Linq;
-using App.Core.Analysis;
 using App.Core.Contracts;
 using App.Core.Flow;
+using UnityEngine;
 using UnityEngine.UI;
 
 namespace App.UI.Panels
 {
+    /// <summary>Three short steps: the two 1-7 ratings, optional feeling chips, optional own words (typed or dictated).</summary>
     public sealed class CheckInPanel : FlowPanel
     {
         public RatingRow EyeStrain;
@@ -15,42 +16,29 @@ namespace App.UI.Panels
         public List<Toggle> ChipToggles = new List<Toggle>();
         public InputField FreeText;
         public Text Hint;
+        public Text StepLabel;
+        public List<GameObject> Steps = new List<GameObject>();
+        public Button BackButton;
+        public Button NextButton;
         public Button SubmitButton;
-        public Toggle CloudExplanation { get; private set; }
+        /// <summary>Opt-in: aggregate measurements and ratings (never raw gaze or own words) go to the backend and Gemini.</summary>
+        public Toggle CloudExplanation;
+
+        public const int MaxChips = 6;
+        int _step;
 
         public override FlowState State => FlowState.CheckIn;
+        public int Step => _step;
 
         void Awake()
         {
             FreeText.characterLimit = SelfReport.MaxFreeText;
             foreach (var t in ChipToggles) t.onValueChanged.AddListener(_ => EnforceChipLimit());
+            BackButton.onClick.AddListener(() => ShowStep(_step - 1));
+            NextButton.onClick.AddListener(() => ShowStep(_step + 1));
             SubmitButton.onClick.AddListener(Submit);
-            var choice = DefaultControls.CreateToggle(new DefaultControls.Resources());
-            choice.name = "Optional Gemini summary consent";
-            choice.transform.SetParent(SubmitButton.transform.parent.parent, false);
-            choice.transform.SetSiblingIndex(SubmitButton.transform.parent.GetSiblingIndex());
-            choice.AddComponent<LayoutElement>().preferredHeight = 90;
-            CloudExplanation = choice.GetComponent<Toggle>();
-            CloudExplanation.isOn = false;
-            if (ChipToggles.Count > 0)
-            {
-                MatchImage(CloudExplanation.targetGraphic, ChipToggles[0].targetGraphic);
-                MatchImage(CloudExplanation.graphic, ChipToggles[0].graphic);
-            }
-            ((UnityEngine.RectTransform)CloudExplanation.targetGraphic.transform).sizeDelta = new UnityEngine.Vector2(36, 36);
-            var label = choice.GetComponentInChildren<Text>();
-            label.font = UnityEngine.Resources.GetBuiltinResource<UnityEngine.Font>("LegacyRuntime.ttf");
-            label.fontSize = 22; label.supportRichText = false; label.color = Hint.color;
-            label.rectTransform.offsetMin = new UnityEngine.Vector2(48, 0);
-            label.text = "Optional: send aggregate eye measurements and ratings to the configured backend and Google Gemini for an experimental explanation. Raw gaze and free text stay on-device. Google processes the summary under its Gemini terms. You can finish with a local report.";
-            foreach (var node in choice.GetComponentsInChildren<UnityEngine.Transform>(true))
-                node.gameObject.layer = UnityEngine.LayerMask.NameToLayer("UI");
-        }
-
-        static void MatchImage(Graphic target, Graphic source)
-        {
-            if (target is Image destination && source is Image template)
-            { destination.sprite = template.sprite; destination.type = template.type; destination.color = template.color; }
+            EyeStrain.Changed += Refresh;
+            MentalFatigue.Changed += Refresh;
         }
 
         public override void OnShow()
@@ -60,17 +48,38 @@ namespace App.UI.Panels
             foreach (var t in ChipToggles) t.isOn = false;
             FreeText.text = "";
             CloudExplanation.SetIsOnWithoutNotify(false);
-            Hint.text = "Text stays on this device (it is not sent to the AI).";
+            ShowStep(0);
+        }
+
+        public void ShowStep(int step)
+        {
+            if (step > 0 && !(EyeStrain.HasValue && MentalFatigue.HasValue)) step = 0;
+            _step = Mathf.Clamp(step, 0, Steps.Count - 1);
+            for (var i = 0; i < Steps.Count; i++) Steps[i].SetActive(i == _step);
+            Refresh();
+        }
+
+        public override void Refresh()
+        {
+            if (Controller == null) return;
+            var last = _step == Steps.Count - 1;
+            StepLabel.text = $"STEP 3 OF 4  ·  CHECK-IN {_step + 1}/{Steps.Count}";
+            BackButton.gameObject.SetActive(_step > 0);
+            NextButton.gameObject.SetActive(!last);
+            NextButton.interactable = _step > 0 || (EyeStrain.HasValue && MentalFatigue.HasValue);
+            SubmitButton.gameObject.SetActive(last);
+            Hint.text = "Your words stay on this headset for the local report. They are never sent to the backend or Gemini.";
         }
 
         void EnforceChipLimit()
         {
             var on = ChipToggles.Count(t => t.isOn);
-            foreach (var t in ChipToggles) t.interactable = t.isOn || on < 6;
+            foreach (var t in ChipToggles) t.interactable = t.isOn || on < MaxChips;
         }
 
         void Submit()
         {
+            if (!(EyeStrain.HasValue && MentalFatigue.HasValue)) { ShowStep(0); return; }
             var chips = new List<Chip>();
             for (var i = 0; i < ChipToggles.Count; i++) if (ChipToggles[i].isOn) chips.Add((Chip)i);
             var report = new SelfReport

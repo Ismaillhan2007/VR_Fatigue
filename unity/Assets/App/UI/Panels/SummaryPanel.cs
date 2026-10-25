@@ -36,6 +36,7 @@ namespace App.UI.Panels
                 GenerateGeminiButton = Instantiate(FinishReportButton, FinishReportButton.transform.parent);
                 GenerateGeminiButton.name = "Generate Gemini explanation";
                 GenerateGeminiButton.GetComponentInChildren<Text>().text = "Generate Gemini explanation";
+                GenerateGeminiButton.GetComponent<LayoutElement>().preferredWidth = 520;
                 GenerateGeminiButton.onClick = new Button.ButtonClickedEvent();
                 GenerateGeminiButton.onClick.AddListener(() => Controller.RequestGeminiExplanation(CloudExplanation.isOn));
                 CloudExplanation.onValueChanged.AddListener(_ => Refresh());
@@ -50,7 +51,7 @@ namespace App.UI.Panels
             // stop_session: show the take-a-break message instead of offering the scene.
             FinishReportButton.interactable = c.Analysis != null;
             FinishReportButton.GetComponentInChildren<Text>().text = Controller.AnalysisInProgress
-                ? "Finish with local report (cancel Gemini)" : "Finish with report";
+                ? "Finish now, cancel Gemini" : "Finish with report"; // fits the button at headset size
             if (GenerateGeminiButton != null)
                 GenerateGeminiButton.interactable = CloudExplanation.isOn && !Controller.AnalysisInProgress
                     && c.Analysis != null && c.Analysis.AiSource != AiSource.Live

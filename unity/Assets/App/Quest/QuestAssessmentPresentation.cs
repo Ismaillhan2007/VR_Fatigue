@@ -60,7 +60,7 @@ namespace App.Quest
                     var layout = body.GetComponent<LayoutElement>();
                     if (layout != null && layout.flexibleHeight > 0) MakeScrollable(body);
                 }
-                if (panel is BaselinePanel baseline) MakeScrollable(baseline.Status);
+                if (panel is BaselinePanel baseline) MakeScrollable(baseline.Status, 200); // with the spacer, instructions fit unscrolled
                 if (panel is ScenePanel) panelRect.anchorMax = new Vector2(panelRect.anchorMax.x, 0.58f);
             }
             var pauseRect = (RectTransform)controller.PauseOverlay.transform;
@@ -79,8 +79,8 @@ namespace App.Quest
             statusRect.anchorMax = new Vector2(0.95f, 0.07f);
             statusRect.offsetMin = statusRect.offsetMax = Vector2.zero;
             _status.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            _status.fontSize = 22; _status.fontStyle = FontStyle.Bold;
-            _status.color = Color.white;
+            _status.fontSize = 28; _status.fontStyle = FontStyle.Bold;
+            _status.color = new Color(0.66f, 0.73f, 0.69f);
             _status.alignment = TextAnchor.MiddleLeft;
             _status.raycastTarget = false;
             SetStatus("Point and press trigger. Thumbstick scrolls. Y / B brings Pause into view. Replay requires no eye permission.");
@@ -118,7 +118,7 @@ namespace App.Quest
 
         public void SetStatus(string message) { if (_status != null) _status.text = message; }
 
-        static void MakeScrollable(Text body)
+        static void MakeScrollable(Text body, float minHeight = 120)
         {
             var parent = body.transform.parent;
             var index = body.transform.GetSiblingIndex();
@@ -126,7 +126,7 @@ namespace App.Quest
             scrollGo.transform.SetParent(parent, false);
             scrollGo.transform.SetSiblingIndex(index);
             scrollGo.GetComponent<LayoutElement>().flexibleHeight = 1;
-            scrollGo.GetComponent<LayoutElement>().minHeight = 120;
+            scrollGo.GetComponent<LayoutElement>().minHeight = minHeight;
             var viewport = new GameObject("Viewport", typeof(RectTransform), typeof(RectMask2D), typeof(Image));
             viewport.transform.SetParent(scrollGo.transform, false);
             Stretch((RectTransform)viewport.transform);
@@ -143,7 +143,9 @@ namespace App.Quest
             content.GetComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             body.transform.SetParent(content.transform, false);
             body.GetComponent<LayoutElement>().flexibleHeight = 0;
-            body.fontSize = 24;
+            body.GetComponent<LayoutElement>().preferredHeight = -1;
+            // Keep the builder's reading size; best fit is a desktop fallback and is off in the headset.
+            body.fontSize = Mathf.Max(body.fontSize, 30);
             body.verticalOverflow = VerticalWrapMode.Overflow;
             var scroll = scrollGo.GetComponent<ScrollRect>();
             scroll.viewport = (RectTransform)viewport.transform; scroll.content = contentRect;

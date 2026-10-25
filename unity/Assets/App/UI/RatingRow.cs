@@ -1,34 +1,64 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace App.UI
 {
-    /// <summary>1-7 slider with its label (1 = not at all, 7 = extremely).</summary>
+    /// <summary>
+    /// 1-7 rating as seven large number buttons (1 = not at all, 7 = extremely): point and press one. Nothing is
+    /// preselected, so a rating is always the person's own choice; pressing the selected number again keeps it.
+    /// </summary>
     public sealed class RatingRow : MonoBehaviour
     {
-        public Slider Slider;
-        public Text ValueLabel;
+        public const int Max = 7;
 
-        public int Value => Mathf.RoundToInt(Slider.value);
+        /// <summary>Options[i] is the number i + 1.</summary>
+        public List<Toggle> Options = new List<Toggle>();
+
+        /// <summary>The selected number, or 0 when nothing is selected yet.</summary>
+        public int Value { get; private set; }
+        public bool HasValue => Value > 0;
+        public event Action Changed;
 
         void Awake()
         {
-            Slider.minValue = 1;
-            Slider.maxValue = 7;
-            Slider.wholeNumbers = true;
-            Slider.onValueChanged.AddListener(_ => UpdateLabel());
-            UpdateLabel();
+            for (var i = 0; i < Options.Count; i++)
+            {
+                var number = i + 1;
+                Options[i].onValueChanged.AddListener(on =>
+                {
+                    if (on) Select(number);
+                    else if (Value == number) Show(); // a second press keeps the choice
+                });
+            }
+            Show();
         }
 
-        public void ResetValue(int value = 1)
+        public void Select(int value)
         {
-            Slider.value = value;
-            UpdateLabel();
+            if (value < 1 || value > Max) throw new ArgumentOutOfRangeException(nameof(value));
+            Value = value;
+            Show();
+            Changed?.Invoke();
         }
 
-        void UpdateLabel()
+        public void ResetValue()
         {
-            if (ValueLabel != null) ValueLabel.text = $"{Value} / 7";
+            Value = 0;
+            Show();
+            Changed?.Invoke();
+        }
+
+        void Show()
+        {
+            for (var i = 0; i < Options.Count; i++)
+            {
+                var on = i + 1 == Value;
+                Options[i].SetIsOnWithoutNotify(on);
+                var visual = Options[i].GetComponent<ToggleVisual>();
+                if (visual != null) visual.Apply(on);
+            }
         }
     }
 }

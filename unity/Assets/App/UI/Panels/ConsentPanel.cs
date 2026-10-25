@@ -45,10 +45,12 @@ namespace App.UI.Panels
 
         public override void Refresh()
         {
-            Body.text = "Experimental wellness prototype. Not a medical device or diagnosis. Pause or exit at any time. "
-                + "Reports stay in memory until Exit or New session. Free text stays on-device. "
-                + "A local report is always available. An optional choice at check-in can send aggregate measurements and ratings "
-                + "to the configured backend and Google Gemini. Raw gaze and free text stay on-device.\n\n"
+            Body.text = "An experimental wellness prototype: not a medical device and not a diagnosis.\n\n"
+                + "•  About 4 minutes: a baseline, a short task, then a quick check-in and your summary.\n"
+                + "•  Pause any time with Y or B. Exit is always at the top.\n"
+                + "•  Your report stays in memory until Exit or New session. A local report is always available.\n"
+                + "•  At check-in you may choose to send aggregate measurements and ratings to the configured backend "
+                + "and Google Gemini. Raw gaze and your own words stay on this device.\n\n"
                 + $"Eye data source: {Controller.EyeSourceDescription}"
                 + (Controller.ReplayLoadStatus == null ? "" : "\n\n" + Controller.ReplayLoadStatus)
                 + (Controller.HasOperatorBackendDefaults ? "\n\nLaptop-provisioned backend: " + Controller.BackendConnectionStatus : "")

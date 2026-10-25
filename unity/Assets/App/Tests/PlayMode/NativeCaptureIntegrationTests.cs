@@ -43,6 +43,7 @@ public class NativeCaptureIntegrationTests
     {
         yield return SceneManager.LoadSceneAsync("Assessment");
         _controller = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+        _controller.ShowPhaseInstructions = false; // flow and capture tests; PhaseInstructionTests cover the gate
         _controller.BaselineSeconds = _controller.TaskSeconds = 2;
         _source = new Source(); _locks = _releases = 0;
         _oldFactory = EyeProviderFactory.HardwareFactory;

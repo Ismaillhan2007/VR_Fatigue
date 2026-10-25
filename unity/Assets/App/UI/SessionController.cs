@@ -155,6 +155,8 @@ namespace App.UI
         [Header("Durations in replay/eye-data seconds (demo_session.json: 130 s baseline + 60 s task)")]
         public float BaselineSeconds = 130;
         public float TaskSeconds = 60;
+        [Tooltip("Show instructions before baseline and task; recording starts only when the person presses Start.")]
+        public bool ShowPhaseInstructions = true;
 
         [Header("UI (wired by App/Build Assessment Scene)")]
         public List<FlowPanel> Panels = new List<FlowPanel>();
@@ -184,6 +186,10 @@ namespace App.UI
         }
         public string MetricsFailureMessage { get; private set; }
         public bool IsCapturing => _recording != null;
+        /// <summary>Baseline or task instructions are showing; nothing is recorded until StartPhase.</summary>
+        public bool AwaitingPhaseStart => _pendingPhase != null;
+        /// <summary>Real-time length of the phase whose instructions are showing.</summary>
+        public float PendingPhaseSeconds { get; private set; }
         /// <summary>Remaining phase time in real seconds (replay may run faster than real time).</summary>
         public float PhaseRemainingSeconds => Mathf.Max(0, (_phaseDuration - _phaseElapsed) / Mathf.Max(0.01f, PhaseSpeed));
         public int ProbeCount => _recording?.Probes.Count ?? 0;
@@ -214,6 +220,7 @@ namespace App.UI
         readonly List<GazeSample> _discard = new List<GazeSample>();
         IEyeTrackingProvider _provider;
         PhaseRecording _recording;
+        Action _pendingPhase;
         float _phaseDuration, _phaseElapsed;
         string _probePrefix;
         int _lastTrial = -1;
@@ -383,7 +390,7 @@ namespace App.UI
             Flow.AcceptConsent(native.DataSource, null, native.Capabilities, native.Name);
             _baseline.Recording.Clear(); _baseline.SelfReport = null; _task.Clear();
             HardwareSetupStatus = null; MetricsFailureMessage = null;
-            BeginCapture(_baseline.Recording, diagnostic ? 60 : BaselineSeconds, "b", false);
+            BeginOrAwait(_baseline.Recording, diagnostic ? 60 : BaselineSeconds, "b", false);
         }
 
         public void AbortHardware(string reason)
@@ -447,7 +454,7 @@ namespace App.UI
             _baseline.Recording.Clear();
             _baseline.SelfReport = null;
             _task.Clear();
-            BeginCapture(_baseline.Recording, BaselineSeconds, "b", loaded: false);
+            BeginOrAwait(_baseline.Recording, BaselineSeconds, "b", loaded: false);
         }
 
         public void EndCaptureEarly()
@@ -456,13 +463,24 @@ namespace App.UI
             if (_recording != null) EndCapture();
         }
 
+        /// <summary>The person read the instructions: start recording the baseline or task.</summary>
+        public void StartPhase()
+        {
+            if (_pendingPhase == null || Flow.IsPaused) return;
+            var begin = _pendingPhase;
+            _pendingPhase = null;
+            begin();
+            RefreshVisible();
+        }
+
         public void SubmitBaseline(int eyeStrain, int mentalFatigue)
         {
             if (NativeDiagnostic) return; // The separate 60s diagnostic is never promoted into an eligible baseline.
+            if (IsCapturing || AwaitingPhaseStart) return; // Rate only after the baseline was recorded.
             var report = new SelfReport { Phase = ReportPhase.Baseline, EyeStrain = eyeStrain, MentalFatigue = mentalFatigue };
             Flow.CompleteBaseline(report);
             _baseline.SelfReport = report;
-            BeginCapture(_task, TaskSeconds, "l", loaded: true);
+            BeginOrAwait(_task, TaskSeconds, "l", loaded: true);
         }
 
         CancellationTokenSource _analysisRequest;
@@ -638,6 +656,14 @@ namespace App.UI
 
         // ----- internals -----
 
+        void BeginOrAwait(PhaseRecording recording, float seconds, string probePrefix, bool loaded)
+        {
+            PendingPhaseSeconds = seconds / Mathf.Max(0.01f, PhaseSpeed);
+            if (ShowPhaseInstructions) _pendingPhase = () => BeginCapture(recording, seconds, probePrefix, loaded);
+            else BeginCapture(recording, seconds, probePrefix, loaded);
+            RefreshVisible(); // the phase panel was shown before the instructions were armed
+        }
+
         void BeginCapture(PhaseRecording recording, float seconds, string probePrefix, bool loaded)
         {
             var now = Now;
@@ -744,6 +770,7 @@ namespace App.UI
 
         void StopCapture()
         {
+            _pendingPhase = null;
             _recording = null;
             ProbeRunner?.Hide();
             _provider?.Stop();

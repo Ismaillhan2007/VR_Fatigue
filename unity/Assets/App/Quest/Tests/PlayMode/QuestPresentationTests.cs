@@ -31,6 +31,7 @@ public class QuestPresentationTests
     {
         yield return SceneManager.LoadSceneAsync("Assessment");
         _controller = Object.FindAnyObjectByType<SessionController>();
+        _controller.ShowPhaseInstructions = false; // flow and capture tests; PhaseInstructionTests cover the gate
         var head = Camera.main;
         _view = new GameObject("Simulated Quest presentation").AddComponent<QuestAssessmentPresentation>();
         _view.Configure(_controller, head);
@@ -101,7 +102,7 @@ public class QuestPresentationTests
         Canvas.ForceUpdateCanvases();
         var scroll = body.GetComponentInParent<ScrollRect>();
         Assert.IsFalse(body.resizeTextForBestFit);
-        Assert.AreEqual(24, body.fontSize);
+        Assert.GreaterOrEqual(body.fontSize, 30, "report text keeps a headset-readable size");
         Assert.Greater(scroll.content.rect.height, scroll.viewport.rect.height);
         var pointer = new Pointer(_module, _view.Head);
         pointer.Target = scroll.viewport.TransformPoint(scroll.viewport.rect.center);
@@ -159,6 +160,65 @@ public class QuestPresentationTests
     }
 
     [UnityTest]
+    public IEnumerator MissedCheckInConsentCanBeGivenOnTheSummaryWithoutRepeatingTheTask()
+    {
+        _controller.EyeSource = EyeSourceMode.Synthetic;
+        _controller.BaselineSeconds = _controller.TaskSeconds = 1;
+        _controller.Analysis = AnalysisMode.Local;
+        _controller.AcceptConsent();
+        var deadline = Time.realtimeSinceStartup + 10;
+        while (_controller.IsCapturing && Time.realtimeSinceStartup < deadline) yield return null;
+        _controller.SubmitBaseline(2, 2);
+        while (_controller.Flow.State != FlowState.CheckIn && Time.realtimeSinceStartup < deadline) yield return null;
+        // The participant skipped the optional Gemini choice at check-in.
+        _controller.SubmitCheckIn(new SelfReport { Phase = ReportPhase.PostTask, EyeStrain = 3, MentalFatigue = 3 }, null, false);
+        while ((_controller.Flow.Context.Analysis == null || _controller.AnalysisInProgress) && Time.realtimeSinceStartup < deadline)
+            yield return null;
+        Assert.AreEqual(FlowState.Summary, _controller.Flow.State);
+        yield return null;
+        Canvas.ForceUpdateCanvases();
+
+        var summary = Object.FindAnyObjectByType<SummaryPanel>();
+        var panel = (RectTransform)summary.transform;
+        Assert.NotNull(summary.CloudExplanation, "Summary offers its own Gemini consent");
+        Assert.NotNull(summary.GenerateGeminiButton);
+        foreach (var control in new Selectable[] { summary.CloudExplanation, summary.GenerateGeminiButton,
+                     summary.FinishReportButton, summary.EnterSceneButton })
+        {
+            Assert.IsTrue(control.gameObject.activeInHierarchy, control.name + " is shown");
+            AssertInside((RectTransform)control.transform, panel, control.name);
+            var label = control.GetComponentInChildren<Text>();
+            Assert.AreEqual(label.text.Length, label.cachedTextGenerator.characterCountVisible, control.name + " label is not cut off");
+        }
+        Assert.IsFalse(summary.CloudExplanation.isOn, "consent is never preselected");
+        Assert.IsFalse(summary.GenerateGeminiButton.interactable, "Generate needs explicit consent first");
+
+        var pointer = new Pointer(_module, _view.Head);
+        _module.RegisterInteractor(pointer);
+        try
+        {
+            yield return Click(pointer, summary.CloudExplanation);
+            Assert.IsTrue(summary.CloudExplanation.isOn, "the ray reaches the consent control");
+            Assert.IsTrue(summary.GenerateGeminiButton.interactable, "Generate is available without repeating the task");
+            Assert.AreEqual(FlowState.Summary, _controller.Flow.State);
+        }
+        finally { _module.UnregisterInteractor(pointer); }
+    }
+
+    static void AssertInside(RectTransform inner, RectTransform outer, string name)
+    {
+        var corners = new Vector3[4];
+        inner.GetWorldCorners(corners);
+        var bounds = outer.rect;
+        foreach (var corner in corners)
+        {
+            var local = (Vector2)outer.InverseTransformPoint(corner);
+            Assert.IsTrue(local.x >= bounds.xMin - 0.5f && local.x <= bounds.xMax + 0.5f
+                && local.y >= bounds.yMin - 0.5f && local.y <= bounds.yMax + 0.5f, name + " lies inside the panel");
+        }
+    }
+
+    [UnityTest]
     public IEnumerator ReportOnlyCompletesThroughTrackedRayWithReportDependency()
     {
         if (typeof(SessionController).GetMethod("FinishWithReport") == null)
@@ -169,15 +229,37 @@ public class QuestPresentationTests
         _module.RegisterInteractor(pointer);
         try
         {
+            // The participant path with the ray only: instructions, number buttons and check-in steps.
+            _controller.ShowPhaseInstructions = true;
             yield return Click(pointer, Object.FindAnyObjectByType<ConsentPanel>().StartButton);
             var deadline = Time.realtimeSinceStartup + 15;
+            while (!_controller.AwaitingPhaseStart && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.IsFalse(_controller.IsCapturing, "nothing records before the instructions are confirmed");
+            var baseline = Object.FindAnyObjectByType<BaselinePanel>();
+            yield return Click(pointer, baseline.StartButton);
+            Assert.IsTrue(_controller.IsCapturing);
+            deadline = Time.realtimeSinceStartup + 15;
             while (_controller.IsCapturing && Time.realtimeSinceStartup < deadline) yield return null;
             Assert.IsFalse(_controller.IsCapturing);
-            yield return Click(pointer, Object.FindAnyObjectByType<BaselinePanel>().ContinueButton);
+            yield return Click(pointer, baseline.EyeStrain.Options[1]);
+            yield return Click(pointer, baseline.MentalFatigue.Options[2]);
+            Assert.AreEqual(2, baseline.EyeStrain.Value);
+            Assert.AreEqual(3, baseline.MentalFatigue.Value);
+            yield return Click(pointer, baseline.ContinueButton);
+            Assert.AreEqual(FlowState.LoadTask, _controller.Flow.State);
+            yield return Click(pointer, Object.FindAnyObjectByType<LoadTaskPanel>().StartButton);
             deadline = Time.realtimeSinceStartup + 15;
             while (_controller.Flow.State != FlowState.CheckIn && Time.realtimeSinceStartup < deadline) yield return null;
             Assert.AreEqual(FlowState.CheckIn, _controller.Flow.State);
-            yield return Click(pointer, Object.FindAnyObjectByType<CheckInPanel>().SubmitButton);
+            var checkIn = Object.FindAnyObjectByType<CheckInPanel>();
+            yield return Click(pointer, checkIn.EyeStrain.Options[3]);
+            yield return Click(pointer, checkIn.MentalFatigue.Options[4]);
+            yield return Click(pointer, checkIn.NextButton);
+            yield return Click(pointer, checkIn.ChipToggles[0]);
+            Assert.IsTrue(checkIn.ChipToggles[0].isOn);
+            yield return Click(pointer, checkIn.NextButton);
+            yield return Click(pointer, checkIn.SubmitButton);
+            Assert.AreEqual(4, _controller.Flow.Context.PostTaskReport.EyeStrain);
             var summary = Object.FindAnyObjectByType<SummaryPanel>();
             var finish = summary.GetComponentsInChildren<Button>().Single(b => b.GetComponentInChildren<Text>().text == "Finish with report");
             yield return Click(pointer, finish);
@@ -321,7 +403,7 @@ public class QuestPresentationTests
         Assert.IsNull(provider.AggregateDiagnostics);
     }
 
-    static IEnumerator Click(Pointer pointer, Button button)
+    static IEnumerator Click(Pointer pointer, Selectable button)
     {
         Canvas.ForceUpdateCanvases();
         pointer.Target = button.transform.TransformPoint(((RectTransform)button.transform).rect.center);
