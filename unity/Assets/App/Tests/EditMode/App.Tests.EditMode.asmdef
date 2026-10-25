@@ -5,6 +5,7 @@
         "App.Core",
         "App.Metrics",
         "App.Capture",
+        "App.Relaxation",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

@@ -1,6 +1,32 @@
-# Setup (Unity, desktop mode)
+# Setup: full desktop demo
 
-Everything below runs without a headset, backend or Gemini key. Eye data are synthetic and labelled as such.
+Everything below runs without a headset or a Gemini key. Eye data are synthetic and labelled as such; the backend runs its offline rules by default.
+
+## Full demo in four commands
+
+From the repository root (macOS; Unity installed through Hub, [uv](https://docs.astral.sh/uv/) installed):
+
+```bash
+cd backend && uv sync --locked --extra dev && cd ..
+```
+
+```bash
+cd backend && uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+Then in Unity: open `unity/` in Hub, open `Assets/App/Scenes/Assessment.unity`, press Play, and walk Consent -> Baseline -> Task -> Check-in -> Summary -> Scene -> Re-rating. With the backend running the top bar shows "AI: FALLBACK from backend rules (no AI used)"; stop the backend and it shows "AI: LOCAL FALLBACK (no AI used: backend unreachable ...)". Both paths reach the forest.
+
+Tests (close the editor first; a project cannot be open twice):
+
+```bash
+/Applications/Unity/Hub/Editor/6000.6.7f1/Unity.app/Contents/MacOS/Unity -batchmode -projectPath unity -runTests -testPlatform EditMode -testResults editmode-results.xml -logFile -
+```
+
+PlayMode uses the same command with `-testPlatform PlayMode`. The second PlayMode test runs end to end against the backend only when `VR_SMOKE_BACKEND_URL=http://127.0.0.1:8000` is set (start the backend first); otherwise it is reported as ignored. Backend and contract checks:
+
+```bash
+cd backend && uv run pytest -q && cd .. && backend/.venv/bin/python contracts/validate_examples.py
+```
 
 ## Versions (pinned in this repo)
 
@@ -8,56 +34,34 @@ Everything below runs without a headset, backend or Gemini key. Eye data are syn
 | --- | --- | --- |
 | Unity editor | 6000.6.7f1 | `unity/ProjectSettings/ProjectVersion.txt` |
 | Render pipeline | URP 17.6.0 (Universal 3D template) | `unity/Packages/manifest.json` |
-| XR Interaction Toolkit | 3.6.1 | manifest |
-| OpenXR | 1.18.0 | manifest |
+| Meta XR Core SDK | 207.0.1 (`com.meta.xr.sdk.core`, pulls `com.unity.xr.hands`) | manifest |
+| XR Interaction Toolkit / OpenXR / XR Management | 3.6.1 / 1.18.0 / 4.7.0 | manifest |
 | Input System | 1.20.1 (active input handling: Input System only) | manifest, Player settings |
-| Test Framework | 1.8.0 | manifest |
-| Newtonsoft Json | 3.2.2 (`com.unity.nuget.newtonsoft-json`) | manifest |
-| Meta XR SDK | not installed yet (comes with `feat/quest-eye`) | - |
+| Test Framework / Newtonsoft Json | 1.8.0 / 3.2.2 | manifest |
+| Backend | Python >= 3.11, FastAPI, `uv.lock` | `backend/pyproject.toml` |
 
-The package versions are the ones this editor ships as verified. Do not upgrade packages in a feature PR; propose it in a `chore/` PR.
+Do not upgrade packages in a feature PR; propose it in a `chore/` PR.
 
 ## First open
 
-1. Install **Unity 6000.6.7f1** from Unity Hub (Installs -> Install Editor -> Archive if it is not listed). Add **Android Build Support** (with OpenJDK and Android SDK & NDK) for the later Quest build.
-2. Clone into a path **without spaces or non-ASCII characters** (for example `~/dev/VR_Fatigue`). Android/Gradle builds often fail on such paths; desktop play mode is fine either way.
-3. Unity Hub -> Add -> Add project from disk -> select the `unity/` folder. The first import takes a few minutes.
-4. If `Assets/App/Scenes/Assessment.unity` is missing or broken, run the menu **App > Build Assessment Scene**. It regenerates the panel prefabs in `Assets/App/UI/Prefabs/` and the scene, and puts the scene first in Build Settings. It never touches `ForestDemo`.
+1. Install **Unity 6000.6.7f1** from Unity Hub (Archive if it is not listed) with **Android Build Support** (OpenJDK, Android SDK & NDK) for the Quest build.
+2. Clone into a path **without spaces or non-ASCII characters** (for example `~/dev/VR_Fatigue`). Android/Gradle builds often fail on such paths.
+3. Unity Hub -> Add -> Add project from disk -> `unity/`. The first import resolves the Meta SDK and takes several minutes.
+4. If a scene is missing: **App > Build Assessment Scene** regenerates the Assessment panels and scene (Assessment stays first in Build Settings). **App > Create ForestDemo Placeholder** creates a primitive placeholder `ForestDemo` only if none exists and adds it to Build Settings; the forest owner replaces it.
 
-Never commit without the `.meta` files Unity creates next to new assets, and never edit GUIDs by hand.
+Never commit without the `.meta` files Unity creates, never edit GUIDs by hand, and never commit `unity/Assets/Resources/DevAgentSettings.asset` (the Meta SDK writes a machine-local token into it; it is git-ignored).
 
-## Run in desktop mode
+## SessionController settings (Inspector)
 
-1. Open `Assets/App/Scenes/Assessment.unity` and press Play.
-2. The `SessionController` object holds the settings (Inspector):
-   - **Eye Source**: `Synthetic` (default), `Replay` (needs `Replay Csv Path`, format in [ARCHITECTURE.md](ARCHITECTURE.md)), `Hardware` (placeholder; falls back to synthetic with a visible note).
-   - **Analysis**: `Http` (default; calls the backend and falls back to local rules on any failure), `Mock` (canned fixture), `Local` (offline rules only).
-   - **Backend Base Url**: default `http://127.0.0.1:8000`. In a build, pass `-backendUrl http://<laptop-ip>:8000`.
-   - **Baseline/Task Seconds**: 20 s each on desktop; the pilot protocol uses 120 s / 300 s. With less than 120 s of baseline the baseline is flagged `too_short` and the experimental indicator is `unavailable`, which is correct behaviour.
-3. Walk through Consent -> Baseline -> Task -> Check-in -> Summary -> Scene -> Re-rating. The top bar always shows the data source (SYNTHETIC / REPLAY / LIVE) and the AI source (live / cached / LOCAL FALLBACK). Pause and Exit work in every step.
+- **Eye Source**: `Synthetic` (default), `Replay` (`Replay Csv Path`, default `../fixtures/replay/steady_gaze.json`; eye-session.v1 JSON or the CSV in [ARCHITECTURE.md](ARCHITECTURE.md); relative to `unity/`), `Hardware` (placeholder, falls back to synthetic with a visible note). The committed replay fixtures are 1-2 s unit cases, so replay currently ends in `insufficient_data`.
+- **Analysis**: `Http` (default; falls back to local rules on any failure, 15 s timeout), `Mock` (canned fixture), `Local` (offline only).
+- **Backend Base Url** / **Backend Access Token**: default `http://127.0.0.1:8000`. In a build use `-backendUrl http://<laptop-LAN-IP>:8000` and, only if the backend sets `VR_BACKEND_ACCESS_TOKEN`, `-backendToken <token>`. Never put the Gemini key in Unity.
+- **Baseline/Task Seconds**: 20 s on desktop. Deviations need at least 6 usable 20 s baseline windows, so use about **130 s** baseline to see them. The experimental indicator also needs probe targets, which the placeholder task does not show yet, so it stays `unavailable` (correct behaviour, not a bug).
 
-Without the backend running, `Http` mode shows "LOCAL FALLBACK (no AI used: backend unreachable ...)". That is the offline demo path and must keep working.
+## Backend and network
 
-## Tests
-
-- Editor: Window -> General -> Test Runner -> **EditMode** -> Run All. Tests read the shared fixtures from `../fixtures/` directly.
-- Command line (close the editor first; the project cannot be open twice):
-
-```bash
-/Applications/Unity/Hub/Editor/6000.6.7f1/Unity.app/Contents/MacOS/Unity -batchmode -nographics -projectPath unity -runTests -testPlatform EditMode -testResults editmode-results.xml -logFile -
-```
-
-- PlayMode smoke test (loads `Assessment`, runs one synthetic session offline): same command with `-testPlatform PlayMode`.
-- Contract fixtures (Python, no Unity):
-
-```bash
-python -m pip install jsonschema referencing && python contracts/validate_examples.py
-```
+- Same machine: keep `http://127.0.0.1:8000` (`localhost` works only on the same machine).
+- Headset or another laptop: start the backend with `--host 0.0.0.0`, use the laptop's **LAN IP** in Unity (not `localhost`, not `0.0.0.0`), open the port in the firewall, and allow HTTP for development builds (Player settings -> Allow downloads over HTTP). Venue Wi-Fi may isolate clients; a phone hotspot is the fallback. See [HARDWARE_QUEST_PRO.md](HARDWARE_QUEST_PRO.md) section 3 and [backend/README.md](../backend/README.md).
+- Gemini stays off unless `backend/.env` enables it with a key, model, prices and budget (see `backend/.env.example`). Only synthetic data is ever sent to it. The request body is `contracts/v1/analyze_request.schema.json` and never contains free text.
 
 When you change a file in `fixtures/` that has a copy in `unity/Assets/StreamingAssets/fixtures/`, copy it again; a test fails if the copies drift.
-
-## Backend connection (when `feat/gemini-backend` is running)
-
-- Same machine: keep the default URL.
-- Headset on Wi-Fi: use the laptop's LAN IP, open the port in the firewall, and allow HTTP for development builds (Player settings -> Allow downloads over HTTP). See [HARDWARE_QUEST_PRO.md](HARDWARE_QUEST_PRO.md) section 3.
-- The request body is `contracts/v1/analyze_request.schema.json`; it never contains free text.

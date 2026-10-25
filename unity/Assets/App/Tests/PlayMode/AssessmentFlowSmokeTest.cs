@@ -61,6 +61,8 @@ namespace App.Tests
 
             c.EnterScene();
             yield return WaitUntil(() => c.SceneStatus.Contains("brightness"));
+            StringAssert.Contains("Forest scene loaded", c.SceneStatus, "ForestDemo must be in Build Settings");
+            Assert.NotNull(UnityEngine.Object.FindAnyObjectByType<App.Relaxation.ForestSceneApplier>());
             c.FinishScene();
             c.SubmitReRating(3, 3);
             Assert.AreEqual(FlowState.Done, c.Flow.State);
@@ -68,6 +70,48 @@ namespace App.Tests
             c.Exit();
             Assert.AreEqual(FlowState.Exited, c.Flow.State);
             Assert.IsNull(c.Flow.Context.Summary);
+        }
+
+        /// <summary>
+        /// End-to-end with the real backend in offline (mock) mode. Set VR_SMOKE_BACKEND_URL=http://127.0.0.1:8000
+        /// and start the backend first; otherwise the test is ignored.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator SessionThroughRunningBackendReachesForest()
+        {
+            var url = Environment.GetEnvironmentVariable("VR_SMOKE_BACKEND_URL");
+            if (string.IsNullOrEmpty(url)) Assert.Ignore("VR_SMOKE_BACKEND_URL not set (backend not running for this run)");
+            yield return SceneManager.LoadSceneAsync("Assessment");
+            var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+            c.BaselineSeconds = 2;
+            c.TaskSeconds = 2;
+            c.Analysis = AnalysisMode.Http;
+            c.BackendBaseUrl = url;
+
+            c.AcceptConsent();
+            yield return WaitUntil(() => !c.IsCapturing);
+            c.SubmitBaseline(2, 2);
+            yield return WaitUntil(() => c.Flow.State == FlowState.CheckIn);
+            c.SubmitCheckIn(new SelfReport
+            {
+                Phase = ReportPhase.PostTask, EyeStrain = 5, MentalFatigue = 5,
+                Chips = new List<Chip> { Chip.TiredEyes, Chip.WantQuiet }, FreeText = "private text stays local",
+            }, null);
+            yield return WaitUntil(() => c.Flow.Context.Analysis != null, 20);
+
+            var a = c.Flow.Context.Analysis;
+            Assert.IsNull(c.Flow.Context.AnalysisFallbackReason, "the backend must have answered: " + c.Flow.Context.AnalysisFallbackReason);
+            Assert.AreEqual("local-0.2", a.PromptVersion, "backend offline rules");
+            Assert.AreEqual(AiSource.Fallback, a.AiSource);
+            Assert.AreEqual(DataSource.Synthetic, a.DataSource);
+            StringAssert.Contains("backend rules", UnityEngine.Object.FindAnyObjectByType<ProvenanceBar>().AiLabel.text);
+
+            c.EnterScene();
+            yield return WaitUntil(() => c.SceneStatus.Contains("brightness"));
+            StringAssert.Contains("Forest scene loaded", c.SceneStatus);
+            c.FinishScene();
+            c.SubmitReRating(3, 3);
+            Assert.AreEqual(FlowState.Done, c.Flow.State);
         }
     }
 }

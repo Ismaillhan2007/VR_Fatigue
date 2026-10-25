@@ -4,6 +4,8 @@
     "references": [
         "App.UI",
         "App.Core",
+        "App.Relaxation",
+        "App.Squirrel",
         "Unity.InputSystem",
         "UnityEngine.UI"
     ],

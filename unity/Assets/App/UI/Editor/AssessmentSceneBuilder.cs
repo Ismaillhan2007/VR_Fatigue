@@ -138,10 +138,11 @@ namespace App.UI.Editor
 
         static GameObject SceneView()
         {
-            var root = PanelRoot("ScenePanel");
+            var root = PanelRoot("ScenePanel", new Vector2(0.08f, 0.02f), new Vector2(0.92f, 0.3f));
+            root.GetComponent<Image>().color = new Color(0.12f, 0.16f, 0.2f, 0.75f);
             var p = root.AddComponent<ScenePanel>();
-            Label(root.transform, "Calming scene", 30, 44);
-            p.Body = Label(root.transform, "", 18, flexible: true);
+            Label(root.transform, "Calming scene", 24, 32);
+            p.Body = Label(root.transform, "", 15, flexible: true);
             var row = ButtonRow(root.transform);
             p.MuteButton = MakeButton(row, "Mute");
             p.FinishButton = MakeButton(row, "Finish");
@@ -250,12 +251,12 @@ namespace App.UI.Editor
             return prefab;
         }
 
-        static GameObject PanelRoot(string name)
+        static GameObject PanelRoot(string name, Vector2? anchorMin = null, Vector2? anchorMax = null)
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(VerticalLayoutGroup));
             var rt = (RectTransform)go.transform;
-            rt.anchorMin = new Vector2(0.08f, 0.03f);
-            rt.anchorMax = new Vector2(0.92f, 0.88f);
+            rt.anchorMin = anchorMin ?? new Vector2(0.08f, 0.03f);
+            rt.anchorMax = anchorMax ?? new Vector2(0.92f, 0.88f);
             rt.offsetMin = rt.offsetMax = Vector2.zero;
             go.GetComponent<Image>().color = new Color(0.12f, 0.16f, 0.2f, 0.95f);
             var v = go.GetComponent<VerticalLayoutGroup>();

@@ -2,7 +2,7 @@
 
 HackTX prototype: Unity eye-signal capture, a Gemini-assisted wellness summary, and a personalized relaxation scene. Start with one reliable forest demo with optional squirrels and a clearly labeled offline/replay path.
 
-The Unity project in `unity/` includes the application session flow, UI, contract DTOs and integration seams (see [setup](docs/SETUP.md) and [architecture](docs/ARCHITECTURE.md)). The signals module adds deterministic replay, quality, gaze/head/probe metrics, personal baseline comparison, an experimental indicator and the Quest Pro SDK bridge. The modules are delivered together; wiring the application seams to these signal APIs remains integrator work. Unity is pinned to **6000.6.7f1** and Meta XR Core SDK to **207.0.1**. Backend, forest and live headset acceptance remain pending.
+**Status (integration branch):** the desktop demo runs end to end with synthetic eye data: Unity session flow -> real signals metrics (quality, gaze/head metrics, baseline deviations) -> FastAPI backend (offline rules by default) or local fallback -> sanitised `SceneConfig` -> placeholder forest. Every step shows its data source and AI source. Not done yet: a probe task (so the experimental indicator is still `unavailable` in the app), the real forest scene, the Quest Pro adapter wired into the app, live Gemini, and any headset or Android check. Unity **6000.6.7f1**, Meta XR Core SDK **207.0.1**. Run it with [setup](docs/SETUP.md); seams in [architecture](docs/ARCHITECTURE.md); open issues per owner in [integration review](docs/INTEGRATION_REVIEW.md).
 
 - [Project objectives, architecture, feature acceptance, and build order](docs/PROJECT_PLAN.md)
 - [Backend setup and Unity/HTTP integration](backend/README.md)

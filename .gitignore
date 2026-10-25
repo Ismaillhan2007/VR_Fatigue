@@ -47,3 +47,7 @@ private-reports/
 # Unity extras
 unity/.utmp/
 unity/*.pidb
+
+# Meta XR SDK writes a machine-local dev-agent token and LAN address here
+unity/Assets/Resources/DevAgentSettings.asset
+unity/Assets/Resources/DevAgentSettings.asset.meta

@@ -1,0 +1,16 @@
+{
+    "name": "App.Squirrel",
+    "rootNamespace": "VrFatigue.Squirrel",
+    "references": [
+        "App.Relaxation"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
