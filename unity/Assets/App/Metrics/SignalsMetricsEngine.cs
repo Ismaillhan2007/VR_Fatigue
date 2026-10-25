@@ -30,24 +30,34 @@ namespace App.Metrics
         /// </summary>
         public static Sig.MetricPolicy ProbePolicy => new Sig.MetricPolicy(probeToleranceDeg: 2, acquisitionDeadlineUs: 500000);
 
-        public string MetricVersion => Sig.MetricPolicy.AlgorithmVersion;
+        public string MetricVersion => Sig.MetricPolicy.AlgorithmVersion + "+capture.v2";
 
         /// <summary>Per-trial counts of the last Compute, for the summary screen (not part of the v1 contract).</summary>
         public ProbeTrialStats LastProbeStats { get; private set; }
 
         public SessionSummary Compute(PhaseRecording task, BaselineData baseline, MetricsContext context)
         {
+            LastProbeStats = null;
             var baselineSamples = baseline?.Recording?.Samples ?? new List<AppCapture.GazeSample>();
             var taskSamples = task?.Samples ?? new List<AppCapture.GazeSample>();
             var all = baselineSamples.Concat(taskSamples).ToList();
-            if (all.Count == 0) return Empty(context, baseline);
+            var fallbackClock = new FrameToSensor(all, 0);
+            var taskBounds = Bounds(task, fallbackClock);
+            var baselineBounds = baseline?.Recording == null ? (taskBounds.start, taskBounds.start)
+                : Bounds(baseline.Recording, fallbackClock);
+            bool hasBaseline = baseline?.Recording != null && (baselineSamples.Count > 0 ||
+                baseline.Recording.DurationSeconds > 0 || baseline.Recording.SensorStartTime.HasValue);
+            if (!hasBaseline) baselineBounds = (taskBounds.start, taskBounds.start);
+            if (baselineBounds.Item2 > taskBounds.start + 0.000001)
+                throw new ArgumentException("Baseline and task acquisition bounds overlap.");
 
-            // One clock for both phases: sensor timestamps relative to the first baseline-or-task row.
-            var origin = all[0].SensorTimestamp;
+            // Explicit phase bounds survive missing edge samples and remain on the acquisition clock.
+            var origin = baselineBounds.Item1;
             long Us(double seconds) => (long)Math.Round((seconds - origin) * 1e6, MidpointRounding.AwayFromZero);
             var samples = all.Select(s => ToEyeSample(s, Us(s.SensorTimestamp))).ToList();
-            var endUs = Math.Max(0, samples.Max(s => s.TimestampUs));
-            var baselineEndUs = taskSamples.Count > 0 ? Math.Max(0, Math.Min(endUs, Us(taskSamples[0].SensorTimestamp))) : endUs;
+            var endUs = Us(taskBounds.end);
+            var baselineEndUs = Us(baselineBounds.Item2);
+            var taskStartUs = Us(taskBounds.start);
 
             var info = new Sig.SessionInfo(context.SessionId, Wire(context.DataSource), Wire(context.ReplayOrigin), 0, endUs, Capabilities(context));
             var clock = new FrameToSensor(all, origin);
@@ -59,20 +69,19 @@ namespace App.Metrics
             var report = baseline?.SelfReport;
             var plan = new Sig.BaselinePlan(context.SessionId,
                 new Sig.AssessmentPhase(0, baselineEndUs, baselineProbes.Count > 0 ? ConditionsId : NoProbeConditionsId),
-                new Sig.AssessmentPhase(baselineEndUs, endUs, taskProbes.Count > 0 ? ConditionsId : NoProbeConditionsId),
+                new Sig.AssessmentPhase(taskStartUs, endUs, taskProbes.Count > 0 ? ConditionsId : NoProbeConditionsId),
                 report == null ? null : new Sig.BaselineSelfReport(report.EyeStrain, report.MentalFatigue));
             var comparison = Sig.BaselineEvaluator.Evaluate(session, plan, metricPolicy: ProbePolicy);
             var indicator = Sig.IndicatorEvaluator.Evaluate(comparison);
 
             var clean = comparison.SessionQuality;
-            var taskInfo = new Sig.SessionInfo(info.SessionId, info.DataSource, info.ReplayOrigin, baselineEndUs, endUs, info.Capabilities);
+            var taskInfo = new Sig.SessionInfo(info.SessionId, info.DataSource, info.ReplayOrigin, taskStartUs, endUs, info.Capabilities);
             var taskQuality = Sig.QualityEvaluator.Evaluate(taskInfo,
-                clean.AcceptedStream.Where(s => s.TimestampUs >= baselineEndUs), clean.Policy);
+                clean.AcceptedStream.Where(s => s.TimestampUs >= taskStartUs), clean.Policy);
             // Only trials that lie wholly inside the task phase count for the task-level probe metrics.
-            var inTask = probes.GroupBy(p => p.ProbeId).Where(g => g.All(p => p.TimestampUs >= baselineEndUs)).SelectMany(g => g)
+            var inTask = probes.GroupBy(p => p.ProbeId).Where(g => g.All(p => p.TimestampUs >= taskStartUs)).SelectMany(g => g)
                 .OrderBy(p => p.TimestampUs).ToList();
             var taskMetrics = Sig.MetricsEvaluator.Evaluate(taskQuality, inTask, comparison.Baseline.MetricPolicy);
-            LastProbeStats = ProbeTrialStats.From(comparison.Baseline.Windows, taskMetrics.Probes);
 
             var usable = clean.Status == "usable" && taskQuality.Status == "usable";
             var summary = new SessionSummary
@@ -85,13 +94,39 @@ namespace App.Metrics
                 Quality = QualityOf(clean, usable, context, probes.Count > 0),
                 Baseline = BaselineOf(comparison.Baseline, baselineEndUs),
                 Metrics = Values(name => usable ? taskMetrics.Metrics[name].Value : null),
-                Deviations = Values(name => MedianZ(comparison, name)),
+                Deviations = Values(name => usable ? MedianZ(comparison, name) : null),
                 SelfReport = context.PostTaskReport,
             };
             summary.DurationMs = summary.Quality.ValidDurationMs + summary.Quality.GapDurationMs;
             summary.StrainIndicator = IndicatorOf(indicator, summary, usable);
+            LastProbeStats = ProbeTrialStats.From(comparison.Baseline.Windows, taskMetrics.Probes);
             return summary;
         }
+
+        static (double start, double end) Bounds(PhaseRecording recording, FrameToSensor fallback)
+        {
+            if (recording == null) throw new ArgumentNullException(nameof(recording));
+            if (recording.SensorStartTime.HasValue != recording.SensorEndTime.HasValue)
+                throw new ArgumentException("Both acquisition bounds are required.");
+            double start, end;
+            if (recording.SensorStartTime.HasValue)
+            { start = recording.SensorStartTime.Value; end = recording.SensorEndTime.Value; }
+            else
+            {
+                if (!Finite(recording.StartTime) || !Finite(recording.EndTime) || recording.EndTime < recording.StartTime ||
+                    !Finite(recording.SensorClockRate) || recording.SensorClockRate <= 0)
+                    throw new ArgumentException("Invalid capture phase clock.");
+                if (recording.DurationSeconds == 0 && recording.Samples.Count > 0)
+                    throw new ArgumentException("Samples require explicit phase bounds.");
+                start = fallback.At(recording.StartTime, recording.SensorClockRate);
+                end = fallback.At(recording.EndTime, recording.SensorClockRate);
+            }
+            if (!Finite(start) || !Finite(end) || end < start || (end - start) * 1e6 > long.MaxValue)
+                throw new ArgumentException("Invalid acquisition bounds.");
+            return (start, end);
+        }
+
+        static bool Finite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
 
         // ----- mapping -----
 
@@ -115,7 +150,7 @@ namespace App.Metrics
             foreach (var p in r.Probes)
             {
                 var target = new Sig.Direction3(p.TargetDirection.X, p.TargetDirection.Y, p.TargetDirection.Z);
-                long onset = clock.Us(p.OnsetTime, endUs), hold = clock.Us(p.HoldStartTime, endUs), end = clock.Us(p.EndTime, endUs);
+                long onset = clock.Us(p.OnsetTime, endUs, r.SensorClockRate), hold = clock.Us(p.HoldStartTime, endUs, r.SensorClockRate), end = clock.Us(p.EndTime, endUs, r.SensorClockRate);
                 if (!(onset < hold && hold < end)) continue; // clipped at the session edge: not an evaluable trial
                 var id = string.IsNullOrEmpty(p.TrialId) ? $"t{onset}" : p.TrialId;
                 yield return new Sig.ProbeEvent(onset, id, "target_onset", target);
@@ -132,30 +167,37 @@ namespace App.Metrics
 
             public FrameToSensor(List<AppCapture.GazeSample> rows, double origin)
             {
+                if (rows.Any(s => !Finite(s.FrameTime) || !Finite(s.SensorTimestamp)))
+                    throw new ArgumentException("Nonfinite capture clock.");
                 var ordered = rows.OrderBy(s => s.FrameTime).ToList();
                 _frame = ordered.Select(s => s.FrameTime).ToArray();
                 _sensor = ordered.Select(s => s.SensorTimestamp).ToArray();
                 _origin = origin;
             }
 
-            public long Us(double frameTime, long endUs)
+            public long Us(double frameTime, long endUs, double rate)
+                => Math.Max(0, Math.Min(endUs, (long)Math.Round((At(frameTime, rate) - _origin) * 1e6)));
+
+            public double At(double frameTime, double rate)
             {
+                if (!Finite(frameTime)) throw new ArgumentException("Nonfinite phase/probe time.");
                 var n = _frame.Length;
+                if (n == 0) return frameTime * rate;
                 double sensor;
                 var i = Array.BinarySearch(_frame, frameTime);
                 if (i >= 0) sensor = _sensor[i];
                 else
                 {
                     i = ~i;
-                    if (i == 0) sensor = _sensor[0] - (_frame[0] - frameTime);
-                    else if (i >= n) sensor = _sensor[n - 1] + (frameTime - _frame[n - 1]);
+                    if (i == 0) sensor = _sensor[0] - (_frame[0] - frameTime) * rate;
+                    else if (i >= n) sensor = _sensor[n - 1] + (frameTime - _frame[n - 1]) * rate;
                     else
                     {
                         var f = (frameTime - _frame[i - 1]) / Math.Max(1e-9, _frame[i] - _frame[i - 1]);
                         sensor = _sensor[i - 1] + f * (_sensor[i] - _sensor[i - 1]);
                     }
                 }
-                return Math.Max(0, Math.Min(endUs, (long)Math.Round((sensor - _origin) * 1e6)));
+                return sensor;
             }
         }
 
@@ -224,8 +266,8 @@ namespace App.Metrics
 
         static StrainIndicator IndicatorOf(Sig.IndicatorResult r, SessionSummary s, bool usable)
         {
-            // The last window may be partial (unavailable); report the latest window that has a value.
-            var last = r.Windows.LastOrDefault(w => w.State.Value.HasValue)?.State;
+            // An unavailable/partial final window resets the current state; never resurrect a past value.
+            var last = r.Windows.LastOrDefault()?.State;
             var probesMeasured = s.Metrics.ProbeLatencyMs.HasValue && s.Metrics.ProbeRmsErrorDeg.HasValue && s.Metrics.ProbeMissFraction.HasValue;
             var available = usable && last?.Value != null && s.Baseline.Windows >= BaselinePolicy.MinWindows && probesMeasured;
             return new StrainIndicator
@@ -253,30 +295,6 @@ namespace App.Metrics
                 HeadSpeedDegS = R("head_speed_deg_s"),
             };
         }
-
-        static SessionSummary Empty(MetricsContext c, BaselineData baseline) => new SessionSummary
-        {
-            SessionId = c.SessionId,
-            DataSource = c.DataSource,
-            ReplayOrigin = c.ReplayOrigin,
-            DurationMs = 0,
-            MetricVersion = Sig.MetricPolicy.AlgorithmVersion,
-            Capabilities = c.Capabilities,
-            Quality = new Quality
-            {
-                Status = QualityStatus.InsufficientData,
-                PolicyVersion = Sig.QualityPolicy.PrototypeV1.Version,
-                Unavailable = new List<UnavailableSignal> { new UnavailableSignal { Signal = Signal.Gaze, Reason = UnavailableReason.TrackingLost } },
-            },
-            Baseline = new Baseline
-            {
-                State = BaselineState.Absent,
-                LowConfidence = true,
-                LowConfidenceReason = BaselinePolicy.SelfReportedTired(baseline?.SelfReport) ? LowConfidenceReason.SelfReportedTired : LowConfidenceReason.TooShort,
-            },
-            StrainIndicator = new StrainIndicator { MethodVersion = Sig.IndicatorPolicy.MethodVersion },
-            SelfReport = c.PostTaskReport,
-        };
 
         static string Wire(DataSource d) => d == DataSource.Live ? "live" : d == DataSource.Replay ? "replay" : "synthetic";
         static string Wire(ReplayOrigin? o) => o == null ? null : o == ReplayOrigin.Recorded ? "recorded" : "synthetic";
