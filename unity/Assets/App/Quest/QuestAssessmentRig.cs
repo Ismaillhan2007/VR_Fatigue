@@ -25,6 +25,8 @@ namespace App.Quest
         OVRDisplay _display;
         InputAction _pause;
         readonly PlacementGate _placement = new PlacementGate();
+        XRRayInteractor _leftRay, _rightRay;
+        float _nextDiagnostic;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void Install()
@@ -72,8 +74,8 @@ namespace App.Quest
             // UI and its XRUIInputModule first: the rays register with that module when they are enabled.
             owner.Presentation = root.AddComponent<QuestAssessmentPresentation>();
             owner.Presentation.Configure(controller, owner.Head);
-            ConfigureRay(rig.leftControllerAnchor, "LeftHand");
-            ConfigureRay(rig.rightControllerAnchor, "RightHand");
+            owner._leftRay = ConfigureRay(rig.leftControllerAnchor, "LeftHand");
+            owner._rightRay = ConfigureRay(rig.rightControllerAnchor, "RightHand");
             owner._pause = new InputAction("Pause assessment", InputActionType.Button);
             owner._pause.AddBinding("<XRController>{LeftHand}/secondaryButton");
             owner._pause.AddBinding("<XRController>{RightHand}/secondaryButton");
@@ -82,7 +84,7 @@ namespace App.Quest
             return owner;
         }
 
-        static void ConfigureRay(Transform anchor, string hand)
+        static XRRayInteractor ConfigureRay(Transform anchor, string hand)
         {
             var go = new GameObject(hand + " UI ray");
             go.SetActive(false);
@@ -96,6 +98,10 @@ namespace App.Quest
             press.AddBinding($"<XRController>{{{hand}}}/{{TriggerButton}}"); // same trigger through its standard usage
             ray.uiPressInput = new XRInputButtonReader("UI press", inputSourceMode: XRInputButtonReader.InputSourceMode.InputAction)
             { inputActionPerformed = press };
+            // On the headset the trigger is also read through Meta's OVRInput, so a click never depends on a single
+            // Input System binding/profile resolving (first device run: visible ray, trigger did nothing).
+            ray.uiPressInput.bypass = new QuestTriggerReader(press,
+                hand == "LeftHand" ? OVRInput.RawButton.LIndexTrigger : OVRInput.RawButton.RIndexTrigger);
             ray.uiScrollInput = new XRInputValueReader<Vector2>("UI scroll", XRInputValueReader.InputSourceMode.InputAction)
             { inputAction = new InputAction("UI scroll", InputActionType.Value, $"<XRController>{{{hand}}}/primary2DAxis", expectedControlType: "Vector2") };
             var visual = go.AddComponent<XRInteractorLineVisual>();
@@ -104,6 +110,7 @@ namespace App.Quest
             visual.smoothMovement = false;
             visual.stopLineAtFirstRaycastHit = true;
             go.SetActive(true);
+            return ray;
         }
 
         // Re-place the start screen whenever the flow returns to Consent (new session) or the headset is put on.
@@ -131,6 +138,24 @@ namespace App.Quest
                 _display = OVRManager.display;
                 if (_display != null) _display.RecenteredPose += HandleRecenter;
             }
+            if (Debug.isDebugBuild && Time.unscaledTime >= _nextDiagnostic) LogInputDiagnostic();
+        }
+
+        // Development builds only: one line per second in logcat (tag Unity, prefix [QuestInput]) to see on the device
+        // whether each trigger path fires and what each ray hits. No eye data, tokens or identifiers.
+        void LogInputDiagnostic()
+        {
+            _nextDiagnostic = Time.unscaledTime + 1f;
+            string Ray(XRRayInteractor ray)
+            {
+                if (ray == null) return "none";
+                var reader = ray.uiPressInput.bypass as QuestTriggerReader;
+                var hit = ray.TryGetCurrentUIRaycastResult(out var result) ? result.gameObject.name : "-";
+                return $"inputSystem={reader?.InputSystemPressed}, ovr={reader?.OvrPressed}, uiHit={hit}";
+            }
+            var events = EventSystem.current;
+            var module = events != null ? events.currentInputModule : null;
+            Debug.Log($"[QuestInput] L({Ray(_leftRay)}) R({Ray(_rightRay)}) module={(module != null ? module.GetType().Name : "none")} state={CurrentState}");
         }
 
         // After OVRCameraRig has moved the head anchor this frame; wait for stable tracking so the start screen
@@ -221,5 +246,41 @@ namespace App.Quest
             Pending = false;
             return true;
         }
+    }
+
+    /// <summary>
+    /// UI press for one controller: pressed when the Input System trigger binding OR (on the device) Meta OVRInput
+    /// reports the index trigger. Tracks per-frame transitions for XRI.
+    /// </summary>
+    public sealed class QuestTriggerReader : IXRInputButtonReader
+    {
+        readonly InputAction _action;
+        readonly OVRInput.RawButton _button;
+        readonly bool _useOvr = !Application.isEditor && Application.platform == RuntimePlatform.Android;
+        int _frame = -1;
+        bool _now, _previous;
+
+        public QuestTriggerReader(InputAction action, OVRInput.RawButton button)
+        {
+            _action = action;
+            _button = button;
+        }
+
+        public bool InputSystemPressed => _action != null && _action.enabled && _action.IsPressed();
+        public bool OvrPressed => _useOvr && OVRInput.Get(_button);
+
+        void Sample()
+        {
+            if (Time.frameCount == _frame) return;
+            _frame = Time.frameCount;
+            _previous = _now;
+            _now = InputSystemPressed || OvrPressed;
+        }
+
+        public bool ReadIsPerformed() { Sample(); return _now; }
+        public bool ReadWasPerformedThisFrame() { Sample(); return _now && !_previous; }
+        public bool ReadWasCompletedThisFrame() { Sample(); return !_now && _previous; }
+        public float ReadValue() => ReadIsPerformed() ? 1f : 0f;
+        public bool TryReadValue(out float value) { value = ReadValue(); return true; }
     }
 }
