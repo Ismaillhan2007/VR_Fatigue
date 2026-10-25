@@ -1,0 +1,24 @@
+{
+  "references": [
+    "App.Quest",
+    "App.Core",
+    "App.UI",
+    "App.Capture",
+    "Unity.XR.Interaction.Toolkit",
+    "UnityEngine.UI",
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner",
+    "Unity.InputSystem",
+    "Unity.XR.OpenXR",
+    "Unity.Collections"
+  ],
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "name": "App.Quest.PlayTests"
+}

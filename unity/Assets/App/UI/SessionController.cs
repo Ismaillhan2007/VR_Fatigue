@@ -70,6 +70,9 @@ namespace App.UI
 
         float PhaseSpeed => _provider is ReplayEyeProvider r ? (float)r.Speed : 1f;
         public int SampleCount => _recording?.Samples.Count ?? 0;
+        public bool ReplayLoading { get; private set; }
+        public string ReplayLoadStatus { get; private set; }
+        int _replayLoadRevision;
         public bool AnalysisInProgress { get; private set; }
         public string SceneStatus { get; private set; } = "";
 
@@ -111,6 +114,7 @@ namespace App.UI
 
         void OnDestroy()
         {
+            ClearReplayLoad();
             _cts.Cancel();
             _provider?.Stop();
         }
@@ -139,9 +143,54 @@ namespace App.UI
 
         public void AcceptConsent()
         {
+            if (ReplayLoading || Flow.State != FlowState.Consent || Flow.IsPaused) return;
+            var path = ResolveReplayPath(ReplayCsvPath);
+            if (EyeSource == EyeSourceMode.Replay && ReplayAssetLoader.IsAssetUrl(path))
+            {
+                StartCoroutine(LoadReplayAndAccept(path));
+                return;
+            }
+            StartConsentedCapture(null);
+        }
+
+        System.Collections.IEnumerator LoadReplayAndAccept(string path)
+        {
+            var revision = ++_replayLoadRevision;
+            var sessionId = Flow.Context.SessionId;
+            ReplayLoading = true;
+            ReplayLoadStatus = "Loading bundled replay (not live eye measurements)...";
+            RefreshVisible();
+            ReplayEyeProvider prepared = null;
+            string error = null;
+            yield return ReplayAssetLoader.Load(path, ReplayOrigin, (provider, reason) => { prepared = provider; error = reason; });
+            if (revision != _replayLoadRevision || Flow.Context.SessionId != sessionId) yield break;
+            ReplayLoading = false;
+            ReplayLoadStatus = error;
+            if (prepared != null && Flow.State == FlowState.Consent && !Flow.IsPaused)
+                StartConsentedCapture(prepared);
+            else RefreshVisible(); // Keep consent on failure; never substitute synthetic data for this selected replay.
+        }
+
+        void ClearReplayLoad()
+        {
+            _replayLoadRevision++;
+            ReplayLoading = false;
+            ReplayLoadStatus = null;
+        }
+
+        void StartConsentedCapture(ReplayEyeProvider prepared)
+        {
             MetricsFailureMessage = null;
             _provider?.Stop();
-            _provider = EyeProviderFactory.CreateAndStart(EyeSource, Now, SyntheticSeed, ResolveReplayPath(ReplayCsvPath), ReplayOrigin, out var note, ReplaySpeed);
+            string note = null;
+            if (prepared != null)
+            {
+                prepared.Speed = ReplaySpeed;
+                prepared.Start(Now);
+                _provider = prepared;
+            }
+            else _provider = EyeProviderFactory.CreateAndStart(EyeSource, Now, SyntheticSeed,
+                ResolveReplayPath(ReplayCsvPath), ReplayOrigin, out note, ReplaySpeed);
             if (_provider is ReplayEyeProvider replay)
             {
                 // File parsing happens before capture. Start the replay clock only when the phase is ready.
@@ -256,6 +305,7 @@ namespace App.UI
 
         public void Exit()
         {
+            ClearReplayLoad();
             MetricsFailureMessage = null;
             _cts.Cancel();
             _cts.Dispose();
@@ -275,6 +325,7 @@ namespace App.UI
         {
             if (Flow.State != FlowState.Done && Flow.State != FlowState.Exited)
                 throw new InvalidOperationException("finish or exit before restarting");
+            ClearReplayLoad();
             _cts.Cancel();
             _cts.Dispose();
             _cts = new CancellationTokenSource();
@@ -406,16 +457,8 @@ namespace App.UI
         }
 
         /// <summary>Relative to the unity/ folder; falls back to the StreamingAssets copy (builds have no repo).</summary>
-        static string ResolveReplayPath(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path)) return path;
-            var full = System.IO.Path.IsPathRooted(path)
-                ? path
-                : System.IO.Path.GetFullPath(System.IO.Path.Combine(Application.dataPath, "..", path));
-            if (System.IO.File.Exists(full)) return full;
-            var packaged = System.IO.Path.Combine(Application.streamingAssetsPath, "fixtures", "replay", System.IO.Path.GetFileName(path));
-            return System.IO.File.Exists(packaged) ? packaged : full;
-        }
+        static string ResolveReplayPath(string path) => ReplayAssetLoader.Resolve(path, Application.dataPath,
+            Application.streamingAssetsPath, Application.platform == RuntimePlatform.Android && !Application.isEditor);
 
         static string CommandLineValue(string name)
         {
