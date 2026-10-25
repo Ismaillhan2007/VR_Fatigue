@@ -21,6 +21,8 @@ namespace App.Capture
 
         readonly List<GazeSample> _rows;
         readonly List<ProbeEvent> _probes;
+        readonly double _timelineStart, _sensorStart;
+        double? _phaseEnd;
         double _start, _replayed, _lastNow;
         bool _held;
         int _cursor, _probeCursor;
@@ -29,10 +31,12 @@ namespace App.Capture
         public double Speed { get; set; } = 1;
 
         public ReplayEyeProvider(IEnumerable<GazeSample> rows, ReplayOrigin origin, Capabilities capabilities = null,
-            IEnumerable<ProbeEvent> probes = null)
+            IEnumerable<ProbeEvent> probes = null, double? timelineStart = null)
         {
             _rows = new List<GazeSample>(rows);
             _probes = new List<ProbeEvent>(probes ?? Array.Empty<ProbeEvent>());
+            _timelineStart = timelineStart ?? (_rows.Count == 0 ? 0 : _rows[0].FrameTime);
+            _sensorStart = timelineStart ?? (_rows.Count == 0 ? 0 : _rows[0].SensorTimestamp);
             ReplayOrigin = origin;
             Capabilities = capabilities ?? new Capabilities { GazePose = true, ConfidenceInformative = false };
             if (origin == Core.Contracts.ReplayOrigin.Synthetic) Capabilities.NativeEyeGaze = false;
@@ -102,7 +106,7 @@ namespace App.Capture
                 GazePose = gaze,
                 NativeEyeGaze = false,
                 ConfidenceInformative = session.Info.Capabilities.ConfidenceInformative,
-            }, probes);
+            }, probes, session.Info.StartTimestampUs / 1e6);
         }
 
         static Vector3 V(VRFatigue.Signals.Direction3 d) => new Vector3((float)d.X, (float)d.Y, (float)d.Z);
@@ -122,11 +126,24 @@ namespace App.Capture
             _start = _lastNow = now;
             _replayed = 0;
             _held = false;
+            _phaseEnd = null;
             _cursor = _probeCursor = 0;
             IsRunning = true;
         }
 
         public void Stop() => IsRunning = false;
+
+        /// <summary>Limit a capture phase before polling, so a slow render frame cannot consume the next phase.</summary>
+        public void BeginPhase(double seconds, double now)
+        {
+            if (double.IsNaN(seconds) || double.IsInfinity(seconds) || seconds <= 0)
+                throw new ArgumentOutOfRangeException(nameof(seconds));
+            Advance(now);
+            _phaseEnd = _replayed + seconds;
+        }
+
+        /// <summary>Replay acquisition clock; keeps advancing through missing samples, holds between phases.</summary>
+        public double SensorTime(double now) { Advance(now); return _sensorStart + _replayed; }
 
         public void SetHold(bool hold, double now)
         {
@@ -138,7 +155,7 @@ namespace App.Capture
         {
             if (!IsRunning || _rows.Count == 0) return 0;
             Advance(now);
-            var t0 = _rows[0].FrameTime;
+            var t0 = _timelineStart;
             var added = 0;
             while (_cursor < _rows.Count && _rows[_cursor].FrameTime - t0 <= _replayed)
             {
@@ -155,9 +172,10 @@ namespace App.Capture
         {
             if (_rows.Count == 0) return 0;
             Advance(now);
-            var t0 = _rows[0].FrameTime;
+            var t0 = _timelineStart;
             var added = 0;
-            while (_probeCursor < _probes.Count && _probes[_probeCursor].OnsetTime - t0 <= _replayed)
+            while (_probeCursor < _probes.Count && _probes[_probeCursor].OnsetTime - t0 <= _replayed &&
+                (!_phaseEnd.HasValue || _probes[_probeCursor].OnsetTime - t0 < _phaseEnd.Value))
             {
                 var p = _probes[_probeCursor++];
                 p.OnsetTime = ToFrameClock(p.OnsetTime - t0);
@@ -179,6 +197,7 @@ namespace App.Capture
         void Advance(double now)
         {
             if (!_held && now > _lastNow) _replayed += (now - _lastNow) * Math.Max(0.01, Speed);
+            if (_phaseEnd.HasValue) _replayed = Math.Min(_phaseEnd.Value, _replayed);
             _lastNow = now;
         }
 
