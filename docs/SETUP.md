@@ -38,7 +38,7 @@ cd backend && uv run pytest -q && cd .. && backend/.venv/bin/python contracts/va
 | XR Interaction Toolkit / OpenXR / XR Management | 3.6.1 / 1.18.0 / 4.7.0 | manifest |
 | Input System | 1.20.1 (active input handling: Input System only) | manifest, Player settings |
 | Test Framework / Newtonsoft Json | 1.8.0 / 3.2.2 | manifest |
-| Backend | Python >= 3.11, FastAPI, `uv.lock` | `backend/pyproject.toml` |
+| Backend | Python 3.12, FastAPI, `uv.lock` | `.python-version`, `backend/pyproject.toml` |
 
 Do not upgrade packages in a feature PR; propose it in a `chore/` PR.
 

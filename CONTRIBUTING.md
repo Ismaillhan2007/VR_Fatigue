@@ -99,7 +99,7 @@ Fill in the PR template honestly: what ran, what did not (headset, live Gemini, 
 
 - One teammate who did not author the change approves. Reviewers check behaviour, honest source labels, missing-data handling, offline fallback, secret handling, ownership, and Unity asset/GUID integrity.
 - Before merging into `dev`: the PR shows "no conflicts" against the current `dev`, its checks pass, and the deleted-files check above is empty.
-- `dev` -> `main` (integrator): all checks above on `dev`, the end-to-end PlayMode run against the backend, and the offline run with the backend stopped. Then merge with a merge commit; `main` and `dev` point to the same commit afterwards.
+- `dev` -> `main` (integrator): all checks above on `dev`, the end-to-end PlayMode run against the backend, and the offline run with the backend stopped. Then merge with a merge commit; `main` contains the validated `dev` changes (the merge advances `main` only; `dev` keeps its own tip).
 - Agents prepare PRs and fixes; merging stays a human action unless the user explicitly authorizes it.
 
 ## Verification by change type

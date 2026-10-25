@@ -63,13 +63,13 @@ Unity owns capture, baseline/metrics/indicator calculation, deterministic reconc
 
 An observation requires both a non-null measurement and its non-null deviation for a supported metric. Missing values are never treated as zero. If no supported pairs exist, even with `quality.status: usable`, the backend returns HTTP 200 with `data_quality_limited` and a local report/scene, without a Gemini call, attempt reservation, or cache entry. Partial comparisons describe only available pairs. Supplied quality, provenance, and reconciliation remain unchanged; callers must still use an unavailable indicator/reconciliation when required by the request's semantic rules. A missing or short baseline retains the more specific `no_baseline` observation.
 
-## Compatibility with the planned app
+## Compatibility with the current app
 
 The backend follows the shared `contracts/v1/analyze_request.schema.json` and `analysis_response.schema.json` boundary. Unity's DTOs and HTTP client live under `unity/Assets/App/`. The local report version is `local-0.3`; existing response fields and enums are unchanged. Request preferences are nullable, and request free text must stay null to match Unity's D1 policy.
 
 | App part | Current backend boundary | Verification / remaining dependency |
 | --- | --- | --- |
-| Capture and metrics | Accepts aggregate `SessionSummary`; leaves measurements, quality and reconciliation under Unity ownership. | Synthetic requests and nullable/partial measurements tested. Unity's stub reports task duration separately from baseline, with valid + gap durations summing exactly to task duration. Real metrics remain separate work. |
+| Capture and metrics | Accepts aggregate `SessionSummary`; leaves measurements, quality and reconciliation under Unity ownership. | `MetricsEngineFactory` uses `SignalsMetricsEngine`. The default synthetic replay has a 130 s baseline, 60 s task and probes. Its C# request passed real HTTP and response-guard checks; valid + gap durations sum to task duration. Hardware capture remains separate acceptance work. |
 | Report UI | Returns approved observations, narrative, limitations, safety notice and independent data/AI source labels. | Responses checked against the shared JSON Schema; UI rendering untested. Keep the original summary for numeric values and join by `session_id`. |
 | Forest engine | Returns bounded `SceneConfig`; reapplies mute, animal-free and motion-free restrictions. | Config validated through the response schema and API tests; Unity asset application unavailable. |
 | Gemini | Optional synthetic-only enhancement; real and recorded inputs stay on the local path. | Mocked SDK/failure tests plus a successful manual `gemini-3.1-flash-lite` generation/cache check; other models unverified. |
@@ -163,6 +163,37 @@ The backend branch includes the draft `feat/contracts-v1` dependency. Review/mer
 
 Before LAN sharing, configure a separate `VR_BACKEND_ACCESS_TOKEN` in `backend/.env` and give the same token to the trusted Unity process through its environment. Restart both processes after changing settings. Do not share `GEMINI_API_KEY` or the complete `.env` file. No token belongs in a scene or prefab.
 
+Stop the existing backend with Ctrl+C in its original terminal before restarting with `uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --access-log`. `[Errno 48] address already in use` means an earlier process still owns the port; activating a virtual environment does not free it. On macOS, `lsof -nP -iTCP:8000 -sTCP:LISTEN` identifies the listener. A reloader can have a parent/child pair sharing one socket; stop the original server command rather than starting another instance.
+
+### Launch Unity with the shared token
+
+Get the token from the backend owner's `backend/.env`: copy only the value of `VR_BACKEND_ACCESS_TOKEN`. It is generated locally, not obtained from Google. `GEMINI_API_KEY` stays on the backend. The [root README](../README.md#where-to-get-the-token) includes fresh-setup token creation.
+
+Unity must inherit the token when its process starts. Quit the existing Editor and launch the Editor binary directly from the terminal used below. Replace the project path (and Editor install path if different).
+
+**macOS (zsh/bash):** run this command by itself:
+
+```sh
+read -r -s VR_BACKEND_ACCESS_TOKEN
+```
+
+Paste the shared backend token, then press Enter. Input is hidden. Then run:
+
+```sh
+export VR_BACKEND_ACCESS_TOKEN
+/Applications/Unity/Hub/Editor/6000.6.7f1/Unity.app/Contents/MacOS/Unity -projectPath "/path/to/VR_Fatigue/unity"
+```
+
+**Windows (PowerShell):** run the first line, paste the token at the hidden prompt, then run the remaining lines:
+
+```powershell
+$backendTokenInput = Read-Host "Backend token" -AsSecureString
+$env:VR_BACKEND_ACCESS_TOKEN = [System.Net.NetworkCredential]::new("", $backendTokenInput).Password
+& "C:\Program Files\Unity\Hub\Editor\6000.6.7f1\Editor\Unity.exe" -projectPath "C:\path\to\VR_Fatigue\unity"
+```
+
+A Hub process that was already running may have an older environment; launching the Editor binary directly avoids that ambiguity. These commands do not put the token in the Editor's command-line arguments or print it. Authentication failures return 401 and Unity uses its local fallback, so confirm the server's POST status rather than relying only on scene entry.
+
 With the receiver running, this cloud-disabled synthetic probe checks real HTTP, provenance, the fallback header, 422 validation, and 401 authentication when a token is configured:
 
 ```sh
@@ -170,8 +201,8 @@ cd backend
 uv run python -m scripts.probe_backend --base-url http://<backend-laptop-reachable-IP>:8000
 ```
 
-On the teammate's Editor machine, set `VR_RUN_BACKEND_TESTS=1`, `VR_UNITY_BACKEND_TEST_URL` to the reachable URL, and `VR_BACKEND_ACCESS_TOKEN` to the matching demo token **before starting the Editor**. In Test Runner, run the `AssessmentFlowSmokeTest` PlayMode tests. The two opt-in backend tests run the actual Assessment scene at its saved 20-second baseline/task durations and test native HTTP, auth and 422 handling. The invalid-response and refused-connection tests use local test endpoints and require no cloud access. Without opt-in, backend-dependent tests are explicitly ignored, rather than reported as verified. These tests do not establish headset reachability or forest visuals.
+On the teammate's Editor machine, set `VR_RUN_BACKEND_TESTS=1`, `VR_UNITY_BACKEND_TEST_URL` to the reachable URL, and `VR_BACKEND_ACCESS_TOKEN` to the matching demo token **before starting the Editor**. In Test Runner, run the `AssessmentFlowSmokeTest` PlayMode tests. The configured-scene test preserves the saved 130-second baseline / 60-second task replay at 4x speed (about 48 seconds plus check-in time); a separate test checks native HTTP authentication and 422 handling. Another shortened-session backend test uses `VR_SMOKE_BACKEND_URL` as its opt-in. The invalid-response and refused-connection tests use local test endpoints and require no cloud access. Without opt-in, backend-dependent tests are explicitly ignored, rather than reported as verified. These tests do not establish headset reachability or forest visuals.
 
-See [the implementation/test plan and evidence](../docs/BACKEND_RUNTIME_PLAN.md). The root scene/prefab configuration has not been changed for a machine-specific network address.
+See [the earlier implementation/test plan and evidence](../docs/BACKEND_RUNTIME_PLAN.md) for the 20/20-second stub-era checkpoint; it is a historical record. Current defaults are in [SETUP.md](../docs/SETUP.md). Keep machine-specific network addresses and credentials out of committed scenes/prefabs.
 
 References: [FastAPI application structure](https://fastapi.tiangolo.com/tutorial/bigger-applications/), [FastAPI testing](https://fastapi.tiangolo.com/tutorial/testing/), [Google Gen AI SDK](https://github.com/googleapis/python-genai).
