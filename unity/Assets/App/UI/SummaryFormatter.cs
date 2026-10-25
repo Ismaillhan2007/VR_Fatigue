@@ -30,6 +30,8 @@ namespace App.UI
                 : $"{ReportText.IndicatorLabel}: {ind.Level.ToString().ToLowerInvariant()} ({ind.Value?.ToString("0.00", CultureInfo.InvariantCulture)})");
             b.AppendLine(ReportText.IndicatorDisclaimer);
             b.AppendLine($"Data quality: {s.Quality.Status}, valid coverage {s.Quality.ValidCoverage:P0}, metrics {s.MetricVersion}");
+            if (c.PostTaskReport != null)
+                b.AppendLine($"Self-report after the task (1-7): eye strain {c.PostTaskReport.EyeStrain}, mental fatigue {c.PostTaskReport.MentalFatigue}.");
             b.AppendLine();
             b.AppendLine("Per-metric deviation from your baseline (robust z, clamped to +/-4):");
             foreach (MetricName m in Enum.GetValues(typeof(MetricName)))
@@ -52,8 +54,6 @@ namespace App.UI
             b.AppendLine("Limitations:");
             foreach (var l in a.Limitations) b.AppendLine("  - " + l);
             b.AppendLine();
-            b.AppendLine("Scene preview: " + SceneLine(a.SceneConfig));
-            b.AppendLine(a.SceneRationale);
             return b.ToString();
         }
 
