@@ -84,3 +84,6 @@ APK rebuild/install, native Quest keyboard/controller input and device offline
 fallback. Unity 6000.6.7f1 desktop verification now exists in PR #30 (375 EditMode,
 35 PlayMode tests); it does not satisfy these physical-device criteria. Keep
 #15 and #20 open until their remaining acceptance is observed.
+
+Decision after review of this proposal: the user chose **keep local only for now**.
+Do not create or deploy the proposed public service without a later instruction.
