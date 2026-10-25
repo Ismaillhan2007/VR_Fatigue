@@ -12,11 +12,11 @@ using PlaceholderBuilder = App.UI.Editor.ForestDemoPlaceholderBuilder;
 namespace App.Relaxation.Editor
 {
     /// <summary>
-    /// Builds Assets/App/Scenes/ForestDemo.unity from the committed Quaternius models, the 4K sky, generated ground
-    /// and synthesised audio. Deterministic (fixed seed) and re-runnable; it REPLACES the scene, prefabs and generated
-    /// assets under Assets/App/Forest. Run it once on one machine and commit the result (including .meta files) so GUIDs
-    /// stay stable for everybody. Menu: App > Forest > Build ForestDemo. Batch: -executeMethod
-    /// App.Relaxation.Editor.ForestSceneBuilder.BuildBatch.
+    /// Builds Assets/App/Scenes/ForestDemo.unity from the committed Quaternius "Stylized Nature MegaKit" (68 textured
+    /// models, CC0), the 4K sky, generated ground and synthesised audio. Deterministic (fixed seed) and re-runnable; it
+    /// REPLACES the scene, prefabs and generated assets under Assets/App/Forest. Run it once on one machine and commit the
+    /// result (including .meta files) so GUIDs stay stable for everybody. Menu: App > Forest > Build ForestDemo. Batch:
+    /// -executeMethod App.Relaxation.Editor.ForestSceneBuilder.BuildBatch.
     ///
     /// It wires the existing seams only: SceneConfigApplier (forest DTO, VrFatigue.Relaxation) + ForestSceneApplier
     /// (ISceneApplier seam, App.Relaxation). It adds no config fields and no runtime code besides the skybox hook.
@@ -25,7 +25,8 @@ namespace App.Relaxation.Editor
     public static class ForestSceneBuilder
     {
         public const string Root = "Assets/App/Forest";
-        const string ModelDir = Root + "/Art/Models";
+        const string ModelDir = Root + "/Art/MegaKit";
+        const string TextureDir = ModelDir + "/Textures";
         const string SkyTexturePath = Root + "/Art/Sky/DayEnvironmentHDRI113_4K_TONEMAPPED.jpg";
         const string GeneratedDir = Root + "/Generated";
         const string MaterialDir = Root + "/Materials";
@@ -33,19 +34,18 @@ namespace App.Relaxation.Editor
         const string AudioDir = Root + "/Audio";
         const string SquirrelModel = "Assets/App/Squirrel/Squirrel.obj";
         const int Seed = 20260101;
+        const int QuestTextureSize = 1024; // Android override for every MegaKit texture (ASTC)
 
         static readonly Vector3 Viewer = new Vector3(ForestTerrain.Viewer.x, 0f, ForestTerrain.Viewer.y);
-        static readonly Vector3 StumpPosition = new Vector3(2.0f, 0f, -5.6f);
+        static readonly Vector2 RockSeat = new Vector2(2.0f, -5.6f); // boulder the squirrel sits on
 
         struct Spec
         {
             public string Name;
-            public float Target;      // metres: height, or longest side for rocks / width for ByWidth
-            public bool Extent;       // measure the longest horizontal/vertical side instead of height
-            public bool TwoSided;     // thin foliage: render both faces
+            public float Target;      // metres: height, or longest side when Extent
+            public bool Extent;       // measure the longest side instead of the height
             public float CullHeight;  // >0 adds a one-level LODGroup that culls below this screen height
-            public Spec(string n, float t, bool extent = false, bool twoSided = false, float cull = 0f)
-            { Name = n; Target = t; Extent = extent; TwoSided = twoSided; CullHeight = cull; }
+            public Spec(string n, float t, bool extent = false, float cull = 0f) { Name = n; Target = t; Extent = extent; CullHeight = cull; }
         }
 
         static readonly Spec[] Specs = BuildSpecs();
@@ -54,22 +54,37 @@ namespace App.Relaxation.Editor
         {
             var l = new List<Spec>();
             for (int i = 1; i <= 5; i++) l.Add(new Spec("CommonTree_" + i, 9.0f));
-            for (int i = 1; i <= 5; i++) l.Add(new Spec("BirchTree_" + i, 9.5f));
-            for (int i = 1; i <= 3; i++) l.Add(new Spec("PineTree_" + i, 11.0f));
-            for (int i = 1; i <= 2; i++) l.Add(new Spec("Willow_" + i, 7.5f));
-            for (int i = 1; i <= 2; i++) l.Add(new Spec("Bush_" + i, 1.2f));
-            for (int i = 1; i <= 2; i++) l.Add(new Spec("BushBerries_" + i, 1.1f));
-            for (int i = 1; i <= 5; i++) l.Add(new Spec("Plant_" + i, 0.7f, false, true, 0.012f));
-            l.Add(new Spec("Grass", 0.55f, false, true, 0.012f));
-            l.Add(new Spec("Grass_2", 0.5f, false, true, 0.012f));
-            l.Add(new Spec("Grass_Short", 0.3f, false, true, 0.012f));
-            l.Add(new Spec("Flowers", 0.45f, false, true, 0.012f));
-            float[] rock = { 1.1f, 0.8f, 0.6f, 1.4f, 0.9f, 0.7f, 1.0f };
-            for (int i = 1; i <= 7; i++) l.Add(new Spec("Rock_" + i, rock[i - 1], true, false, 0.01f));
-            for (int i = 1; i <= 7; i++) l.Add(new Spec("Rock_Moss_" + i, rock[i - 1], true, false, 0.01f));
-            l.Add(new Spec("TreeStump", 0.6f));
-            l.Add(new Spec("TreeStump_Moss", 0.6f));
-            l.Add(new Spec("Lilypad", 0.55f, true, true));
+            for (int i = 1; i <= 5; i++) l.Add(new Spec("TwistedTree_" + i, 7.0f));
+            for (int i = 1; i <= 5; i++) l.Add(new Spec("Pine_" + i, 11.0f));
+            for (int i = 1; i <= 5; i++) l.Add(new Spec("DeadTree_" + i, 8.0f));
+            l.Add(new Spec("Bush_Common", 1.3f));
+            l.Add(new Spec("Bush_Common_Flowers", 1.3f));
+            l.Add(new Spec("Plant_1", 0.8f, false, 0.012f));
+            l.Add(new Spec("Plant_1_Big", 1.2f, false, 0.012f));
+            l.Add(new Spec("Plant_7", 0.8f, false, 0.012f));
+            l.Add(new Spec("Plant_7_Big", 1.2f, false, 0.012f));
+            l.Add(new Spec("Fern_1", 0.9f, false, 0.012f));
+            l.Add(new Spec("Clover_1", 0.35f, true, 0.01f));
+            l.Add(new Spec("Clover_2", 0.35f, true, 0.01f));
+            l.Add(new Spec("Grass_Common_Short", 0.35f, false, 0.012f));
+            l.Add(new Spec("Grass_Common_Tall", 0.7f, false, 0.012f));
+            l.Add(new Spec("Grass_Wispy_Short", 0.4f, false, 0.012f));
+            l.Add(new Spec("Grass_Wispy_Tall", 0.8f, false, 0.012f));
+            foreach (var f in new[] { "Flower_3_Single", "Flower_4_Single" }) l.Add(new Spec(f, 0.4f, false, 0.012f));
+            foreach (var f in new[] { "Flower_3_Group", "Flower_4_Group" }) l.Add(new Spec(f, 0.5f, false, 0.012f));
+            for (int i = 1; i <= 5; i++) l.Add(new Spec("Petal_" + i, 0.12f, true, 0.008f));
+            l.Add(new Spec("Mushroom_Common", 0.18f, false, 0.01f));
+            l.Add(new Spec("Mushroom_Laetiporus", 0.35f, true, 0.01f));
+            for (int i = 1; i <= 5; i++) l.Add(new Spec("Pebble_Round_" + i, 0.18f, true, 0.008f));
+            for (int i = 1; i <= 6; i++) l.Add(new Spec("Pebble_Square_" + i, 0.2f, true, 0.008f));
+            for (int i = 1; i <= 3; i++) l.Add(new Spec("RockPath_Round_Small_" + i, 0.6f, true, 0.01f));
+            for (int i = 1; i <= 3; i++) l.Add(new Spec("RockPath_Square_Small_" + i, 0.6f, true, 0.01f));
+            l.Add(new Spec("RockPath_Round_Thin", 0.9f, true, 0.01f));
+            l.Add(new Spec("RockPath_Square_Thin", 0.9f, true, 0.01f));
+            l.Add(new Spec("RockPath_Round_Wide", 1.1f, true, 0.01f));
+            l.Add(new Spec("RockPath_Square_Wide", 1.1f, true, 0.01f));
+            float[] rock = { 1.4f, 1.1f, 1.6f };
+            for (int i = 1; i <= 3; i++) l.Add(new Spec("Rock_Medium_" + i, rock[i - 1], true, 0.01f));
             return l.ToArray();
         }
 
@@ -102,10 +117,15 @@ namespace App.Relaxation.Editor
             }
 
             MaterialCache.Clear();
+            TextureIndex.Clear();
+            UnresolvedTextures.Clear();
+            PathStones.Clear();
             foreach (var d in new[] { GeneratedDir, MaterialDir, PrefabDir, AudioDir }) Directory.CreateDirectory(d);
             try
             {
+                ConfigureTextures();
                 ImportModels();
+                IndexTextures();
                 var sky = ConfigureSky();
                 var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -116,8 +136,9 @@ namespace App.Relaxation.Editor
                 BuildFarGround(env);
 
                 var rng = new System.Random(Seed);
-                var occupied = new List<Vector3>(); // x,z = position, y = clearance radius
-                occupied.Add(new Vector3(StumpPosition.x, StumpPosition.z, 1.2f));
+                var occupied = new List<Vector3>(); // x = world x, y = world z, z = clearance radius
+                occupied.Add(new Vector3(RockSeat.x, RockSeat.y, 1.6f));
+                PlacePath(prefabs, env, rng, occupied);
                 PlaceTrees(prefabs, env, rng, occupied);
                 PlaceUnderstory(prefabs, env, rng, occupied);
                 PlacePondDetails(prefabs, env, rng);
@@ -132,12 +153,12 @@ namespace App.Relaxation.Editor
                 var orb = BuildOrb(fx);
 
                 var audio = new GameObject("Audio").transform;
-                var controller = BuildController(audio, sun, sky, anchor, fireflies, pollen, orb);
+                BuildController(audio, sun, sky, anchor, fireflies, pollen, orb);
 
                 ApplyRenderSettings(sky, sun);
                 EditorSceneManager.SaveScene(scene, PlaceholderBuilder.ScenePath, false);
                 AssetDatabase.SaveAssets();
-                Report(env, ground, water);
+                Report(ground, water);
             }
             finally
             {
@@ -150,6 +171,46 @@ namespace App.Relaxation.Editor
 
         // ---------------------------------------------------------------- import settings
 
+        static bool IsAlphaTexture(string stem) =>
+            stem.StartsWith("Leaves") || stem.StartsWith("Leaf") || stem.StartsWith("Grass") || stem.StartsWith("Flowers");
+
+        // Every MegaKit texture is capped for the headset (ASTC) while the editor keeps the full-size source.
+        static void ConfigureTextures()
+        {
+            AssetDatabase.StartAssetEditing();
+            try
+            {
+                foreach (var path in Directory.GetFiles(TextureDir, "*.png").Select(p => p.Replace('\\', '/')))
+                {
+                    var ti = AssetImporter.GetAtPath(path) as TextureImporter;
+                    if (ti == null) continue;
+                    string stem = Path.GetFileNameWithoutExtension(path);
+                    bool normal = stem.EndsWith("_Normal");
+                    ti.textureType = normal ? TextureImporterType.NormalMap : TextureImporterType.Default;
+                    ti.mipmapEnabled = true;
+                    ti.anisoLevel = 2;
+                    ti.wrapMode = TextureWrapMode.Repeat;
+                    ti.filterMode = FilterMode.Bilinear;
+                    ti.textureCompression = TextureImporterCompression.Compressed;
+                    if (!normal && IsAlphaTexture(stem))
+                    {
+                        ti.alphaSource = TextureImporterAlphaSource.FromInput;
+                        ti.alphaIsTransparency = true;
+                        ti.mipMapsPreserveCoverage = true;
+                        ti.alphaTestReferenceValue = 0.5f;
+                    }
+                    ti.SetPlatformTextureSettings(new TextureImporterPlatformSettings
+                    {
+                        name = "Android", overridden = true, maxTextureSize = QuestTextureSize,
+                        format = normal ? TextureImporterFormat.ASTC_5x5 : TextureImporterFormat.ASTC_6x6, compressionQuality = 50,
+                    });
+                    ti.SaveAndReimport();
+                }
+            }
+            finally { AssetDatabase.StopAssetEditing(); }
+            AssetDatabase.Refresh();
+        }
+
         static void ImportModels()
         {
             AssetDatabase.StartAssetEditing();
@@ -157,8 +218,7 @@ namespace App.Relaxation.Editor
             {
                 foreach (var s in Specs)
                 {
-                    var path = $"{ModelDir}/{s.Name}.fbx";
-                    var mi = AssetImporter.GetAtPath(path) as ModelImporter;
+                    var mi = AssetImporter.GetAtPath($"{ModelDir}/{s.Name}.fbx") as ModelImporter;
                     if (mi == null) continue;
                     mi.importCameras = false;
                     mi.importLights = false;
@@ -194,8 +254,7 @@ namespace App.Relaxation.Editor
             });
             ti.SaveAndReimport();
 
-            var path = MaterialDir + "/ForestSky.mat";
-            var mat = Recreate(path, "Skybox/Panoramic");
+            var mat = Recreate(MaterialDir + "/ForestSky.mat", "Skybox/Panoramic");
             mat.SetTexture("_MainTex", AssetDatabase.LoadAssetAtPath<Texture>(SkyTexturePath));
             mat.SetFloat("_Mapping", 1f); // latitude/longitude layout
             mat.EnableKeyword("_MAPPING_LATITUDE_LONGITUDE_LAYOUT");
@@ -208,6 +267,17 @@ namespace App.Relaxation.Editor
         // ---------------------------------------------------------------- materials
 
         static readonly Dictionary<string, Material> MaterialCache = new Dictionary<string, Material>();
+        static readonly Dictionary<string, Texture2D> TextureIndex = new Dictionary<string, Texture2D>();
+        static readonly HashSet<string> UnresolvedTextures = new HashSet<string>();
+
+        static void IndexTextures()
+        {
+            foreach (var path in Directory.GetFiles(TextureDir, "*.png").Select(p => p.Replace('\\', '/')))
+            {
+                var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+                if (tex != null) TextureIndex[Path.GetFileNameWithoutExtension(path).ToLowerInvariant()] = tex;
+            }
+        }
 
         static Material Recreate(string path, string shaderName)
         {
@@ -217,39 +287,76 @@ namespace App.Relaxation.Editor
             return m;
         }
 
-        static Material Lit(string name, Color color, float smoothness = 0.05f, bool twoSided = false, Texture baseMap = null)
+        static Material Lit(string name, Color color, float smoothness = 0.05f, bool twoSided = false, Texture baseMap = null,
+            Texture normalMap = null, bool alphaClip = false)
         {
-            string key = name + (twoSided ? "_2s" : "");
+            string key = name + (twoSided ? "_2s" : "") + (alphaClip ? "_ac" : "");
             if (MaterialCache.TryGetValue(key, out var cached) && cached != null) return cached;
             var m = Recreate($"{MaterialDir}/{key}.mat", "Universal Render Pipeline/Lit");
             m.SetColor("_BaseColor", color);
             if (baseMap != null) m.SetTexture("_BaseMap", baseMap);
+            if (normalMap != null)
+            {
+                m.SetTexture("_BumpMap", normalMap);
+                m.SetFloat("_BumpScale", 1f);
+                m.EnableKeyword("_NORMALMAP");
+            }
             m.SetFloat("_Smoothness", smoothness);
             m.SetFloat("_Metallic", 0f);
             m.SetFloat("_SpecularHighlights", 0f);
             m.EnableKeyword("_SPECULARHIGHLIGHTS_OFF");
             if (twoSided) m.SetFloat("_Cull", 0f);
+            if (alphaClip)
+            {
+                m.SetFloat("_AlphaClip", 1f);
+                m.SetFloat("_Cutoff", 0.5f);
+                if (m.HasProperty("_AlphaToMask")) m.SetFloat("_AlphaToMask", 1f); // smooth leaf edges when MSAA is on
+                m.EnableKeyword("_ALPHATEST_ON");
+                m.SetOverrideTag("RenderType", "TransparentCutout");
+                m.renderQueue = (int)RenderQueue.AlphaTest;
+            }
             m.enableInstancing = true;
             EditorUtility.SetDirty(m);
             MaterialCache[key] = m;
             return m;
         }
 
-        // Quaternius colours are saturated for a stylised look; pull them slightly towards a calm natural forest.
+        // Pull saturated source colours slightly towards a calm natural forest (used only when a material has no texture).
         static Color Grade(Color c)
         {
             Color.RGBToHSV(c, out var h, out var s, out var v);
             return Color.HSVToRGB(h, s * 0.88f, Mathf.Pow(v, 1.05f) * 0.95f);
         }
 
-        static Material ToUrp(Material src, bool twoSided)
+        // MegaKit materials are named after their texture family ("Leaves_NormalTree", "Bark_NormalTree", "Leaves_Pine",
+        // "Grass", "Rocks", ...). Unity usually binds the PNGs by file name on import; when it does not, resolve them here.
+        static Texture2D FindTexture(string materialName, bool wantNormal)
         {
-            if (src == null) return Lit("Fallback", new Color(0.4f, 0.4f, 0.4f), 0.05f, twoSided);
+            string n = materialName.ToLowerInvariant().Replace("leaves_pine", "leaf_pine");
+            string[] candidates = wantNormal
+                ? new[] { n + "_normal" }
+                : new[] { n + "_c", n, n + "_diffuse" };
+            foreach (var c in candidates)
+                if (TextureIndex.TryGetValue(c, out var t)) return t;
+            if (wantNormal) return null;
+            foreach (var kv in TextureIndex) // fuzzy: "PathRocks" -> PathRocks_Diffuse, "Rocks" -> Rocks_Diffuse
+                if (!kv.Key.EndsWith("_normal") && (kv.Key.StartsWith(n) || n.StartsWith(kv.Key.Replace("_diffuse", "").Replace("_c", ""))))
+                    return kv.Value;
+            return null;
+        }
+
+        static Material ToUrp(Material src)
+        {
+            if (src == null) return Lit("Fallback", new Color(0.4f, 0.4f, 0.4f), 0.05f, true);
+            string name = new string(src.name.Where(ch => char.IsLetterOrDigit(ch) || ch == '_').ToArray());
+            bool foliage = IsAlphaTexture(name);
+            Texture baseMap = src.mainTexture != null ? src.mainTexture : FindTexture(name, false);
+            Texture normalMap = src.HasProperty("_BumpMap") && src.GetTexture("_BumpMap") != null ? src.GetTexture("_BumpMap") : FindTexture(name, true);
+            if (baseMap == null) UnresolvedTextures.Add(name);
             Color c = src.HasProperty("_BaseColor") ? src.GetColor("_BaseColor")
                     : src.HasProperty("_Color") ? src.GetColor("_Color") : Color.gray;
-            c = Grade(c);
-            string name = new string(src.name.Where(ch => char.IsLetterOrDigit(ch) || ch == '_').ToArray());
-            return Lit($"{name}_{ColorUtility.ToHtmlStringRGB(c)}", c, 0.05f, twoSided);
+            c = baseMap != null ? new Color(0.97f, 0.97f, 0.97f) : Grade(c);
+            return Lit(name, c, foliage ? 0.02f : 0.06f, foliage, baseMap, normalMap, foliage && baseMap != null);
         }
 
         // ---------------------------------------------------------------- prefabs
@@ -269,7 +376,7 @@ namespace App.Relaxation.Editor
                 model.transform.SetParent(root.transform, false);
                 foreach (var r in root.GetComponentsInChildren<Renderer>())
                 {
-                    r.sharedMaterials = r.sharedMaterials.Select(m => ToUrp(m, s.TwoSided)).ToArray();
+                    r.sharedMaterials = r.sharedMaterials.Select(ToUrp).ToArray();
                     r.shadowCastingMode = s.Target < 0.8f ? ShadowCastingMode.Off : ShadowCastingMode.On;
                     r.receiveShadows = true;
                 }
@@ -358,7 +465,7 @@ namespace App.Relaxation.Editor
             return mesh;
         }
 
-        // ---------------------------------------------------------------- placement
+        // ---------------------------------------------------------------- placement helpers
 
         static float Smooth(float edge0, float edge1, float x) => Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((x - edge0) / (edge1 - edge0)));
 
@@ -400,24 +507,79 @@ namespace App.Relaxation.Editor
         static float Range(System.Random rng, float a, float b) => a + (float)rng.NextDouble() * (b - a);
         static string[] Names(string prefix, int from, int to) => Enumerable.Range(from, to - from + 1).Select(i => prefix + i).ToArray();
 
+        static string PickWeighted(System.Random rng, string[] names, float[] weights)
+        {
+            float total = weights.Sum(), r = (float)rng.NextDouble() * total;
+            for (int i = 0; i < names.Length; i++)
+            {
+                r -= weights[i];
+                if (r <= 0f) return names[i];
+            }
+            return names[names.Length - 1];
+        }
+
+        static Vector2 Bezier(Vector2 a, Vector2 b, Vector2 c, Vector2 d, float t)
+        {
+            float u = 1f - t;
+            return u * u * u * a + 3f * u * u * t * b + 3f * u * t * t * c + t * t * t * d;
+        }
+
+        static readonly List<Vector2> PathStones = new List<Vector2>();
+        static bool OnPath(Vector2 p) => PathStones.Any(s => Vector2.Distance(s, p) < 0.8f);
+
+        static readonly string[] AllRocks = Names("Rock_Medium_", 1, 3);
+        static readonly string[] AllPebbles = Names("Pebble_Round_", 1, 5).Concat(Names("Pebble_Square_", 1, 6)).ToArray();
+        static readonly string[] Ferns = { "Fern_1", "Plant_1", "Plant_1_Big", "Plant_7", "Plant_7_Big" };
+        static readonly string[] Blooms = { "Flower_3_Single", "Flower_3_Group", "Flower_4_Single", "Flower_4_Group" };
+
+        // ---------------------------------------------------------------- placement
+
+        // Stepping stones from the clearing towards the pond (a visible, calm line of sight; no collisions, never walked).
+        static void PlacePath(Dictionary<string, GameObject> p, Transform env, System.Random rng, List<Vector3> occupied)
+        {
+            var path = new GameObject("StonePath").transform;
+            path.SetParent(env, false);
+            var a = new Vector2(-0.3f, -5.2f);
+            var pond = ForestTerrain.Pond;
+            var end = pond + (a - pond).normalized * ForestTerrain.PondRadius * 1.25f;
+            var c1 = new Vector2(-1.1f, -2.4f);
+            var c2 = new Vector2(end.x - 1.4f, end.y - 1.6f);
+            var kinds = new[] { "RockPath_Round_Wide", "RockPath_Square_Wide", "RockPath_Round_Thin", "RockPath_Square_Thin",
+                "RockPath_Round_Small_1", "RockPath_Square_Small_1", "RockPath_Round_Small_2", "RockPath_Square_Small_2",
+                "RockPath_Round_Small_3", "RockPath_Square_Small_3" };
+            const int Count = 13;
+            for (int i = 0; i < Count; i++)
+            {
+                float t = i / (float)(Count - 1);
+                var pos = Bezier(a, c1, c2, end, t);
+                var ahead = Bezier(a, c1, c2, end, Mathf.Min(1f, t + 0.02f));
+                float yaw = Mathf.Atan2(ahead.x - pos.x, ahead.y - pos.y) * Mathf.Rad2Deg + Range(rng, -25f, 25f);
+                pos += new Vector2(Range(rng, -0.12f, 0.12f), Range(rng, -0.1f, 0.1f));
+                Spawn(p[kinds[(i * 3 + rng.Next(3)) % kinds.Length]], path, pos, yaw, Range(rng, 0.9f, 1.15f), 0f, 0.03f);
+                occupied.Add(new Vector3(pos.x, pos.y, 0.55f));
+                PathStones.Add(pos);
+            }
+        }
+
         static void PlaceTrees(Dictionary<string, GameObject> p, Transform env, System.Random rng, List<Vector3> occupied)
         {
             var trees = new GameObject("Trees").transform;
             trees.SetParent(env, false);
             var common = Names("CommonTree_", 1, 5);
-            var birch = Names("BirchTree_", 1, 5);
-            var pine = Names("PineTree_", 1, 3);
+            var twisted = Names("TwistedTree_", 1, 5);
+            var pine = Names("Pine_", 1, 5);
+            var dead = Names("DeadTree_", 1, 5);
 
-            // Landmarks beside the pond: two willows frame the focal point.
+            // Two gnarled trees frame the pond, which is the focal point of the view.
             var pond = ForestTerrain.Pond;
-            foreach (var (name, off) in new[] { ("Willow_1", new Vector2(-6.2f, 3.4f)), ("Willow_2", new Vector2(6.6f, 2.2f)) })
+            foreach (var (name, off) in new[] { ("TwistedTree_1", new Vector2(-6.2f, 3.4f)), ("TwistedTree_3", new Vector2(6.6f, 2.2f)) })
             {
                 var pos = pond + off;
-                Spawn(p[name], trees, pos, Range(rng, 0, 360), 1.05f, 1.5f, 0f);
+                Spawn(p[name], trees, pos, Range(rng, 0, 360), 1.1f, 1.5f, 0f);
                 occupied.Add(new Vector3(pos.x, pos.y, 2.2f));
             }
 
-            int placed = 0, attempts = 0;
+            int placed = 0, attempts = 0, deadCount = 0;
             const int Main = 70;
             while (placed < Main && attempts++ < 6000)
             {
@@ -428,7 +590,11 @@ namespace App.Relaxation.Editor
                 float r = Range(rng, 2.4f, 3.8f);
                 if (!Clear(pos, r, occupied)) continue;
                 double kind = rng.NextDouble();
-                string name = kind < 0.5 ? Pick(rng, common) : kind < 0.88 ? Pick(rng, birch) : Pick(rng, pine);
+                string name;
+                if (kind < 0.42) name = Pick(rng, common);
+                else if (kind < 0.60) name = Pick(rng, twisted);
+                else if (kind < 0.94 || deadCount >= 4 || Vector2.Distance(pos, ForestTerrain.Viewer) < 14f) name = Pick(rng, pine);
+                else { name = Pick(rng, dead); deadCount++; }
                 Spawn(p[name], trees, pos, Range(rng, 0, 360), Range(rng, 0.88f, 1.3f), 2.5f, 0.05f);
                 occupied.Add(new Vector3(pos.x, pos.y, r * 0.5f));
                 placed++;
@@ -454,10 +620,10 @@ namespace App.Relaxation.Editor
             var under = new GameObject("Understory").transform;
             under.SetParent(env, false);
             var trunks = occupied.Where(o => o.z > 1.0f).Select(o => new Vector2(o.x, o.y)).ToList();
-            var bushes = new List<string> { "Bush_1", "Bush_2", "BushBerries_1", "BushBerries_2" };
-            var plants = Names("Plant_", 1, 5);
-            var grasses = new[] { "Grass", "Grass_2", "Grass_Short" };
-            var rocks = Names("Rock_", 1, 7).Concat(Names("Rock_Moss_", 1, 7)).ToArray();
+            var bushes = new[] { "Bush_Common", "Bush_Common_Flowers" };
+            var grasses = new[] { "Grass_Common_Short", "Grass_Common_Tall", "Grass_Wispy_Short", "Grass_Wispy_Tall" };
+            var grassWeights = new[] { 3f, 2f, 3f, 2f };
+            var fernWeights = new[] { 2f, 2f, 1f, 1.5f, 1f };
 
             int n = 0, tries = 0;
             while (n < 48 && tries++ < 3000)
@@ -465,20 +631,20 @@ namespace App.Relaxation.Editor
                 var pos = new Vector2(Range(rng, -28f, 28f), Range(rng, -28f, 28f));
                 if (Mathf.PerlinNoise(pos.x * 0.11f + 5f, pos.y * 0.11f + 9f) < 0.42f) continue;
                 if (Blocked(pos, 1.2f, true) || !Clear(pos, 0.9f, occupied)) continue;
-                Spawn(p[Pick(rng, bushes)], under, pos, Range(rng, 0, 360), Range(rng, 0.8f, 1.3f), 3f, 0.02f);
+                Spawn(p[rng.NextDouble() < 0.7 ? bushes[0] : bushes[1]], under, pos, Range(rng, 0, 360), Range(rng, 0.8f, 1.3f), 3f, 0.02f);
                 occupied.Add(new Vector3(pos.x, pos.y, 0.5f));
                 n++;
             }
 
-            // Plants gather around trunks, the way undergrowth does.
+            // Ferns and plants gather around trunks, the way undergrowth does.
             n = 0; tries = 0;
             while (n < 110 && tries++ < 3000)
             {
                 var around = Pick(rng, trunks);
                 float a = Range(rng, 0f, Mathf.PI * 2f), d = Range(rng, 0.9f, 2.6f);
                 var pos = around + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * d;
-                if (Mathf.Abs(pos.x) > 29f || Mathf.Abs(pos.y) > 29f || Blocked(pos, 0.6f, false)) continue;
-                Spawn(p[Pick(rng, plants)], under, pos, Range(rng, 0, 360), Range(rng, 0.8f, 1.4f), 4f, 0.01f);
+                if (Mathf.Abs(pos.x) > 29f || Mathf.Abs(pos.y) > 29f || Blocked(pos, 0.6f, false) || OnPath(pos)) continue;
+                Spawn(p[PickWeighted(rng, Ferns, fernWeights)], under, pos, Range(rng, 0, 360), Range(rng, 0.8f, 1.4f), 4f, 0.01f);
                 n++;
             }
 
@@ -488,32 +654,64 @@ namespace App.Relaxation.Editor
             {
                 var pos = new Vector2(Range(rng, -29f, 29f), Range(rng, -29f, 29f));
                 if (Mathf.PerlinNoise(pos.x * 0.16f + 31f, pos.y * 0.16f + 2f) < 0.5f) continue;
-                if (Vector2.Distance(pos, ForestTerrain.Viewer) < 1.6f || ForestTerrain.IsWater(pos.x, pos.y)) continue;
-                Spawn(p[Pick(rng, grasses)], under, pos, Range(rng, 0, 360), Range(rng, 0.8f, 1.5f), 6f, 0f);
+                if (Vector2.Distance(pos, ForestTerrain.Viewer) < 1.6f || ForestTerrain.IsWater(pos.x, pos.y) || OnPath(pos)) continue;
+                Spawn(p[PickWeighted(rng, grasses, grassWeights)], under, pos, Range(rng, 0, 360), Range(rng, 0.8f, 1.5f), 6f, 0f);
                 n++;
             }
 
-            // Three small flower meadows at the edge of the clearing.
+            // Clover carpets near the clearing edge.
+            for (int i = 0; i < 70; i++)
+            {
+                var c = new Vector2(Range(rng, -9f, 9f), Range(rng, -9f, 0f));
+                if (Blocked(c, 0.2f, false) || OnPath(c) || Vector2.Distance(c, ForestTerrain.Viewer) < 1.6f) continue;
+                Spawn(p[rng.NextDouble() < 0.5 ? "Clover_1" : "Clover_2"], under, c, Range(rng, 0, 360), Range(rng, 0.9f, 1.6f), 3f, 0f);
+            }
+
+            // Three flower meadows at the edge of the clearing, with fallen petals around them.
             foreach (var c in new[] { new Vector2(-4.6f, -6.2f), new Vector2(5.2f, -3.4f), new Vector2(-6.4f, 0.8f) })
-                for (int i = 0; i < 12; i++)
+            {
+                for (int i = 0; i < 14; i++)
                 {
                     var pos = c + new Vector2(Range(rng, -2.2f, 2.2f), Range(rng, -2.2f, 2.2f));
                     if (Blocked(pos, 0.5f, false) || !Clear(pos, 0.3f, occupied)) continue;
-                    Spawn(p["Flowers"], under, pos, Range(rng, 0, 360), Range(rng, 0.9f, 1.5f), 5f, 0f);
+                    Spawn(p[Pick(rng, Blooms)], under, pos, Range(rng, 0, 360), Range(rng, 0.9f, 1.5f), 5f, 0f);
                 }
+                for (int i = 0; i < 14; i++)
+                {
+                    var pos = c + new Vector2(Range(rng, -2.8f, 2.8f), Range(rng, -2.8f, 2.8f));
+                    if (Blocked(pos, 0.4f, false)) continue;
+                    Spawn(p["Petal_" + rng.Next(1, 6)], under, pos, Range(rng, 0, 360), Range(rng, 0.8f, 1.4f), 0f, 0f);
+                }
+            }
 
-            // Boulders and mossy rocks, half sunk, away from trunks.
+            // Mushrooms at tree bases; a bracket fungus on a few trunks.
             n = 0; tries = 0;
-            while (n < 20 && tries++ < 3000)
+            while (n < 18 && tries++ < 600)
+            {
+                var around = Pick(rng, trunks);
+                float a = Range(rng, 0f, Mathf.PI * 2f), d = Range(rng, 0.6f, 1.3f);
+                var pos = around + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * d;
+                if (Blocked(pos, 0.5f, false)) continue;
+                Spawn(p["Mushroom_Common"], under, pos, Range(rng, 0, 360), Range(rng, 0.8f, 1.5f), 4f, 0f);
+                if (n % 6 == 0) Spawn(p["Mushroom_Laetiporus"], under, pos + new Vector2(0.35f, 0.2f), Range(rng, 0, 360), 1f, 0f, 0.02f);
+                n++;
+            }
+
+            // Boulders, half sunk, away from trunks; pebbles gather around them.
+            n = 0; tries = 0;
+            while (n < 16 && tries++ < 3000)
             {
                 var pos = new Vector2(Range(rng, -27f, 27f), Range(rng, -27f, 27f));
                 if (Blocked(pos, 1.0f, true) || !Clear(pos, 0.8f, occupied)) continue;
-                Spawn(p[Pick(rng, rocks)], under, pos, Range(rng, 0, 360), Range(rng, 0.7f, 1.6f), 8f, 0.18f);
+                Spawn(p[Pick(rng, AllRocks)], under, pos, Range(rng, 0, 360), Range(rng, 0.7f, 1.7f), 8f, 0.18f);
                 occupied.Add(new Vector3(pos.x, pos.y, 0.6f));
+                for (int k = 0; k < 4; k++)
+                {
+                    float a = Range(rng, 0f, Mathf.PI * 2f), d = Range(rng, 0.9f, 1.8f);
+                    Spawn(p[Pick(rng, AllPebbles)], under, pos + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * d, Range(rng, 0, 360), Range(rng, 0.8f, 1.5f), 0f, 0.3f);
+                }
                 n++;
             }
-            foreach (var pos in new[] { new Vector2(-8f, -3f), new Vector2(9f, -7f) })
-                Spawn(p["TreeStump"], under, pos, Range(rng, 0, 360), 1f, 0f, 0.05f);
         }
 
         static void PlacePondDetails(Dictionary<string, GameObject> p, Transform env, System.Random rng)
@@ -522,42 +720,45 @@ namespace App.Relaxation.Editor
             pond.SetParent(env, false);
             var center = ForestTerrain.Pond;
             float rim = ForestTerrain.PondRadius;
-            var rocks = Names("Rock_", 1, 7).Concat(Names("Rock_Moss_", 1, 7)).ToArray();
-            for (int i = 0; i < 11; i++)
+            for (int i = 0; i < 9; i++)
             {
-                float a = Mathf.PI * (0.05f + 0.9f * i / 10f) + Range(rng, -0.1f, 0.1f); // the near (viewer-facing) side
-                a += Mathf.PI;
+                float a = Mathf.PI * (0.05f + 0.9f * i / 8f) + Range(rng, -0.1f, 0.1f) + Mathf.PI; // the near (viewer-facing) side
                 var pos = center + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * Range(rng, rim * 1.05f, rim * 1.35f);
-                Spawn(p[Pick(rng, rocks)], pond, pos, Range(rng, 0, 360), Range(rng, 0.6f, 1.3f), 8f, 0.2f);
+                Spawn(p[Pick(rng, AllRocks)], pond, pos, Range(rng, 0, 360), Range(rng, 0.6f, 1.2f), 8f, 0.2f);
             }
-            var plants = Names("Plant_", 1, 5);
-            for (int i = 0; i < 26; i++)
+            for (int i = 0; i < 34; i++)
             {
                 float a = Range(rng, 0f, Mathf.PI * 2f);
-                var pos = center + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * Range(rng, rim * 1.0f, rim * 1.5f);
-                Spawn(p[Pick(rng, plants)], pond, pos, Range(rng, 0, 360), Range(rng, 0.9f, 1.5f), 4f, 0f);
+                var pos = center + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * Range(rng, rim * 0.95f, rim * 1.5f);
+                if (ForestTerrain.IsWater(pos.x, pos.y)) continue;
+                Spawn(p[Pick(rng, AllPebbles)], pond, pos, Range(rng, 0, 360), Range(rng, 0.8f, 1.6f), 0f, 0.3f);
+            }
+            var fernWeights = new[] { 3f, 1f, 1f, 1f, 1f };
+            for (int i = 0; i < 28; i++)
+            {
+                float a = Range(rng, 0f, Mathf.PI * 2f);
+                var pos = center + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * Range(rng, rim * 1.0f, rim * 1.55f);
+                if (ForestTerrain.IsWater(pos.x, pos.y)) continue;
+                Spawn(p[PickWeighted(rng, Ferns, fernWeights)], pond, pos, Range(rng, 0, 360), Range(rng, 0.9f, 1.5f), 4f, 0f);
             }
             for (int i = 0; i < 10; i++)
             {
-                var pos = center + new Vector2(Range(rng, -rim * 0.8f, rim * 0.8f), Range(rng, -rim * 0.8f, rim * 0.8f));
-                if (!ForestTerrain.IsWater(pos.x, pos.y)) continue;
-                var go = (GameObject)PrefabUtility.InstantiatePrefab(p["Lilypad"], pond);
-                go.transform.position = new Vector3(pos.x, ForestTerrain.WaterLevel + 0.01f, pos.y);
-                go.transform.rotation = Quaternion.Euler(0f, Range(rng, 0, 360), 0f);
-                go.transform.localScale = Vector3.one * Range(rng, 0.8f, 1.5f);
-                foreach (var t in go.GetComponentsInChildren<Transform>(true)) t.gameObject.isStatic = true;
+                float a = Range(rng, 0f, Mathf.PI * 2f);
+                var pos = center + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * Range(rng, rim * 1.1f, rim * 1.6f);
+                if (ForestTerrain.IsWater(pos.x, pos.y)) continue;
+                Spawn(p[Pick(rng, Blooms)], pond, pos, Range(rng, 0, 360), Range(rng, 0.9f, 1.4f), 5f, 0f);
             }
         }
 
         static Transform BuildSquirrel(Dictionary<string, GameObject> p, Transform env)
         {
-            var stump = Spawn(p["TreeStump_Moss"], env, new Vector2(StumpPosition.x, StumpPosition.z), 20f, 1.1f, 0f, 0.02f);
-            float top = RenderBounds(stump).max.y;
+            var seat = Spawn(p["Rock_Medium_2"], env, RockSeat, 20f, 0.8f, 0f, 0.04f);
+            var bounds = RenderBounds(seat);
 
             var anchor = new GameObject("SquirrelAnchor").transform;
             anchor.SetParent(env, false);
-            anchor.position = new Vector3(StumpPosition.x, top, StumpPosition.z);
-            var toViewer = new Vector2(Viewer.x - StumpPosition.x, Viewer.z - StumpPosition.z);
+            anchor.position = new Vector3(bounds.center.x, bounds.max.y - 0.02f, bounds.center.z);
+            var toViewer = new Vector2(Viewer.x - anchor.position.x, Viewer.z - anchor.position.z);
             anchor.rotation = Quaternion.Euler(0f, Mathf.Atan2(toViewer.x, toViewer.y) * Mathf.Rad2Deg, 0f);
 
             var model = AssetDatabase.LoadAssetAtPath<GameObject>(SquirrelModel);
@@ -731,7 +932,7 @@ namespace App.Relaxation.Editor
 
         // ---------------------------------------------------------------- report
 
-        static void Report(Transform env, MeshFilter ground, MeshFilter water)
+        static void Report(MeshFilter ground, MeshFilter water)
         {
             long tris = 0;
             int renderers = 0;
@@ -744,6 +945,8 @@ namespace App.Relaxation.Editor
             }
             Debug.Log($"[ForestSceneBuilder] ForestDemo written: {renderers} mesh renderers, {tris} triangles before culling " +
                       "(measure frame time on the Quest Pro; no performance figure has been recorded).");
+            if (UnresolvedTextures.Count > 0)
+                Debug.LogWarning("[ForestSceneBuilder] no texture found for materials (plain colour used): " + string.Join(", ", UnresolvedTextures));
         }
     }
 }

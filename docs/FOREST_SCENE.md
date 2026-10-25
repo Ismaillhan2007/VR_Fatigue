@@ -44,12 +44,21 @@ here to avoid breaking the integration branch.
   viewer, a pond basin, and a 2048x2048 painted albedo (grass, moss, soil, a damp ring around the pond). Heights and
   texture fade to a flat 800 m far plane so the ground never ends in an island edge.
 - **Layout**: viewer at (0, 0, -10) looking along +Z (the Assessment camera is at (0, 1, -10)). A 5 m clearing around the
-  viewer, a kept-open sightline to a pond at (3, 4) framed by two willows, rocks, plants and lily pads. Squirrel on a
-  mossy stump 4.8 m away, to the right. About 70 main trees (denser towards the edge, never within 7 m of the viewer),
-  48 far-plane trees, 48 bushes, 110 plants, 340 grass tufts, 3 flower meadows, 20 rocks, stumps. Fixed seed 20260101.
-- **Models**: 45 curated Quaternius FBX files (CC0), each wrapped in a prefab that normalises height/size, puts the pivot
-  on the ground, converts materials to URP/Lit (slightly desaturated, no specular highlights), uses two-sided materials
-  for thin foliage, and adds a culling-only `LODGroup` for grass/plants/flowers/small rocks (the pack has no LOD meshes).
+  viewer, a kept-open sightline to a pond at (3, 4) framed by two twisted trees, a curved stepping-stone path of
+  `RockPath_*` pieces from the clearing to the pond, pebbles and ferns at the bank. The squirrel sits on a boulder 4.8 m
+  away, to the right. About 70 main trees (common, twisted, pine and a few dead trees; denser towards the edge, never
+  within 7 m of the viewer), 48 far-plane trees, 48 bushes, 110 ferns/plants, 340 grass tufts in four kinds, clover
+  carpets, 3 flower meadows with fallen petals, 18 mushrooms (plus bracket fungi), 16 boulders with pebbles. Every one of
+  the 68 MegaKit models is used. Fixed seed 20260101.
+- **Models and textures**: the Quaternius Stylized Nature MegaKit [Standard] (CC0): 68 textured FBX files (the pack's
+  "FBX (Unity)" variants) and the 15 textures they reference in `Art/MegaKit` and `Art/MegaKit/Textures`. The builder
+  caps every texture for the headset (Android override 1024, ASTC 6x6, normal maps ASTC 5x5; the 2048 sources stay for the
+  editor), enables alpha coverage on leaf/grass textures, wraps each model in a prefab that normalises its size and pivot,
+  and converts the source materials to URP/Lit with the PNGs bound (alpha-clipped two-sided foliage, normal-mapped bark,
+  no specular highlights). Textures are bound by the Unity importer when it finds them; otherwise the builder resolves
+  them from the material name and lists any it could not in the console. A culling-only `LODGroup` is added for small
+  vegetation, rocks and pebbles (the pack ships no LOD meshes). The first forest (Quaternius Ultimate Nature Pack) is
+  archived in `archive/quaternius-ultimate-nature-pack/`, outside `Assets`.
 - **Squirrel**: `tools/generate_squirrel.py` (original model, about 6.8k triangles, smooth head/tail) with fur/belly/dark
   URP materials and `SquirrelIdle`. The Rifat3D Sketchfab model was **not** imported (download needs an account); swap it
   in under `SquirrelAnchor` if someone with access downloads it.
@@ -82,8 +91,10 @@ grass count, shadow distance (URP asset), particle counts.
 
 ## 6. Known risks to check first
 
-- Quaternius materials may import as non-URP or look flat: the builder reads each source colour and recreates URP/Lit
-  materials, but verify in the Scene view.
+- MegaKit textures: confirm leaves/grass are not opaque squares (alpha clip), bark normals look right and no material is
+  pink. The pack ships plain PBR textures only (its stylized shader is in the paid SOURCE edition), so the look is textured
+  URP/Lit. Check the console for the "no texture found" warning.
+- Repository weight: the MegaKit textures add about 29 MB of PNGs (44 MB with models); the headset build uses the 1024 override.
 - The particle material is configured by script; if it renders opaque, set Surface = Transparent, Blend = Additive.
 - The squirrel was never rendered by its author; proportions may need tweaks in `tools/generate_squirrel.py`.
 - Ground fog colour and sun angles come from `SceneConfigApplier` presets; tune there, not in the scene.
