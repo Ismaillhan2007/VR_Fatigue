@@ -17,13 +17,13 @@ The report is an **experimental wellness summary**, not a medical diagnosis or p
 | VR | Unity LTS + C#, URP, OpenXR, XR Interaction Toolkit | Headset input, UI, prebuilt scenes, comfort controls |
 | Eye adapter | Meta XR Core SDK `OVREyeGaze` on Quest Pro (OpenXR eye gaze as alternative); `ReplayEyeProvider` elsewhere | Capability checks, calibration status, validity, timestamps |
 | Metrics | Pure C# functions with Unity EditMode tests | Local aggregation; no cloud eye processing |
-| Backend | Python 3.11+, FastAPI, Pydantic, `google-genai`, pytest | Contract validation, bounded Gemini call, cache, local fallback |
+| Backend | Python 3.12 (pinned), FastAPI, Pydantic, `google-genai`, pytest | Contract validation, bounded Gemini call, cache, local fallback |
 | Transport | UnityWebRequest + versioned JSON over HTTP locally / HTTPS remotely | One summary request after a session, not frame streaming |
 | Storage | Memory by default; synthetic JSON fixtures | No database needed for the hackathon |
 
 Use the Unity editor that the installed Meta XR SDK supports (verify its release notes); record exact editor, XR package, and SDK versions in the first setup PR. Keep `GEMINI_MODEL` configurable; choose an available stable Flash/Flash-Lite model after checking its structured-output support and project quota. Do not depend on a preview model or assume free quota.
 
-Layout (Unity part scaffolded; backend still planned; seams in [ARCHITECTURE.md](ARCHITECTURE.md)):
+Layout (Unity part scaffolded; backend implemented; seams in [ARCHITECTURE.md](ARCHITECTURE.md)):
 
 ```text
 unity/                  # Assets/, Packages/, ProjectSettings/

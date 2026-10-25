@@ -173,6 +173,8 @@ namespace App.Tests
             summary.SelfReport.FreeText = "I feel dizzy";
             var prefs = new Preferences { Text = "something personal" };
             var request = AnalyzeRequest.Create(summary, null, prefs);
+            Assert.AreEqual(CloudPolicy.LocalOnly, request.CloudPolicy,
+                "a human check-in stays local even when the eye source is synthetic");
             Assert.IsNull(request.SessionSummary.SelfReport.FreeText);
             Assert.IsNull(request.Preferences.Text);
             Assert.AreEqual(SafetyNotice.TakeBreak, request.SafetyNotice, "safety rules still see the local text");

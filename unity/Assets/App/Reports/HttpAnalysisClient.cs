@@ -41,9 +41,17 @@ namespace App.Reports
                     cancellationToken.ThrowIfCancellationRequested();
 
                     if (web.result != UnityWebRequest.Result.Success)
-                        return Fallback(request, $"backend unreachable ({web.responseCode} {web.error})");
+                        return Fallback(request, web.responseCode > 0
+                            ? $"backend HTTP {web.responseCode}"
+                            : "backend connection failed or timed out");
                     var response = ContractJson.Parse<AnalysisResponse>(web.downloadHandler.text);
-                    return new AnalysisResult { Response = AnalysisResponseGuard.Accept(request, response) };
+                    response = AnalysisResponseGuard.Accept(request, response);
+                    return new AnalysisResult
+                    {
+                        Response = response,
+                        FallbackReason = response.AiSource == AiSource.Fallback
+                            ? BackendFallbackDescription(web.GetResponseHeader("X-VR-Fallback-Reason")) : null,
+                    };
                 }
             }
             catch (OperationCanceledException)
@@ -85,5 +93,27 @@ namespace App.Reports
 
         static AnalysisResult Fallback(AnalyzeRequest request, string reason) =>
             new AnalysisResult { Response = LocalFallbackAnalysis.Analyze(request), FallbackReason = reason };
+
+        /// <summary>Never render an arbitrary server header or provider exception in the UI.</summary>
+        public static string BackendFallbackDescription(string code)
+        {
+            switch (code)
+            {
+                case "local_only": return "cloud use disabled for this check-in";
+                case "non_synthetic_input": return "participant eye data stays local";
+                case "safety_stop": return "session stopped for comfort";
+                case "insufficient_data": return "insufficient comparable measurements";
+                case "gemini_disabled": return "Gemini disabled";
+                case "gemini_not_configured": return "Gemini configuration incomplete";
+                case "attempt_limit": return "AI attempt limit reached";
+                case "budget_limit": return "AI budget limit reached";
+                case "timeout": return "AI request timed out";
+                case "provider_rate_limited": return "AI service rate limited";
+                case "provider_unavailable": return "AI service temporarily unavailable";
+                case "invalid_output": return "AI response rejected";
+                case "provider_error": return "AI service error";
+                default: return "backend local rules";
+            }
+        }
     }
 }

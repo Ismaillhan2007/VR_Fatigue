@@ -12,7 +12,7 @@ The backend is offline by default. It returns a deterministic explanation and sc
 
 ## Run locally
 
-Prerequisites: Python 3.11+ and [uv](https://docs.astral.sh/uv/). From the repository root:
+Prerequisites: Python 3.12 (pinned in the root `.python-version`) and [uv](https://docs.astral.sh/uv/). From the repository root:
 
 ```sh
 cd backend
@@ -54,6 +54,10 @@ curl -sS http://127.0.0.1:8000/api/v1/analyze \
 ```
 
 Unity sends the same JSON with `UnityWebRequest` and `Content-Type: application/json`, then deserializes the returned `AnalysisResponse`. Apply only `scene_config`; show `data_source`, `replay_origin`, and `ai_source` separately. When `safety_notice` is `stop_session`, show the exit/take-a-break UI instead of automatically entering the forest. On HTTP/network failure, Unity must still use its own local report/preset.
+
+The additive v1 request field `cloud_policy` defaults to `local_only`. `AnalyzeRequest.Create` always uses that value for interactive check-ins, even when the eye source is synthetic. Only an invented test scenario may explicitly use `synthetic_demo`; its self-report and preferences must also be invented. Both the service and Gemini prompt builder enforce the gate. An omitted field is safe for older clients. Upgrade the backend first because older backends reject unknown request fields.
+
+Fallbacks keep the existing response JSON and return the optional `X-VR-Fallback-Reason` header. Its finite codes are `local_only`, `non_synthetic_input`, `safety_stop`, `insufficient_data`, `gemini_disabled`, `gemini_not_configured`, `attempt_limit`, `budget_limit`, `timeout`, `provider_rate_limited`, `provider_unavailable`, `provider_error`, and `invalid_output`. Live/cached responses omit the header. Unity maps only known codes to approved wording; an absent/unknown header means “backend local rules.” HTTP 401/422 and connection failures are separate client diagnostics. No exception bodies or personal input appear in these headers.
 
 Unity owns capture, baseline/metrics/indicator calculation, deterministic reconciliation and local discomfort rules. It computes `safety_notice` from the full local self-report before removing free text. The HTTP request must send `self_report.free_text: null` and `preferences.text: null`; the backend rejects non-null text, including empty strings. `preferences` itself may be null when the participant lets the app choose. The backend preserves reconciliation and the supplied safety notice; it does not recompute eye movements or decide whether a person is fatigued.
 
@@ -98,7 +102,7 @@ Compatibility checks cover the shared request fixture, null/explicit preferences
 3. Set verified input/output prices per million tokens. For verified unpaid quota, explicitly set both rates to `0`. For paid calls, set a positive `VR_GEMINI_BUDGET_USD` within the team's authorized budget.
 4. Set a separate backend access token before LAN sharing, then set `VR_GEMINI_ENABLED=true` and restart the server. The manual smoke check below can verify the key/model without changing the saved configuration.
 
-Only `synthetic` sessions or replay explicitly marked `synthetic` can reach Gemini. Real/live and recorded participant sessions always use the local response. Free text, preferences text, session IDs, and raw streams are excluded from the cloud prompt. Do not label real data synthetic to bypass this boundary.
+Only `synthetic` sessions or replay explicitly marked `synthetic`, with `cloud_policy: synthetic_demo`, can reach Gemini. Real/live and recorded participant sessions always use the local response. Interactive participant sliders/chips also stay local, even with synthetic eyes. Free text, preferences text, session IDs, and raw streams are excluded from the cloud prompt. A synthetic declaration is for trusted test clients, not proof of nonpersonal data. Do not label participant data synthetic to bypass this boundary.
 
 One analysis attempt performs a token-count request followed by at most one generation request. The token-count check includes the prompt and schema text conservatively. The generation has a 1,000-token output/thinking cap, SDK retries disabled, and a deadline of at most 15 seconds including lock wait. Input counts above 2,000 skip generation. Empty, blocked, invalid, timed-out, unsupported, or rate-limited output falls back locally. The adapter retains only numeric token-usage metadata for inspection, not provider response text or prompts. Validate the chosen model's accounting and pricing before paid use.
 
@@ -147,10 +151,27 @@ The backend branch includes the draft `feat/contracts-v1` dependency. Review/mer
 ## Remaining backend work
 
 1. Review the shared-contract dependency with the team; keep the Pydantic models, Unity DTOs, and fixtures aligned as the contracts change.
-2. Agree on and pin the team's Python version in `.python-version`; continue installing dependencies with `uv sync --locked --extra dev`.
+2. Use the pinned Python 3.12 with `uv sync --locked --extra dev`; keep the lockfile current when dependencies change.
 3. Repeat the manual smoke check when changing the key, model, SDK or pricing. The initial synthetic live check passed on `gemini-3.1-flash-lite`; it does not establish other models' compatibility or production reliability.
 4. Confirm which self-report data, if any, may leave the device before expanding the synthetic-only cloud boundary. Keep real eye data on the local path until that decision is explicit.
 5. Integrate a real Unity request/response, then verify the standalone Quest Pro can reach the backend over the demo network. Check source labels, explicit preference overrides, and Unity's own network-failure fallback.
-6. Add automated backend/contract checks to CI once the shared contracts are integrated. For any later public deployment, implement authentication, request/rate limits, and durable shared spending counters first; current counters are process-local.
+6. The backend/contract CI workflow is in `.github/workflows/backend.yml` and never calls Gemini. For any later public deployment, implement authentication, request/rate limits, and durable shared spending counters first; current counters are process-local.
+
+## Cross-laptop receiver and Unity tests
+
+`127.0.0.1` always means the machine running the client. A teammate's Unity can use that URL only if the backend also runs there or a tunnel forwards the port. When Python runs on a different laptop, set Unity's `SessionController.BackendBaseUrl` (or `-backendUrl`) to `http://<backend-laptop-reachable-IP>:8000` and bind Uvicorn to `0.0.0.0`. Confirm the two laptops can reach each other; venue Wi-Fi or VPN routing can prevent this. Never enter `0.0.0.0` as the Unity destination.
+
+Before LAN sharing, configure a separate `VR_BACKEND_ACCESS_TOKEN` in `backend/.env` and give the same token to the trusted Unity process through its environment. Restart both processes after changing settings. Do not share `GEMINI_API_KEY` or the complete `.env` file. No token belongs in a scene or prefab.
+
+With the receiver running, this cloud-disabled synthetic probe checks real HTTP, provenance, the fallback header, 422 validation, and 401 authentication when a token is configured:
+
+```sh
+cd backend
+uv run python -m scripts.probe_backend --base-url http://<backend-laptop-reachable-IP>:8000
+```
+
+On the teammate's Editor machine, set `VR_RUN_BACKEND_TESTS=1`, `VR_UNITY_BACKEND_TEST_URL` to the reachable URL, and `VR_BACKEND_ACCESS_TOKEN` to the matching demo token **before starting the Editor**. In Test Runner, run the `AssessmentFlowSmokeTest` PlayMode tests. The two opt-in backend tests run the actual Assessment scene at its saved 20-second baseline/task durations and test native HTTP, auth and 422 handling. The invalid-response and refused-connection tests use local test endpoints and require no cloud access. Without opt-in, backend-dependent tests are explicitly ignored, rather than reported as verified. These tests do not establish headset reachability or forest visuals.
+
+See [the implementation/test plan and evidence](../docs/BACKEND_RUNTIME_PLAN.md). The root scene/prefab configuration has not been changed for a machine-specific network address.
 
 References: [FastAPI application structure](https://fastapi.tiangolo.com/tutorial/bigger-applications/), [FastAPI testing](https://fastapi.tiangolo.com/tutorial/testing/), [Google Gen AI SDK](https://github.com/googleapis/python-genai).

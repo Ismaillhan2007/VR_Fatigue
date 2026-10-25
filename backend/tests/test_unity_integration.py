@@ -35,6 +35,7 @@ def test_actual_unity_request_is_accepted_and_response_matches_contract(preferen
 
 def test_synthetic_gemini_path_and_cache_accept_null_preferences():
     body = fixture("analyze_request_synthetic.json")
+    body["cloud_policy"] = "synthetic_demo"
     body["preferences"] = None
     adapter = FakeAdapter()
     with client_for(live_settings(), adapter) as client:
