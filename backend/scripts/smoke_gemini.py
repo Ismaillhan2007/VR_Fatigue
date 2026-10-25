@@ -61,6 +61,8 @@ async def check(args):
         "reconciliation": "agree_high",
         "safety_notice": "none",
     }
+    body["session_summary"]["self_report"]["free_text"] = None
+    body["preferences"].update(animals_enabled=False, sound="silent", motion="none")
     adapter = ProbeAdapter(settings)
     service = AnalysisService(settings, adapter)
     first = await service.analyze(AnalysisRequest.model_validate(body))

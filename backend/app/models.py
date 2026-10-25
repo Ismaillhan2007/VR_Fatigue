@@ -234,12 +234,17 @@ class Observation(ContractModel):
 class AnalysisRequest(ContractModel):
     schema_version: Version
     session_summary: SessionSummary
-    preferences: Preferences
+    preferences: Preferences | None
     reconciliation: Reconciliation
     safety_notice: SafetyNotice
 
     @model_validator(mode="after")
     def unavailable_reconciliation(self):
+        report = self.session_summary.self_report
+        if (report is not None and report.free_text is not None) or (
+            self.preferences is not None and self.preferences.text is not None
+        ):
+            raise ValueError("Free text stays on device; send null in analysis requests")
         unavailable = self.session_summary.strain_indicator.level == "unavailable"
         if unavailable and self.reconciliation != "unavailable":
             raise ValueError("Unavailable eye indicator requires unavailable reconciliation")

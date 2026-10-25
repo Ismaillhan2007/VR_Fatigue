@@ -2,7 +2,7 @@
 
 HackTX prototype: Unity eye-signal capture, a Gemini-assisted wellness summary, and a personalized relaxation scene. Start with one reliable forest demo with optional squirrels and a clearly labeled offline/replay path.
 
-The separate [FastAPI backend app](backend/README.md) has a runnable offline analysis endpoint, typed contracts, tests, and an optional Gemini adapter. The Unity application has not been scaffolded yet. Unity is confirmed and the target headset is a Meta Quest Pro; eye-data access in our own build still needs the first-hour check.
+The Unity project in `unity/` has the session flow, strict contract DTOs, an HTTP analysis client and subsystem stubs (desktop mode, synthetic data; see [docs/SETUP.md](docs/SETUP.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)). The separate [FastAPI backend](backend/README.md) provides validated offline analysis and optional synthetic-only Gemini output. Real metrics, the forest scene and the headset adapter remain separate work. The target headset is a Meta Quest Pro; eye-data access in our own build still needs the first-hour check.
 
 - [Project objectives, architecture, feature acceptance, and build order](docs/PROJECT_PLAN.md)
 - [Backend setup and Unity/HTTP integration](backend/README.md)

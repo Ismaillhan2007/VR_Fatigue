@@ -55,23 +55,23 @@ curl -sS http://127.0.0.1:8000/api/v1/analyze \
 
 Unity sends the same JSON with `UnityWebRequest` and `Content-Type: application/json`, then deserializes the returned `AnalysisResponse`. Apply only `scene_config`; show `data_source`, `replay_origin`, and `ai_source` separately. When `safety_notice` is `stop_session`, show the exit/take-a-break UI instead of automatically entering the forest. On HTTP/network failure, Unity must still use its own local report/preset.
 
-Unity owns capture, baseline/metrics/indicator calculation, and deterministic reconciliation. This service does not recompute eye movements or decide whether a person is fatigued. It preserves the supplied reconciliation, validates unavailable-data combinations, and may raise an explicit discomfort notice through simple local keyword rules. These English keyword rules are a demo safeguard, not a comprehensive assessment.
+Unity owns capture, baseline/metrics/indicator calculation, deterministic reconciliation and local discomfort rules. It computes `safety_notice` from the full local self-report before removing free text. The HTTP request must send `self_report.free_text: null` and `preferences.text: null`; the backend rejects non-null text, including empty strings. `preferences` itself may be null when the participant lets the app choose. The backend preserves reconciliation and the supplied safety notice; it does not recompute eye movements or decide whether a person is fatigued.
 
 An observation requires both a non-null measurement and its non-null deviation for a supported metric. Missing values are never treated as zero. If no supported pairs exist, even with `quality.status: usable`, the backend returns HTTP 200 with `data_quality_limited` and a local report/scene, without a Gemini call, attempt reservation, or cache entry. Partial comparisons describe only available pairs. Supplied quality, provenance, and reconciliation remain unchanged; callers must still use an unavailable indicator/reconciliation when required by the request's semantic rules. A missing or short baseline retains the more specific `no_baseline` observation.
 
 ## Compatibility with the planned app
 
-The backend follows the v1 HTTP/JSON boundary in [the project plan](../docs/PROJECT_PLAN.md). This missing-data fix changes report selection and wording (`local-0.2`), not schema fields, enums, endpoints, or the request envelope. Existing v1 consumers do not need a DTO change.
+The backend follows the shared `contracts/v1/analyze_request.schema.json` and `analysis_response.schema.json` boundary. Unity's DTOs and HTTP client live under `unity/Assets/App/`. The local report version is `local-0.3`; existing response fields and enums are unchanged. Request preferences are nullable, and request free text must stay null to match Unity's D1 policy.
 
 | App part | Current backend boundary | Verification / remaining dependency |
 | --- | --- | --- |
-| Capture and metrics | Accepts aggregate `SessionSummary`; leaves measurements, quality and reconciliation under Unity ownership. | Synthetic fixtures and nullable/partial measurements tested; actual producer unavailable. |
+| Capture and metrics | Accepts aggregate `SessionSummary`; leaves measurements, quality and reconciliation under Unity ownership. | Synthetic requests and nullable/partial measurements tested. Unity's stub reports task duration separately from baseline, with valid + gap durations summing exactly to task duration. Real metrics remain separate work. |
 | Report UI | Returns approved observations, narrative, limitations, safety notice and independent data/AI source labels. | Responses checked against the shared JSON Schema; UI rendering untested. Keep the original summary for numeric values and join by `session_id`. |
 | Forest engine | Returns bounded `SceneConfig`; reapplies mute, animal-free and motion-free restrictions. | Config validated through the response schema and API tests; Unity asset application unavailable. |
 | Gemini | Optional synthetic-only enhancement; real and recorded inputs stay on the local path. | Mocked SDK/failure tests plus a successful manual `gemini-3.1-flash-lite` generation/cache check; other models unverified. |
 | Runtime | Separate local Python service with in-memory cache/counters. | Quest Pro LAN reachability and the client's own network-failure fallback remain untested. |
 
-Compatibility is verified at the backend/contract level, not end to end. The analysis-request envelope is documented here and in OpenAPI but has no standalone shared JSON Schema yet. Pydantic adds semantic checks beyond the draft schemas (for example, baseline/probe requirements and duration totals), so schema-valid inputs may still receive 422. Shared-contract review, matching C# DTOs, client-side validation/fallback, and headset checks remain integration work when those app parts are available. Shared-token authentication is available for the local demo; production access control, rate limiting and a durable multi-worker spending limit remain public-hosting work.
+Compatibility checks cover the shared request fixture, null/explicit preferences, text rejection, authenticated requests, mocked Gemini/cache responses, and scene-rule cases shared by Python and C#. Pydantic adds semantic checks beyond the draft schemas (for example, baseline/probe requirements and duration totals), so schema-valid inputs may still receive 422. A real Unity editor-to-backend session, scene application and headset checks still require their respective runtimes. Shared-token authentication is available for the local demo; production access control, rate limiting and durable multi-worker spending limits remain public-hosting work.
 
 ## Connect other teammates and the headset
 
@@ -80,6 +80,7 @@ Compatibility is verified at the backend/contract level, not end to end. The ana
 - Both devices need a reachable local network; venue Wi-Fi may isolate clients. A team hotspot may be easier. Configure the local firewall and development-only HTTP settings as described in [the hardware guide](../docs/HARDWARE_QUEST_PRO.md).
 - Native Unity HTTP requests do not need browser CORS middleware. A future browser/WebGL client will need an explicit allowed-origin configuration.
 - Configure `VR_BACKEND_ACCESS_TOKEN` with a separate random secret before sharing the backend on a LAN; clients then send `Authorization: Bearer <token>`. Never reuse the Google API key. Empty/unset preserves the local offline starter's unauthenticated behavior. `/health` and API documentation remain public but do not expose either secret. A bearer token over local HTTP is a development convenience; public deployment requires HTTPS and further controls.
+- Unity's `HttpAnalysisClient` accepts the token as a runtime constructor argument, or reads `VR_BACKEND_ACCESS_TOKEN` from its process environment. Set the same demo token for the backend and desktop Unity process. It is not a serialized scene/prefab field, is not logged, and is never sent to Google. Runtime provisioning for a standalone headset is separate deployment work.
 
 ## Security boundaries
 
@@ -107,7 +108,7 @@ Successful synthetic results have a bounded five-minute cache; cached responses 
 
 ## Scene precedence
 
-The local mapping starts with the forest preset and applies chips, then reapplies explicit preferences after any AI response. Quiet wins over sound, no motion wins over motion, and animal-free wins over animals. For this starter, `want_quiet` mutes; `tired_eyes` disables motion; `overstimulated` also disables animals and particles. The requested time-of-day preference wins. These are deterministic demo choices, not claims about health benefit. Unity should apply the same restrictions again.
+Python and Unity start from the same saved forest preset and apply CONCEPT 7.3 chip rows in order (later rows win), then apply non-null explicit preferences. `want_quiet` lowers volume to 0.2; explicit `sound: silent` zeros the master and every layer. `tired_eyes` sets motion speed to zero; a later `want_movement` chip may set it to 0.3, while an explicit `motion: none` always sets it back to zero. `overstimulated` disables animals/particles and leaves the pad layer; explicit animal choices still win. A `stop_session` notice finally disables motion, animals, particles and the orb regardless of preferences; Unity blocks scene entry. These are deterministic demo choices, not health-benefit claims. Shared cases in `fixtures/integration/scene_rules.json` exercise the same rules in both test suites.
 
 ## Checks and ownership
 

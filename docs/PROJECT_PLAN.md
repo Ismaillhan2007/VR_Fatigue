@@ -23,11 +23,12 @@ The report is an **experimental wellness summary**, not a medical diagnosis or p
 
 Use the Unity editor that the installed Meta XR SDK supports (verify its release notes); record exact editor, XR package, and SDK versions in the first setup PR. Keep `GEMINI_MODEL` configurable; choose an available stable Flash/Flash-Lite model after checking its structured-output support and project quota. Do not depend on a preview model or assume free quota.
 
-Planned layout (not yet scaffolded):
+Layout (Unity part scaffolded; backend still planned; seams in [ARCHITECTURE.md](ARCHITECTURE.md)):
 
 ```text
 unity/                  # Assets/, Packages/, ProjectSettings/
   Assets/App/
+    Core/               # pure C#: contract DTOs, seams, session flow, local rules
     Capture/            # IEyeTrackingProvider, hardware and replay adapters
     Metrics/            # filtering, window aggregation, deterministic observations
     Reports/            # measured data, AI narrative, fallback, source labels
@@ -37,7 +38,7 @@ unity/                  # Assets/, Packages/, ProjectSettings/
     Tests/              # EditMode and PlayMode
 backend/app/            # routes, contracts, gemini_service, fallback, budget
 backend/tests/
-contracts/v1/           # JSON schemas (present) + validate_examples.py; C# DTOs and Pydantic models to follow
+contracts/v1/           # JSON schemas + validate_examples.py; matching C# DTOs and Pydantic models exist
 fixtures/               # synthetic sessions, valid/invalid examples (present); replay streams to follow
 docs/                   # plan, setup, demo script, asset credits as implemented
 ```

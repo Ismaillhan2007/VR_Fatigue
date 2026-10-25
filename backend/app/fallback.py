@@ -1,7 +1,5 @@
 """Deterministic explanation and scene mapping. No cloud dependency."""
 
-import re
-
 from app.models import (
     AnalysisRequest,
     AnalysisResponse,
@@ -37,6 +35,7 @@ def observations_for(request: AnalysisRequest) -> list[Observation]:
         ("probe_rms_error_deg", "probe_less_accurate", True),
         ("probe_miss_fraction", "probe_more_misses", True),
         ("gaze_speed_p95_deg_s", "gaze_speed_changed", False),
+        ("gaze_speed_median_deg_s", "gaze_speed_changed", False),
         ("gaze_dispersion_deg", "gaze_spread_changed", False),
         ("head_speed_deg_s", "head_more_active", True),
     ):
@@ -46,7 +45,7 @@ def observations_for(request: AnalysisRequest) -> list[Observation]:
             continue
         has_comparison = True
         changed = value >= 1 if directional else abs(value) >= 1
-        if changed:
+        if changed and not any(item.code == code for item in result):
             result.append(Observation(code=code, metric=metric))
     if not has_comparison:
         return [Observation(code="data_quality_limited", metric=None)]
@@ -54,35 +53,27 @@ def observations_for(request: AnalysisRequest) -> list[Observation]:
 
 
 def safety_for(request: AnalysisRequest) -> SafetyNotice:
-    # Only raise the caller's explicit notice. These are conservative demo keywords.
-    report = request.session_summary.self_report
-    text = " ".join(filter(None, [report.free_text if report else None, request.preferences.text]))
-    if re.search(r"\b(dizziness|dizzy|nausea|nauseous|pain)\b", text, re.IGNORECASE):
-        return "stop_session"
+    # Unity evaluates the full local text before stripping it from the wire request.
     return request.safety_notice
 
 
 def constrain_scene(scene: SceneConfig, request: AnalysisRequest) -> SceneConfig:
-    """Apply choices again after AI. Quiet/no motion/no animals cannot be reversed."""
+    """Match Unity: explicit choices win; silence and stop-session disable effects."""
     scene = scene.model_copy(deep=True)
     prefs = request.preferences
-    report = request.session_summary.self_report
-    chips = set(report.chips if report else [])
-    scene.time_of_day = prefs.time_of_day
-    scene.animals_enabled = prefs.animals_enabled and "overstimulated" not in chips
-    scene.sound = "silent" if prefs.sound == "silent" or "want_quiet" in chips else "forest"
+    if prefs is not None:
+        scene.time_of_day = prefs.time_of_day
+        scene.animals_enabled = prefs.animals_enabled
+        scene.sound = prefs.sound
+        scene.motion = prefs.motion
     if scene.sound == "silent":
         scene.master_volume = 0
         scene.sound_layers.wind = 0
         scene.sound_layers.birds = 0
         scene.sound_layers.water = 0
         scene.sound_layers.pad = 0
-    no_motion = prefs.motion == "none" or bool(chips & {"tired_eyes", "overstimulated"})
-    scene.motion = "none" if no_motion else "gentle"
-    if no_motion:
+    if scene.motion == "none":
         scene.motion_speed = 0
-    if "overstimulated" in chips:
-        scene.particles = []
     if safety_for(request) == "stop_session":
         scene.motion = "none"
         scene.motion_speed = 0
@@ -107,29 +98,38 @@ def local_scene(request: AnalysisRequest) -> SceneConfig:
         motion="gentle",
         motion_speed=0.2,
         particles=["fireflies"],
-        orb={"enabled": False, "breath_seconds": 6.0},
+        orb={"enabled": True, "breath_seconds": 5.5},
     )
     report = request.session_summary.self_report
     chips = set(report.chips if report else [])
     if "tired_eyes" in chips:
-        scene.brightness = 0.65
-        scene.light_warmth = 0.85
-        scene.fog_density = 0.35
-    if "want_dim" in chips:
-        scene.brightness = 0.5
-    if chips & {"tense", "restless"}:
-        scene.orb.enabled = True
-    if "want_nature" in chips:
-        scene.sound_layers.birds = 0.5
-        scene.sound_layers.water = 0.6
-    if "low_energy" in chips:
-        scene.sound_layers.birds = min(1.0, scene.sound_layers.birds + 0.2)
-    if "want_movement" in chips:
-        scene.motion_speed = 0.3
+        scene.brightness -= 0.15
+        scene.light_warmth += 0.15
+        scene.fog_density += 0.1
+        scene.motion_speed = 0
     if "overstimulated" in chips:
+        scene.particles = []
+        scene.animals_enabled = False
         scene.sound_layers.wind = 0
         scene.sound_layers.birds = 0
         scene.sound_layers.water = 0
+    if chips & {"tense", "restless"}:
+        scene.orb.enabled = True
+        scene.orb.breath_seconds = 6.0
+    if "low_energy" in chips:
+        scene.time_of_day = "day"
+        scene.sound_layers.birds += 0.2
+        scene.motion = "gentle"
+    if "want_quiet" in chips:
+        scene.master_volume = 0.2
+    if "want_dim" in chips:
+        scene.brightness = 0.5
+    if "want_nature" in chips:
+        scene.sound_layers.birds += 0.2
+        scene.sound_layers.water += 0.2
+    if "want_movement" in chips:
+        scene.motion = "gentle"
+        scene.motion_speed = 0.3
     return constrain_scene(scene, request)
 
 
@@ -180,5 +180,5 @@ def local_response(request: AnalysisRequest) -> AnalysisResponse:
         scene_config=scene,
         ai_source="fallback",
         model_id=None,
-        prompt_version="local-0.2",
+        prompt_version="local-0.3",
     )
