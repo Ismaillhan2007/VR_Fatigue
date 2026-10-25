@@ -57,6 +57,7 @@ namespace App.UI
 
         public SessionFlow Flow { get; private set; }
         public string ProviderNote { get; private set; }
+        public string MetricsFailureMessage { get; private set; }
         public bool IsCapturing => _recording != null;
         /// <summary>Remaining phase time in real seconds (replay may run faster than real time).</summary>
         public float PhaseRemainingSeconds => Mathf.Max(0, (_phaseDuration - _phaseElapsed) / Mathf.Max(0.01f, PhaseSpeed));
@@ -138,8 +139,16 @@ namespace App.UI
 
         public void AcceptConsent()
         {
+            MetricsFailureMessage = null;
             _provider?.Stop();
             _provider = EyeProviderFactory.CreateAndStart(EyeSource, Now, SyntheticSeed, ResolveReplayPath(ReplayCsvPath), ReplayOrigin, out var note, ReplaySpeed);
+            if (_provider is ReplayEyeProvider replay)
+            {
+                // File parsing happens before capture. Start the replay clock only when the phase is ready.
+                var ready = Now;
+                replay.Start(ready);
+                replay.SetHold(true, ready);
+            }
             ProviderNote = note;
             Flow.AcceptConsent(_provider.DataSource, _provider.ReplayOrigin, _provider.Capabilities, _provider.Name);
             _baseline.Recording.Clear();
@@ -165,16 +174,8 @@ namespace App.UI
         {
             Flow.SubmitCheckIn(report, preferences);
             var sessionId = Flow.Context.SessionId;
-            SessionSummary summary;
-            try
-            {
-                summary = _metrics.Compute(_task, _baseline, ContextForMetrics(report));
-            }
-            catch (Exception e)
-            {
-                Debug.LogError($"[SessionController] metrics engine failed, using stub: {e}");
-                summary = new StubMetricsEngine().Compute(_task, _baseline, ContextForMetrics(report));
-            }
+            var succeeded = MetricsEngineFactory.TryCompute(_metrics, _task, _baseline, ContextForMetrics(report), out var summary);
+            MetricsFailureMessage = succeeded ? null : "Measurements could not be calculated. Please repeat the session or continue using your check-in.";
             Flow.SetSummary(summary);
 
             var request = AnalyzeRequest.Create(summary, Flow.Context.BaselineReport, preferences);
@@ -240,6 +241,7 @@ namespace App.UI
 
         public void Exit()
         {
+            MetricsFailureMessage = null;
             _cts.Cancel();
             _cts = new CancellationTokenSource();
             StopCapture();
@@ -254,6 +256,7 @@ namespace App.UI
 
         public void Restart()
         {
+            MetricsFailureMessage = null;
             StopCapture();
             ProviderNote = null;
             Flow.Restart();
@@ -263,10 +266,11 @@ namespace App.UI
 
         void BeginCapture(PhaseRecording recording, float seconds, string probePrefix, bool loaded)
         {
+            var now = Now;
             recording.Clear();
-            recording.StartTime = Now;
-            if (_provider is IHoldableProvider holdable) holdable.SetHold(false, Now);
-            _provider.ReadSamples(_discard, Now); // drop anything produced before this phase
+            recording.StartTime = now;
+            if (_provider is IHoldableProvider holdable) holdable.SetHold(false, now);
+            _provider.ReadSamples(_discard, now); // drop anything produced before this phase
             _discard.Clear();
             if (_provider is IProbeFollower follower) follower.SetLoaded(loaded);
             _recording = recording;
@@ -274,7 +278,13 @@ namespace App.UI
             _lastTrial = -1;
             _phaseDuration = Mathf.Max(1, seconds);
             _phaseElapsed = 0;
-            _phaseStartReplay = _provider is ReplayEyeProvider replay ? replay.ReplayedSeconds(Now) : 0;
+            _phaseStartReplay = _provider is ReplayEyeProvider replay ? replay.ReplayedSeconds(now) : 0;
+            if (_provider is ReplayEyeProvider timed)
+            {
+                timed.BeginPhase(_phaseDuration, now);
+                recording.SensorClockRate = Math.Max(0.01, timed.Speed);
+                recording.SensorStartTime = timed.SensorTime(now);
+            }
         }
 
         /// <summary>
@@ -304,10 +314,12 @@ namespace App.UI
 
         void EndCapture()
         {
-            _recording.EndTime = Now;
+            var now = Now;
+            _recording.EndTime = now;
+            if (_provider is ReplayEyeProvider replay) _recording.SensorEndTime = replay.SensorTime(now);
             _recording = null;
             ProbeRunner?.Hide();
-            if (_provider is IHoldableProvider holdable) holdable.SetHold(true, Now);
+            if (_provider is IHoldableProvider holdable) holdable.SetHold(true, now);
             if (Flow.State == FlowState.LoadTask)
             {
                 _provider.Stop();
