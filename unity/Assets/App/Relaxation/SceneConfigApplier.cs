@@ -77,11 +77,35 @@ namespace VrFatigue.Relaxation
         float savedFogDensity, savedAmbientIntensity;
         Material savedSkybox;
         UnityEngine.Rendering.AmbientMode savedAmbientMode;
+        Light savedSun;
+        bool sunsSuppressed;
+        readonly System.Collections.Generic.List<Light> suppressedLights = new System.Collections.Generic.List<Light>();
 
         void Awake()
         {
             CaptureRenderSettings();
-            ApplyJson(savedPresetJson != null ? savedPresetJson.text : null, snap: true);
+            SuppressOtherSuns();
+            // Start in the participant's own config, never in the built-in preset: RelaxationSceneLoader sets the
+            // handoff BEFORE this scene loads (it only falls back to the offline preset for standalone play). Applying
+            // the preset first could play preset sound or show the squirrel for a quiet / animal-free participant.
+            Apply(App.Relaxation.ForestSceneApplier.ToForest(App.Relaxation.SceneConfigHandoff.Current), snap: true);
+        }
+
+        // ForestDemo is loaded additively under the assessment scene, which keeps its own directional light. Two suns
+        // double the brightness and shadows, so the other scenes' directional lights are switched off while the forest
+        // is loaded and restored when it unloads.
+        void SuppressOtherSuns()
+        {
+            if (sun == null || sunsSuppressed) return;
+            savedSun = RenderSettings.sun;
+            RenderSettings.sun = sun;
+            foreach (var light in UnityEngine.Object.FindObjectsByType<Light>(FindObjectsInactive.Exclude))
+            {
+                if (light == sun || light.type != LightType.Directional || !light.enabled || light.gameObject.scene == gameObject.scene) continue;
+                light.enabled = false;
+                suppressedLights.Add(light);
+            }
+            sunsSuppressed = true;
         }
 
         public void CaptureRenderSettings()
@@ -115,6 +139,14 @@ namespace VrFatigue.Relaxation
             RenderSettings.ambientIntensity = savedAmbientIntensity;
             RenderSettings.skybox = savedSkybox;
             RenderSettings.ambientMode = savedAmbientMode;
+            if (sunsSuppressed)
+            {
+                RenderSettings.sun = savedSun;
+                foreach (var light in suppressedLights)
+                    if (light != null) light.enabled = true;
+                suppressedLights.Clear();
+                sunsSuppressed = false;
+            }
         }
 
         // Safe entry point for text coming from the backend or a file. Invalid input -> saved preset.
