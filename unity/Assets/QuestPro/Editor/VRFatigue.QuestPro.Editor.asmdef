@@ -1,7 +1,7 @@
 {
   "name": "VRFatigue.QuestPro.Editor",
   "rootNamespace": "VRFatigue.QuestPro.Editor",
-  "references": ["VRFatigue.QuestPro", "Oculus.VR", "Oculus.VR.Editor", "Unity.XR.OpenXR", "Unity.XR.Management", "Unity.XR.Management.Editor"],
+  "references": ["VRFatigue.QuestPro", "Oculus.VR", "Oculus.VR.Editor", "Unity.XR.OpenXR", "Unity.XR.OpenXR.Features.MetaQuestSupport", "Unity.XR.Management", "Unity.XR.Management.Editor"],
   "includePlatforms": ["Editor"],
   "autoReferenced": true,
   "versionDefines": [{"name": "com.meta.xr.sdk.core", "expression": "[207.0.1,208.0.0)", "define": "VR_FATIGUE_META_207"}]

@@ -24,7 +24,9 @@ render-texture coverage. Do not enable both paths.
 
 Supported devices use fixed Medium foveation before participant consent or
 without eye permission/capability. Eye-tracked Medium additionally requires
-consent, OS permission and runtime support. Unsupported fixed foveation is Off.
+consent, OS permission and runtime support. Rejected ETFR activation (for example,
+system eye tracking disabled) falls back to fixed mode and is exposed in diagnostics.
+Unsupported fixed foveation is Off.
 No pupil diameter, openness, or live capture capability is inferred from ETFR.
 The rendering runtime consumes gaze internally; this controller never records it.
 
@@ -61,7 +63,7 @@ and retain the calibration/permission wait before selecting a live app provider.
 Use Unity **6000.6.7f1**, Meta XR Core **207.0.1**, OpenXR **1.18.0**.
 In Unity, run **App > Quest Pro > Apply 90 Hz Meta Foveation Settings**.
 The explicit editor command sets Vulkan-only Android rendering, Multiview
-(`SinglePassInstanced`), Legacy foveation API, both Meta foveation features,
+(`SinglePassInstanced`), Meta Quest Support, Legacy foveation API, both Meta foveation features,
 disables the competing Unity foveation feature, and declares optional eye
 tracking support in the Meta project configuration. It also assigns the Android
 OpenXR loader and enables Initialize XR on Startup; an existing alternative
@@ -93,3 +95,25 @@ Primary references:
 [Meta ETFR](https://developers.meta.com/vr/documentation/unity/unity-eye-tracked-foveated-rendering/),
 [Unity foveation setup](https://docs.unity.com/en-us/engine/6000.5/manual/xr/graphics/foveated-rendering/enable),
 and the installed SDK/OpenXR source for the pinned versions.
+
+## Validation, October 25, 2026
+
+The full tracked project, including the forest builder/product-objectives update
+at `origin/dev` `bf96d63`, was imported in an isolated Unity **6000.6.7f1** project
+with the unchanged pinned dependency versions: URP 17.6.0, OpenXR 1.18.0,
+XR Management 4.7.0, Input System 1.20.1 and Meta XR Core 207.0.1.
+All **321 EditMode tests** and **15 PlayMode tests** passed, with no skips.
+This includes 20 new rendering/geometry cases and two new lifecycle checks.
+The PlayMode flow used a loopback FastAPI backend with Gemini disabled.
+
+The setup command passed validation. Six deliberately invalid configuration
+cases were rejected (automatic graphics API, wrong foveation backend, competing
+Unity feature, disabled Meta Quest Support, missing eye tracking declaration,
+and XR startup disabled). All six configuration files were byte-identical after
+restoring and reapplying the profile. Asset metadata/GUID and secret/private-data
+checks passed. No screenshot-based testing was used.
+
+An Android APK build, Quest Pro permission/calibration/native sample alignment,
+foveal image quality, CPU/GPU timing and sustained 90 FPS have **not** been
+verified. The existing app hardware-provider/rig integration still needs its
+integrator handoff; passing desktop tests does not supply that device acceptance.

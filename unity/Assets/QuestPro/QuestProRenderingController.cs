@@ -138,6 +138,15 @@ namespace VRFatigue.QuestPro
                 if (OVRManager.useDynamicFoveatedRendering) OVRManager.useDynamicFoveatedRendering = false;
                 if (eyeSupported && OVRManager.eyeTrackedFoveatedRenderingEnabled != (desired == QuestFoveationMode.EyeTracked))
                     OVRManager.eyeTrackedFoveatedRenderingEnabled = desired == QuestFoveationMode.EyeTracked;
+                bool eyeActivationRejected = desired == QuestFoveationMode.EyeTracked &&
+                    !OVRManager.eyeTrackedFoveatedRenderingEnabled;
+                if (eyeActivationRejected)
+                {
+                    // System eye tracking can be disabled despite an OS permission grant.
+                    // Cancel a delayed activation before accepting a stable fixed-mode baseline.
+                    OVRManager.eyeTrackedFoveatedRenderingEnabled = false;
+                    desired = QuestFoveationMode.Fixed;
+                }
                 var level = desired == QuestFoveationMode.Off
                     ? OVRManager.FoveatedRenderingLevel.Off : OVRManager.FoveatedRenderingLevel.Medium;
                 if (OVRManager.foveatedRenderingLevel != level) OVRManager.foveatedRenderingLevel = level;
@@ -151,7 +160,7 @@ namespace VRFatigue.QuestPro
                 if (!verified || !policy.ConditionsMatch(ActualMode, ActualDisplayHz)) InvalidateAssessment();
                 SetStatus($"mode={ActualMode} verified={verified} level={OVRManager.foveatedRenderingLevel} " +
                     $"dynamic={OVRManager.useDynamicFoveatedRendering} displayHz={ActualDisplayHz:R} " +
-                    $"requestedHz=90 supported90={SupportsRequestedDisplayHz}");
+                    $"requestedHz=90 supported90={SupportsRequestedDisplayHz} eyeActivationRejected={eyeActivationRejected}");
             }
             catch (Exception error) { Unavailable("runtime_error_" + error.GetType().Name); }
 #else

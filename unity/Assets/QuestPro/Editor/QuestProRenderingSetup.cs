@@ -10,6 +10,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.XR.OpenXR;
 using UnityEngine.XR.OpenXR.Features;
+using UnityEngine.XR.OpenXR.Features.MetaQuestSupport;
 using UnityEngine.XR.Management;
 
 namespace VRFatigue.QuestPro.Editor
@@ -30,14 +31,16 @@ namespace VRFatigue.QuestPro.Editor
             if (settings == null) throw new InvalidOperationException("Install Android Build Support and enable Android OpenXR first.");
             var fixedFeature = settings.GetFeature<Meta.XR.MetaXRFoveationFeature>();
             var eyeFeature = settings.GetFeature<Meta.XR.MetaXREyeTrackedFoveationFeature>();
+            var questFeature = settings.GetFeature<MetaQuestFeature>();
             var config = OVRProjectConfig.CachedProjectConfig;
-            if (fixedFeature == null || eyeFeature == null || config == null)
+            if (fixedFeature == null || eyeFeature == null || questFeature == null || config == null)
                 throw new InvalidOperationException("Restore Meta XR Core 207.0.1 and its Android OpenXR features first.");
             ConfigureLoader();
             PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.Android, false);
             PlayerSettings.SetGraphicsAPIs(BuildTarget.Android, new[] { GraphicsDeviceType.Vulkan });
             settings.renderMode = OpenXRSettings.RenderMode.SinglePassInstanced; // Multiview on Quest.
             settings.foveatedRenderingApi = OpenXRSettings.BackendFovationApi.Legacy;
+            questFeature.enabled = true;
             fixedFeature.enabled = true;
             // The SDK's callback uses the active editor target, which may be desktop.
             // Preserve that target's feature when configuring Android from a desktop editor.
@@ -53,6 +56,7 @@ namespace VRFatigue.QuestPro.Editor
             config.eyeTrackingSupport = OVRProjectConfig.FeatureSupport.Supported;
             OVRProjectConfig.CommitProjectConfig(config);
             EditorUtility.SetDirty(settings); EditorUtility.SetDirty(fixedFeature); EditorUtility.SetDirty(eyeFeature);
+            EditorUtility.SetDirty(questFeature);
             AssetDatabase.SaveAssets();
             var errors = Validate();
             if (errors.Count > 0) throw new InvalidOperationException(string.Join("; ", errors));
@@ -113,6 +117,8 @@ namespace VRFatigue.QuestPro.Editor
                 errors.Add("Select the Legacy backend for this Meta API controller");
             if (settings.GetFeature<FoveatedRenderingFeature>()?.enabled == true)
                 errors.Add("Disable Unity Foveated Rendering to avoid competing controllers");
+            if (settings.GetFeature<MetaQuestFeature>()?.enabled != true)
+                errors.Add("Enable Meta Quest Support for the Android OpenXR loader and manifest");
 #if VR_FATIGUE_META_207
             if (settings.GetFeature<Meta.XR.MetaXRFoveationFeature>()?.enabled != true ||
                 settings.GetFeature<Meta.XR.MetaXREyeTrackedFoveationFeature>()?.enabled != true)
