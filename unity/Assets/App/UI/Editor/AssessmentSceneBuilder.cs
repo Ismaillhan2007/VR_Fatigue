@@ -25,23 +25,20 @@ namespace App.UI.Editor
 
         static DefaultControls.Resources _res;
         static Font _font;
+        const float TextScale = 1.25f; // type and its row heights grow together
+
+        enum ButtonKind { Auto, Primary, Secondary, Accent }
+
+        // Anything that goes back, skips, mutes, interrupts or leaves is secondary; the forward action is primary.
+        static readonly string[] SecondaryLabels = { "Skip", "Back", "Exit", "Pause", "Mute", "Try optional", "Finish" };
 
         [MenuItem("App/Build Assessment Scene")]
         public static void BuildAll()
         {
-            _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            _res = new DefaultControls.Resources
-            {
-                standard = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd"),
-                background = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Background.psd"),
-                inputField = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/InputFieldBackground.psd"),
-                knob = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd"),
-                checkmark = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Checkmark.psd"),
-                dropdown = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/DropdownArrow.psd"),
-                mask = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UIMask.psd"),
-            };
+            InitializeWidgets();
             Directory.CreateDirectory(PrefabDir);
             Directory.CreateDirectory(Path.GetDirectoryName(ScenePath));
+            UiTheme.EnsureSprites();
 
             var prefabs = new GameObject[]
             {
@@ -56,6 +53,42 @@ namespace App.UI.Editor
             Debug.Log("[AssessmentSceneBuilder] prefabs and Assessment scene written");
         }
 
+        static void InitializeWidgets()
+        {
+            _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            _res = new DefaultControls.Resources
+            {
+                standard = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd"),
+                background = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Background.psd"),
+                inputField = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/InputFieldBackground.psd"),
+                knob = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd"),
+                checkmark = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Checkmark.psd"),
+                dropdown = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/DropdownArrow.psd"),
+                mask = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UIMask.psd"),
+            };
+        }
+
+        [MenuItem("App/Update Backend Settings UI")]
+        public static void BuildBackendSettings()
+        {
+            InitializeWidgets();
+            var prefab = Save(Consent());
+            var scene = EditorSceneManager.OpenScene(ScenePath);
+            var controller = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+            var old = controller.Panels.OfType<ConsentPanel>().Single();
+            var parent = old.transform.parent;
+            var sibling = old.transform.GetSiblingIndex();
+            var index = controller.Panels.IndexOf(old);
+            UnityEngine.Object.DestroyImmediate(old.gameObject);
+            var replacement = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
+            replacement.transform.SetSiblingIndex(sibling);
+            controller.Panels[index] = replacement.GetComponent<ConsentPanel>();
+            EditorUtility.SetDirty(controller);
+            EditorSceneManager.SaveScene(scene);
+            AssetDatabase.SaveAssets();
+            Debug.Log("[AssessmentSceneBuilder] backend settings UI updated; other panels preserved");
+        }
+
         // ----- panels -----
 
         static GameObject Consent()
@@ -64,7 +97,43 @@ namespace App.UI.Editor
             var p = root.AddComponent<ConsentPanel>();
             Label(root.transform, "Welcome", 30, 44);
             p.Body = Label(root.transform, "", 20, flexible: true);
-            p.StartButton = MakeButton(ButtonRow(root.transform), "I agree, start");
+            var row = ButtonRow(root.transform);
+            p.OpenSettingsButton = MakeButton(row, "Optional backend settings");
+            p.StartButton = MakeButton(row, "I agree, start");
+
+            var settings = PanelRoot("BackendSettings", Vector2.zero, Vector2.one);
+            settings.transform.SetParent(root.transform, false);
+            settings.AddComponent<LayoutElement>().ignoreLayout = true;
+            settings.GetComponent<Image>().color = new Color(0.12f, 0.16f, 0.2f, 1);
+            p.SettingsRoot = settings;
+            Label(settings.transform, "Optional backend (session only)", 26, 38);
+            Label(settings.transform, "Use HTTPS. The team demo token stays in memory and clears on Exit / New session. "
+                + "Checking sends only an invented test request. Upload permission below is separate from eye capture and Gemini.", 18, 72);
+            p.BackendUrl = MakeInput(settings.transform, "HTTPS backend origin");
+            p.BackendUrl.gameObject.name = "BackendUrl";
+            p.BackendUrl.lineType = InputField.LineType.SingleLine;
+            p.BackendUrl.characterLimit = 2048;
+            p.BackendUrl.GetComponent<LayoutElement>().preferredHeight = 44;
+            p.BackendToken = MakeInput(settings.transform, "Team demo token");
+            p.BackendToken.gameObject.name = "BackendToken";
+            p.BackendToken.lineType = InputField.LineType.SingleLine;
+            p.BackendToken.contentType = InputField.ContentType.Password;
+            p.BackendToken.characterLimit = 4096;
+            p.BackendToken.shouldHideMobileInput = true;
+            p.BackendToken.GetComponent<LayoutElement>().preferredHeight = 44;
+            p.LocalDevelopment = MakeToggle(settings.transform, "Local development: allow loopback / private LAN HTTP");
+            p.InventedDemo = MakeToggle(settings.transform, "This entire session uses invented eye data AND invented check-ins");
+            p.AllowUpload = MakeToggle(settings.transform, "Allow this session's invented aggregates and ratings to reach this server");
+            p.ConnectionStatus = Label(settings.transform, "", 18, flexible: true);
+            var buttons = ButtonRow(settings.transform);
+            p.CheckConnectionButton = MakeButton(buttons, "Check with invented data");
+            p.SaveSettingsButton = MakeButton(buttons, "Save and back");
+            // The optional overlay stays dark while the new theme uses light cards.
+            // Preserve dark input-field text on its light field background.
+            foreach (var text in settings.GetComponentsInChildren<Text>(true))
+                if (text.GetComponentInParent<Button>() == null && text.GetComponentInParent<InputField>() == null)
+                    text.color = UiTheme.Paper;
+            settings.SetActive(false);
             return root;
         }
 
@@ -106,11 +175,11 @@ namespace App.UI.Editor
             var grid = new GameObject("Chips", typeof(RectTransform), typeof(GridLayoutGroup), typeof(LayoutElement));
             grid.transform.SetParent(root.transform, false);
             var g = grid.GetComponent<GridLayoutGroup>();
-            g.cellSize = new Vector2(250, 34);
-            g.spacing = new Vector2(8, 6);
+            g.cellSize = new Vector2(296, 52);
+            g.spacing = new Vector2(8, 8);
             g.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             g.constraintCount = 5;
-            grid.GetComponent<LayoutElement>().preferredHeight = 80;
+            grid.GetComponent<LayoutElement>().preferredHeight = 120;
             foreach (Chip c in Enum.GetValues(typeof(Chip))) p.ChipToggles.Add(MakeToggle(grid.transform, ReportText.ChipLabel(c), layout: false));
             p.FreeText = MakeInput(root.transform, "Optional: say how you feel (max 300 characters)");
             p.Hint = Label(root.transform, "", 14, 24);
@@ -154,7 +223,7 @@ namespace App.UI.Editor
         static GameObject SceneView()
         {
             var root = PanelRoot("ScenePanel", new Vector2(0.08f, 0.02f), new Vector2(0.92f, 0.3f));
-            root.GetComponent<Image>().color = new Color(0.12f, 0.16f, 0.2f, 0.75f);
+            root.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.94f);
             var p = root.AddComponent<ScenePanel>();
             Label(root.transform, "Calming scene", 24, 32);
             p.Body = Label(root.transform, "", 15, flexible: true);
@@ -199,7 +268,10 @@ namespace App.UI.Editor
             rt.anchorMin = new Vector2(0, 0.9f);
             rt.anchorMax = Vector2.one;
             rt.offsetMin = rt.offsetMax = Vector2.zero;
-            root.GetComponent<Image>().color = new Color(0.1f, 0.1f, 0.1f, 0.95f);
+            var barImage = root.GetComponent<Image>();
+            barImage.sprite = UiTheme.Fill;
+            barImage.type = Image.Type.Sliced;
+            barImage.color = UiTheme.Ink;
             var h = root.GetComponent<HorizontalLayoutGroup>();
             h.padding = new RectOffset(16, 16, 8, 8);
             h.spacing = 16;
@@ -213,19 +285,22 @@ namespace App.UI.Editor
             b.StateLabel = Label(labels.transform, "", 14, 20);
             b.PauseButton = MakeButton(root.transform, "Pause / Resume");
             b.ExitButton = MakeButton(root.transform, "Exit");
+            Recolor(root, UiTheme.Paper);
             return root;
         }
 
         static GameObject Pause()
         {
             var root = PanelRoot("PauseOverlay");
-            root.GetComponent<Image>().color = new Color(0, 0, 0, 0.92f);
+            root.GetComponent<Image>().sprite = UiTheme.Fill;
+            root.GetComponent<Image>().color = new Color(UiTheme.Ink.r, UiTheme.Ink.g, UiTheme.Ink.b, 0.97f);
             var p = root.AddComponent<PauseOverlay>();
             Label(root.transform, "Paused", 36, 60);
             Label(root.transform, "Take your time. Exit is always available.", 20, flexible: true);
             var row = ButtonRow(root.transform);
-            p.ResumeButton = MakeButton(row, "Resume");
+            p.ResumeButton = MakeButton(row, "Resume", ButtonKind.Accent);
             p.ExitButton = MakeButton(row, "Exit");
+            Recolor(root, UiTheme.Paper);
             return root;
         }
 
@@ -303,10 +378,13 @@ namespace App.UI.Editor
             rt.anchorMin = anchorMin ?? new Vector2(0.08f, 0.03f);
             rt.anchorMax = anchorMax ?? new Vector2(0.92f, 0.88f);
             rt.offsetMin = rt.offsetMax = Vector2.zero;
-            go.GetComponent<Image>().color = new Color(0.12f, 0.16f, 0.2f, 0.95f);
+            var card = go.GetComponent<Image>();
+            card.sprite = UiTheme.CardOutline;
+            card.type = Image.Type.Sliced;
+            card.color = new Color(1f, 1f, 1f, 0.97f);
             var v = go.GetComponent<VerticalLayoutGroup>();
-            v.padding = new RectOffset(32, 32, 24, 24);
-            v.spacing = 10;
+            v.padding = new RectOffset(40, 40, 32, 32);
+            v.spacing = 14;
             v.childControlWidth = v.childControlHeight = true;
             v.childForceExpandWidth = true;
             v.childForceExpandHeight = false;
@@ -320,7 +398,7 @@ namespace App.UI.Editor
             HorizontalOrVerticalLayoutGroup g = horizontal
                 ? (HorizontalOrVerticalLayoutGroup)go.AddComponent<HorizontalLayoutGroup>()
                 : go.AddComponent<VerticalLayoutGroup>();
-            g.spacing = 8;
+            g.spacing = horizontal ? 16 : 8;
             g.childControlWidth = g.childControlHeight = true;
             g.childForceExpandWidth = horizontal;
             g.childForceExpandHeight = false;
@@ -332,7 +410,7 @@ namespace App.UI.Editor
             var row = Group(parent, "Buttons", horizontal: true);
             ((HorizontalLayoutGroup)row.GetComponent<HorizontalOrVerticalLayoutGroup>()).childAlignment = TextAnchor.MiddleRight;
             row.GetComponent<HorizontalOrVerticalLayoutGroup>().childForceExpandWidth = false;
-            row.GetComponent<LayoutElement>().preferredHeight = 52;
+            row.GetComponent<LayoutElement>().preferredHeight = 84;
             return row.transform;
         }
 
@@ -348,31 +426,66 @@ namespace App.UI.Editor
             var go = DefaultControls.CreateText(_res);
             go.name = "Text";
             go.transform.SetParent(parent, false);
-            var t = Style(go.GetComponent<Text>(), size);
+            var t = Style(go.GetComponent<Text>(), Mathf.RoundToInt(size * TextScale));
             t.text = text;
             t.alignment = TextAnchor.UpperLeft;
             var le = go.AddComponent<LayoutElement>();
-            if (height > 0) le.preferredHeight = height;
+            if (height > 0) le.preferredHeight = height * TextScale;
             if (flexible) le.flexibleHeight = 1;
             return t;
         }
 
-        static Button MakeButton(Transform parent, string text)
+        static Button MakeButton(Transform parent, string text, ButtonKind kind = ButtonKind.Auto)
         {
+            if (kind == ButtonKind.Auto)
+                kind = SecondaryLabels.Any(l => text.StartsWith(l)) && text != "Finish with report" ? ButtonKind.Secondary : ButtonKind.Primary;
             var go = DefaultControls.CreateButton(_res);
             go.name = text;
             go.transform.SetParent(parent, false);
+            var image = go.GetComponent<Image>();
+            image.type = Image.Type.Sliced;
+            var button = go.GetComponent<Button>();
+            var colors = button.colors;
+            colors.fadeDuration = 0.08f;
+            Color labelColor;
+            switch (kind)
+            {
+                case ButtonKind.Secondary:
+                    image.sprite = UiTheme.Outline;
+                    colors.normalColor = Color.white; colors.highlightedColor = UiTheme.PaperHover; colors.selectedColor = Color.white;
+                    colors.pressedColor = UiTheme.Border; colors.disabledColor = UiTheme.Disabled;
+                    labelColor = UiTheme.Ink;
+                    break;
+                case ButtonKind.Accent:
+                    image.sprite = UiTheme.Fill;
+                    colors.normalColor = UiTheme.Accent; colors.highlightedColor = UiTheme.AccentHover; colors.selectedColor = UiTheme.Accent;
+                    colors.pressedColor = UiTheme.Ink; colors.disabledColor = UiTheme.Disabled;
+                    labelColor = UiTheme.Paper;
+                    break;
+                default:
+                    image.sprite = UiTheme.Fill;
+                    colors.normalColor = UiTheme.Ink; colors.highlightedColor = UiTheme.InkHover; colors.selectedColor = UiTheme.Ink;
+                    colors.pressedColor = Color.black; colors.disabledColor = UiTheme.Disabled;
+                    labelColor = UiTheme.Paper;
+                    break;
+            }
+            image.color = Color.white;
+            button.colors = colors;
             var label = go.GetComponentInChildren<Text>();
             if (label != null)
             {
                 label.text = text;
                 label.font = _font;
-                label.fontSize = 20;
+                label.fontSize = 28;
+                label.fontStyle = FontStyle.Bold;
+                label.color = labelColor;
+                label.alignment = TextAnchor.MiddleCenter;
+                label.horizontalOverflow = HorizontalWrapMode.Wrap;
             }
             var le = go.AddComponent<LayoutElement>();
-            le.preferredWidth = 240;
-            le.preferredHeight = 48;
-            return go.GetComponent<Button>();
+            le.preferredWidth = 380;
+            le.preferredHeight = 76;
+            return button;
         }
 
         static Toggle MakeToggle(Transform parent, string text, bool layout = true)
@@ -383,11 +496,34 @@ namespace App.UI.Editor
             var label = go.GetComponentInChildren<Text>();
             if (label != null)
             {
-                Style(label, 18);
+                Style(label, 24);
                 label.text = text;
+                var lr = (RectTransform)label.transform;
+                lr.offsetMin = new Vector2(60, 0);
+                lr.offsetMax = new Vector2(-8, 0);
+                label.alignment = TextAnchor.MiddleLeft;
             }
-            if (layout) go.AddComponent<LayoutElement>().preferredHeight = 32;
-            return go.GetComponent<Toggle>();
+            var toggle = go.GetComponent<Toggle>();
+            var box = go.transform.Find("Background") as RectTransform;
+            if (box != null)
+            {
+                box.anchorMin = box.anchorMax = new Vector2(0, 0.5f);
+                box.pivot = new Vector2(0.5f, 0.5f);
+                box.anchoredPosition = new Vector2(26, 0);
+                box.sizeDelta = new Vector2(40, 40);
+                var bg = box.GetComponent<Image>();
+                bg.sprite = UiTheme.Outline;
+                bg.type = Image.Type.Sliced;
+                bg.color = Color.white;
+                var mark = box.Find("Checkmark") as RectTransform;
+                if (mark != null)
+                {
+                    mark.sizeDelta = new Vector2(30, 30);
+                    mark.GetComponent<Image>().color = UiTheme.Accent;
+                }
+            }
+            if (layout) go.AddComponent<LayoutElement>().preferredHeight = 52;
+            return toggle;
         }
 
         static InputField MakeInput(Transform parent, string placeholder)
@@ -397,14 +533,23 @@ namespace App.UI.Editor
             go.transform.SetParent(parent, false);
             var field = go.GetComponent<InputField>();
             field.lineType = InputField.LineType.MultiLineNewline;
+            var fieldImage = go.GetComponent<Image>();
+            fieldImage.sprite = UiTheme.Outline;
+            fieldImage.type = Image.Type.Sliced;
+            fieldImage.color = Color.white;
             field.textComponent.font = _font;
-            field.textComponent.fontSize = 18;
+            field.textComponent.fontSize = 24;
+            field.textComponent.fontStyle = FontStyle.Bold;
+            field.textComponent.color = UiTheme.Ink;
             if (field.placeholder is Text ph)
             {
                 ph.font = _font;
+                ph.fontSize = 24;
+                ph.fontStyle = FontStyle.Bold;
+                ph.color = UiTheme.Muted;
                 ph.text = placeholder;
             }
-            go.AddComponent<LayoutElement>().preferredHeight = 70;
+            go.AddComponent<LayoutElement>().preferredHeight = 110;
             return field;
         }
 
@@ -412,20 +557,21 @@ namespace App.UI.Editor
         {
             var row = Group(parent, label, horizontal: true);
             row.GetComponent<HorizontalOrVerticalLayoutGroup>().childForceExpandWidth = false;
-            row.GetComponent<LayoutElement>().preferredHeight = 36;
-            Label(row.transform, label, 20, 32).GetComponent<LayoutElement>().preferredWidth = 220;
+            row.GetComponent<LayoutElement>().preferredHeight = 60;
+            Label(row.transform, label, 20, 32).GetComponent<LayoutElement>().preferredWidth = 300;
             var sliderGo = DefaultControls.CreateSlider(_res);
             sliderGo.transform.SetParent(row.transform, false);
             var sle = sliderGo.AddComponent<LayoutElement>();
             sle.flexibleWidth = 1;
-            sle.preferredHeight = 24;
+            sle.preferredHeight = 48;
             var slider = sliderGo.GetComponent<Slider>();
             slider.minValue = 1;
             slider.maxValue = 7;
             slider.wholeNumbers = true;
             slider.value = 1;
+            StyleSlider(sliderGo, slider);
             var value = Label(row.transform, "1 / 7", 20, 32);
-            value.GetComponent<LayoutElement>().preferredWidth = 90;
+            value.GetComponent<LayoutElement>().preferredWidth = 120;
             var r = row.AddComponent<RatingRow>();
             r.Slider = slider;
             r.ValueLabel = value;
@@ -436,10 +582,40 @@ namespace App.UI.Editor
         {
             t.font = _font;
             t.fontSize = size;
-            t.color = Color.white;
+            t.fontStyle = FontStyle.Bold;
+            t.color = UiTheme.Ink;
             t.horizontalOverflow = HorizontalWrapMode.Wrap;
             t.verticalOverflow = VerticalWrapMode.Truncate;
             return t;
+        }
+
+        // Chunky VR-friendly slider: thick track, ink fill, large round handle.
+        static void StyleSlider(GameObject sliderGo, Slider slider)
+        {
+            var track = sliderGo.transform.Find("Background")?.GetComponent<Image>();
+            if (track != null) { track.sprite = UiTheme.Fill; track.type = Image.Type.Sliced; track.color = UiTheme.Border; }
+            var fill = sliderGo.transform.Find("Fill Area/Fill")?.GetComponent<Image>();
+            if (fill != null) { fill.sprite = UiTheme.Fill; fill.type = Image.Type.Sliced; fill.color = UiTheme.Ink; }
+            var handleRect = sliderGo.transform.Find("Handle Slide Area/Handle") as RectTransform;
+            if (handleRect != null)
+            {
+                handleRect.sizeDelta = new Vector2(48, 0);
+                var handle = handleRect.GetComponent<Image>();
+                handle.sprite = _res.knob;
+                handle.color = UiTheme.Accent;
+                slider.targetGraphic = handle;
+                var colors = slider.colors;
+                colors.highlightedColor = UiTheme.AccentHover;
+                colors.pressedColor = UiTheme.Ink;
+                slider.colors = colors;
+            }
+        }
+
+        // Re-colours every label under a dark container; button labels keep the colour chosen for their button.
+        static void Recolor(GameObject root, Color color)
+        {
+            foreach (var t in root.GetComponentsInChildren<Text>(true))
+                if (t.GetComponentInParent<Button>() == null) t.color = color;
         }
     }
 }

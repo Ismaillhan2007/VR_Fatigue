@@ -24,6 +24,9 @@ namespace App.Metrics
             {
                 summary = engine.Compute(task, baseline, context);
                 if (summary == null) throw new InvalidOperationException("Missing metric result.");
+                if (summary.Validate().Count > 0 || summary.SessionId != context.SessionId
+                    || summary.DataSource != context.DataSource || summary.ReplayOrigin != context.ReplayOrigin)
+                    throw new InvalidOperationException("Invalid metric result.");
                 return true;
             }
             catch (Exception)

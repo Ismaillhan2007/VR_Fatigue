@@ -28,7 +28,7 @@ Build an eye-tracking app for HackTX: eye-signal capture -> deterministic metric
 - Merge PRs, push directly to `main` or `dev`, force-push shared branches, or discard teammates' changes without explicit authorization.
 - Resolve a merge conflict by taking one whole side ("accept ours/theirs") without reading both; never delete another owner's file to make a merge pass.
 - Buy assets, enable billing, increase spending limits, or deploy publicly without explicit authorization.
-- Commit credentials, `.env`, `unity/Assets/Resources/DevAgentSettings.asset`, identifying eye data, raw eye images, recordings or personal reports; transmit real eye data or participant free text to Gemini.
+- Commit credentials, `.env`, `unity/Assets/Resources/DevAgentSettings.asset`, identifying eye data, raw eye images, recordings or personal reports; transmit raw eye streams, images, identifiers or participant free text to Gemini. Aggregate measurements and ratings require explicit participant `consented_summary` opt-in plus server enablement under the user-approved [cloud report policy](docs/CONSENTED_GEMINI_REPORT.md).
 - Diagnose conditions, prescribe treatment, invent measurements/accuracy, call the indicator a "fatigue score", or describe a demo score as clinically validated.
 - Represent head gaze, missing tracking, synthetic/replay data, or cached/fallback AI output as live eye measurements or live AI.
 - Execute model-generated code, arbitrary tools, asset URLs, or scene scripts. Apply only validated, allowlisted scene settings.

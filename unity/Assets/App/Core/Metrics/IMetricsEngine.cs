@@ -16,6 +16,8 @@ namespace App.Core.Metrics
         public double? SensorEndTime;
         /// <summary>Sensor seconds per frame-clock second when extrapolating legacy frame bounds.</summary>
         public double SensorClockRate = 1;
+        public int? NativeFramesReceived;
+        public int? NativeDuplicateFrames;
 
         public double DurationSeconds => EndTime > StartTime ? EndTime - StartTime : 0;
 
@@ -26,6 +28,7 @@ namespace App.Core.Metrics
             StartTime = EndTime = 0;
             SensorStartTime = SensorEndTime = null;
             SensorClockRate = 1;
+            NativeFramesReceived = NativeDuplicateFrames = null;
         }
     }
 
@@ -46,6 +49,8 @@ namespace App.Core.Metrics
         public IReadOnlyList<UnavailableSignal> Unavailable;
         /// <summary>Post-task self-report embedded into SessionSummary.self_report (may be null).</summary>
         public SelfReport PostTaskReport;
+        /// <summary>Optional original hardware counters before the native adapter drops repeated timestamps.</summary>
+        public double? ObservedRepeatedFraction;
     }
 
     /// <summary>

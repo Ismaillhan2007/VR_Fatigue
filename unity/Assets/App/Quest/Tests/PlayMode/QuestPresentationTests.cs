@@ -59,6 +59,11 @@ public class QuestPresentationTests
         Assert.That(local.z, Is.EqualTo(direction.Z * 2).Within(0.0001));
         _view.PlaceInFrontOfHead();
         Assert.That(Vector3.Distance(head.position, _view.Canvas.transform.position), Is.EqualTo(2).Within(0.0001));
+        // Placed along the horizontal view direction, upright: head pitch (10 deg) must not tilt the panel.
+        Assert.That(_view.Canvas.transform.position.y, Is.EqualTo(head.position.y).Within(0.0001));
+        Assert.That(Vector3.Angle(_view.Canvas.transform.up, Vector3.up), Is.LessThan(0.01f));
+        Assert.That(_view.Canvas.transform.eulerAngles.y, Is.EqualTo(45).Within(0.01));
+        Assert.GreaterOrEqual(_view.Canvas.GetComponent<CanvasScaler>().dynamicPixelsPerUnit, 3f, "text must be rasterized above 1 texel per unit");
     }
 
     [UnityTest]
@@ -135,7 +140,7 @@ public class QuestPresentationTests
     {
         _controller.EyeSource = EyeSourceMode.Synthetic;
         _controller.Analysis = AnalysisMode.Http;
-        _controller.BackendBaseUrl = "http://127.0.0.1:9";
+        _controller.ConfigureBackend("http://127.0.0.1:9", System.Environment.GetEnvironmentVariable("VR_BACKEND_ACCESS_TOKEN") ?? "", true, true, true);
         _controller.AcceptConsent();
         _controller.EndCaptureEarly();
         _controller.SubmitBaseline(2, 2);
@@ -143,7 +148,7 @@ public class QuestPresentationTests
         _controller.SubmitCheckIn(new SelfReport { Phase = ReportPhase.PostTask, EyeStrain = 2, MentalFatigue = 2 }, null);
         _controller.Flow.Pause();
         var deadline = Time.realtimeSinceStartup + 5;
-        while (_controller.Flow.Context.Analysis == null && Time.realtimeSinceStartup < deadline) yield return null;
+        while ((_controller.Flow.Context.Analysis == null || _controller.AnalysisInProgress) && Time.realtimeSinceStartup < deadline) yield return null;
         Assert.NotNull(_controller.Flow.Context.Analysis);
         Assert.IsFalse(_controller.AnalysisInProgress);
         Assert.IsTrue(_controller.Flow.IsPaused);
@@ -233,6 +238,87 @@ public class QuestPresentationTests
             InputSystem.RemoveDevice(device); InputSystem.RemoveLayout(layout);
             Object.Destroy(anchor); Object.Destroy(manager.gameObject);
         }
+    }
+
+    [UnityTest]
+    public IEnumerator TrackedRayOpensBackendSettingsAndReturnsToConsent()
+    {
+        var panel = Object.FindAnyObjectByType<ConsentPanel>();
+        var setup = new GameObject("Combined native and backend controls").AddComponent<QuestEyeSetupPanel>();
+        setup.Configure(_controller);
+        yield return null;
+        var pointer = new Pointer(_module, _view.Head);
+        _module.RegisterInteractor(pointer);
+        try
+        {
+            Canvas.ForceUpdateCanvases();
+            var bounds = new Vector3[4];
+            foreach (var button in panel.GetComponentsInChildren<Button>())
+            {
+                ((RectTransform)button.transform).GetWorldCorners(bounds);
+                foreach (var corner in bounds)
+                    Assert.IsTrue(((RectTransform)_view.Canvas.transform).rect.Contains(
+                        _view.Canvas.transform.InverseTransformPoint(corner)), "combined consent control stays on canvas: " + button.name);
+            }
+            yield return Click(pointer, panel.OpenSettingsButton);
+            Assert.IsTrue(panel.SettingsRoot.activeSelf);
+            Assert.AreEqual(InputField.ContentType.Password, panel.BackendToken.contentType);
+            Canvas.ForceUpdateCanvases();
+            var corners = new Vector3[4];
+            foreach (var field in new[] { panel.BackendUrl, panel.BackendToken })
+            {
+                ((RectTransform)field.transform).GetWorldCorners(corners);
+                foreach (var corner in corners)
+                {
+                    var point = _view.Canvas.transform.InverseTransformPoint(corner);
+                    Assert.IsTrue(((RectTransform)_view.Canvas.transform).rect.Contains(point), "settings input stays within the tracked canvas");
+                }
+            }
+            yield return Click(pointer, panel.SaveSettingsButton);
+            Assert.IsFalse(panel.SettingsRoot.activeSelf);
+            Assert.AreEqual(FlowState.Consent, _controller.Flow.State);
+        }
+        finally { _module.UnregisterInteractor(pointer); Object.Destroy(setup.gameObject); }
+    }
+
+    [UnityTest]
+    public IEnumerator NativeSetupControlsReachConsentAndUnavailableHardwareDoesNotBecomeReplay()
+    {
+        var setup = new GameObject("Native setup controls").AddComponent<QuestEyeSetupPanel>();
+        setup.Configure(_controller);
+        var consent = Object.FindAnyObjectByType<ConsentPanel>();
+        var buttons = consent.GetComponentsInChildren<Button>();
+        buttons.Single(b => b.name == "Use native eyes").onClick.Invoke();
+        Assert.AreEqual(EyeSourceMode.Hardware, _controller.EyeSource);
+        var original = EyeProviderFactory.HardwareFactory;
+        EyeProviderFactory.HardwareFactory = null; // No physical headset in this test.
+        try
+        {
+            buttons.Single(b => b.name == "I consent: request eye permission").onClick.Invoke();
+            consent.StartButton.onClick.Invoke();
+            Assert.AreEqual(FlowState.Consent, _controller.Flow.State);
+            Assert.IsNull(_controller.Flow.Context.DataSource);
+            StringAssert.Contains("Grant eye permission", _controller.HardwareSetupStatus);
+            buttons.Single(b => b.name == "Use replay").onClick.Invoke();
+            Assert.AreEqual(EyeSourceMode.Replay, _controller.EyeSource);
+            Assert.IsFalse(_controller.HardwareCalibrationConfirmed);
+        }
+        finally { EyeProviderFactory.HardwareFactory = original; Object.Destroy(setup.gameObject); }
+        yield return null;
+    }
+
+    [UnityTest]
+    public IEnumerator ProductionNativeFactoryIsUnavailableInEditorAndReleasesItsOwner()
+    {
+        var provider = QuestNativeEyeFactory.Create();
+        Assert.AreEqual(DataSource.Live, provider.DataSource, "declared production source, not successful live acquisition");
+        Assert.IsFalse(provider.Capabilities.GazePose, "capability is not claimed until Start succeeds");
+        Assert.IsFalse(provider.RequestPermissionAfterConsent());
+        provider.ConfirmCalibration(true);
+        Assert.Throws<System.InvalidOperationException>(() => provider.Start(0));
+        Assert.IsFalse(provider.IsRunning);
+        provider.Dispose(); yield return null;
+        Assert.IsNull(provider.AggregateDiagnostics);
     }
 
     static IEnumerator Click(Pointer pointer, Button button)

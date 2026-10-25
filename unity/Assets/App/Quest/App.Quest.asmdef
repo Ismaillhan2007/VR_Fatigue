@@ -8,7 +8,10 @@
     "Oculus.VR",
     "Unity.XR.Interaction.Toolkit",
     "Unity.InputSystem",
-    "UnityEngine.UI"
+    "UnityEngine.UI",
+    "App.Capture",
+    "VRFatigue.Signals",
+    "Unity.RenderPipelines.Universal.Runtime"
   ],
   "autoReferenced": true
 }

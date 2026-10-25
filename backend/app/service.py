@@ -67,9 +67,12 @@ class AnalysisService:
         # Reasons are fixed codes, never exception text or participant input. Each outcome
         # belongs to its request; no shared last-error state can leak between callers.
         reason = None
-        if not synthetic:
+        consented = request.cloud_policy == "consented_summary"
+        if consented and not self.settings.allow_participant_cloud:
+            reason = "participant_cloud_disabled"
+        elif not synthetic and not consented:
             reason = "non_synthetic_input"
-        elif request.cloud_policy != "synthetic_demo":
+        elif request.cloud_policy != "synthetic_demo" and not consented:
             reason = "local_only"
         elif fallback.safety_notice == "stop_session":
             reason = "safety_stop"
@@ -94,11 +97,14 @@ class AnalysisService:
     ) -> AnalysisOutcome:
         session = request.session_summary
         # Only successful synthetic results are cached; never persist participant sessions.
-        payload = request.model_dump()
-        payload["session_summary"].pop("session_id")
-        key = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+        cacheable = request.cloud_policy == "synthetic_demo"
+        key = None
+        if cacheable:
+            payload = request.model_dump()
+            payload["session_summary"].pop("session_id")
+            key = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
         async with self.lock:
-            cached = self.cache.get(key)
+            cached = self.cache.get(key) if cacheable else None
             if cached and time.monotonic() - cached[0] < 300:
                 self.cache.move_to_end(key)
                 return AnalysisOutcome(
@@ -149,7 +155,8 @@ class AnalysisService:
             except Exception:
                 # Never return SDK error bodies, API keys, prompts, or participant payloads.
                 return AnalysisOutcome(fallback, "provider_error")
-            self.cache[key] = (time.monotonic(), result.model_copy(deep=True))
-            while len(self.cache) > 32:
-                self.cache.popitem(last=False)
+            if cacheable:
+                self.cache[key] = (time.monotonic(), result.model_copy(deep=True))
+                while len(self.cache) > 32:
+                    self.cache.popitem(last=False)
             return AnalysisOutcome(result)

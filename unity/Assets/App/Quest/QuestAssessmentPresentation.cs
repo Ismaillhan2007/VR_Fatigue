@@ -13,6 +13,7 @@ namespace App.Quest
     {
         public const float PanelDistance = 2f;
         public const float MetresPerPixel = 0.001f;
+        public const float TextPixelsPerUnit = 3f;
         public Canvas Canvas { get; private set; }
         public Camera Head { get; private set; }
         Text _status;
@@ -29,12 +30,17 @@ namespace App.Quest
             rect.localScale = Vector3.one * MetresPerPixel;
             var scaler = Canvas.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
-            scaler.dynamicPixelsPerUnit = 1;
+            // Legacy Text rasterizes glyphs at fontSize * dynamicPixelsPerUnit texels; at 1 they were blurry in the headset.
+            scaler.dynamicPixelsPerUnit = TextPixelsPerUnit;
             foreach (var raycaster in Canvas.GetComponents<GraphicRaycaster>()) raycaster.enabled = false;
             Canvas.gameObject.AddComponent<TrackedDeviceGraphicRaycaster>();
             var events = FindAnyObjectByType<EventSystem>();
-            foreach (var module in events.GetComponents<BaseInputModule>()) module.enabled = false;
-            var input = events.gameObject.AddComponent<XRUIInputModule>();
+            // Reuse an XRUIInputModule that XRI may already have created for enabled ray interactors: disabling it
+            // would leave those rays registered with a dead module (visible ray, trigger does nothing).
+            var input = events.GetComponent<XRUIInputModule>();
+            foreach (var module in events.GetComponents<BaseInputModule>()) module.enabled = module == input;
+            if (input == null) input = events.gameObject.AddComponent<XRUIInputModule>();
+            input.enabled = true;
             input.enableXRInput = true;
             input.enableMouseInput = false;
             input.enableTouchInput = input.enableGamepadInput = input.enableJoystickInput = false;
@@ -54,6 +60,7 @@ namespace App.Quest
                     var layout = body.GetComponent<LayoutElement>();
                     if (layout != null && layout.flexibleHeight > 0) MakeScrollable(body);
                 }
+                if (panel is BaselinePanel baseline) MakeScrollable(baseline.Status);
                 if (panel is ScenePanel) panelRect.anchorMax = new Vector2(panelRect.anchorMax.x, 0.58f);
             }
             var pauseRect = (RectTransform)controller.PauseOverlay.transform;
@@ -61,9 +68,9 @@ namespace App.Quest
             foreach (var button in Canvas.GetComponentsInChildren<Button>(true))
             {
                 var size = button.GetComponent<LayoutElement>();
-                if (size != null) { size.preferredWidth = Mathf.Max(330, size.preferredWidth); size.preferredHeight = 60; }
+                if (size != null) { size.preferredWidth = Mathf.Max(330, size.preferredWidth); size.preferredHeight = Mathf.Max(60, size.preferredHeight); }
                 var row = button.transform.parent.GetComponent<LayoutElement>();
-                if (row != null) row.preferredHeight = 64;
+                if (row != null) row.preferredHeight = Mathf.Max(64, row.preferredHeight);
             }
             _status = new GameObject("Quest status", typeof(RectTransform), typeof(Text)).GetComponent<Text>();
             _status.transform.SetParent(Canvas.transform, false);
@@ -72,7 +79,7 @@ namespace App.Quest
             statusRect.anchorMax = new Vector2(0.95f, 0.07f);
             statusRect.offsetMin = statusRect.offsetMax = Vector2.zero;
             _status.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            _status.fontSize = 22;
+            _status.fontSize = 22; _status.fontStyle = FontStyle.Bold;
             _status.color = Color.white;
             _status.alignment = TextAnchor.MiddleLeft;
             _status.raycastTarget = false;
@@ -94,11 +101,19 @@ namespace App.Quest
             PlaceInFrontOfHead();
         }
 
+        /// <summary>
+        /// Puts the panel 2 m along the current horizontal view direction, upright at eye height (no pitch or roll),
+        /// so it appears where the person is looking. The panel then stays world-locked.
+        /// </summary>
         public void PlaceInFrontOfHead()
         {
             if (Canvas == null || Head == null) return;
-            Canvas.transform.SetPositionAndRotation(Head.transform.position + Head.transform.forward * PanelDistance,
-                Head.transform.rotation);
+            var head = Head.transform;
+            var forward = Vector3.ProjectOnPlane(head.forward, Vector3.up);
+            if (forward.sqrMagnitude < 1e-4f) forward = Vector3.ProjectOnPlane(-head.up * Mathf.Sign(head.forward.y), Vector3.up);
+            if (forward.sqrMagnitude < 1e-4f) forward = Vector3.forward;
+            forward.Normalize();
+            Canvas.transform.SetPositionAndRotation(head.position + forward * PanelDistance, Quaternion.LookRotation(forward, Vector3.up));
         }
 
         public void SetStatus(string message) { if (_status != null) _status.text = message; }

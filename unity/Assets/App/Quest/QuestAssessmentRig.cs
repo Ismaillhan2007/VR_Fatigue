@@ -20,9 +20,13 @@ namespace App.Quest
         public Camera Head { get; private set; }
         public QuestAssessmentPresentation Presentation { get; private set; }
         public SessionController Controller { get; private set; }
+        /// <summary>Head tracking must be stable this long before the start screen is placed.</summary>
+        public const float PlacementSettleSeconds = 0.5f;
         OVRDisplay _display;
         InputAction _pause;
-        bool _placed;
+        readonly PlacementGate _placement = new PlacementGate();
+        XRRayInteractor _leftRay, _rightRay;
+        float _nextDiagnostic;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void Install()
@@ -67,10 +71,12 @@ namespace App.Quest
                 listener.enabled = false;
             owner.Head.gameObject.AddComponent<AudioListener>();
             root.AddComponent<XRInteractionManager>();
-            ConfigureRay(rig.leftControllerAnchor, "LeftHand");
-            ConfigureRay(rig.rightControllerAnchor, "RightHand");
+            // UI and its XRUIInputModule first: the rays register with that module when they are enabled.
             owner.Presentation = root.AddComponent<QuestAssessmentPresentation>();
             owner.Presentation.Configure(controller, owner.Head);
+            root.AddComponent<QuestEyeSetupPanel>().Configure(controller);
+            owner._leftRay = ConfigureRay(rig.leftControllerAnchor, "LeftHand");
+            owner._rightRay = ConfigureRay(rig.rightControllerAnchor, "RightHand");
             owner._pause = new InputAction("Pause assessment", InputActionType.Button);
             owner._pause.AddBinding("<XRController>{LeftHand}/secondaryButton");
             owner._pause.AddBinding("<XRController>{RightHand}/secondaryButton");
@@ -79,7 +85,7 @@ namespace App.Quest
             return owner;
         }
 
-        static void ConfigureRay(Transform anchor, string hand)
+        static XRRayInteractor ConfigureRay(Transform anchor, string hand)
         {
             var go = new GameObject(hand + " UI ray");
             go.SetActive(false);
@@ -89,8 +95,14 @@ namespace App.Quest
             ray.referenceFrame = anchor.root;
             ray.raycastMask = 1 << LayerMask.NameToLayer("UI"); // UI only; never move/select the forest or the camera.
             ray.enableUIInteraction = true;
+            var press = new InputAction("UI press", InputActionType.Button, $"<XRController>{{{hand}}}/triggerPressed");
+            press.AddBinding($"<XRController>{{{hand}}}/{{TriggerButton}}"); // same trigger through its standard usage
             ray.uiPressInput = new XRInputButtonReader("UI press", inputSourceMode: XRInputButtonReader.InputSourceMode.InputAction)
-            { inputActionPerformed = new InputAction("UI press", InputActionType.Button, $"<XRController>{{{hand}}}/triggerPressed") };
+            { inputActionPerformed = press };
+            // On the headset the trigger is also read through Meta's OVRInput, so a click never depends on a single
+            // Input System binding/profile resolving (first device run: visible ray, trigger did nothing).
+            ray.uiPressInput.bypass = new QuestTriggerReader(press,
+                hand == "LeftHand" ? OVRInput.RawButton.LIndexTrigger : OVRInput.RawButton.RIndexTrigger);
             ray.uiScrollInput = new XRInputValueReader<Vector2>("UI scroll", XRInputValueReader.InputSourceMode.InputAction)
             { inputAction = new InputAction("UI scroll", InputActionType.Value, $"<XRController>{{{hand}}}/primary2DAxis", expectedControlType: "Vector2") };
             var visual = go.AddComponent<XRInteractorLineVisual>();
@@ -99,7 +111,25 @@ namespace App.Quest
             visual.smoothMovement = false;
             visual.stopLineAtFirstRaycastHit = true;
             go.SetActive(true);
+            return ray;
         }
+
+        // Re-place the start screen whenever the flow returns to Consent (new session) or the headset is put on.
+        // Subscribed at runtime only: SessionController creates its Flow in Awake.
+        void Start()
+        {
+            if (Controller != null && Controller.Flow != null) Controller.Flow.StateChanged += HandleStateChanged;
+            OVRManager.HMDMounted += RequestPlacement;
+        }
+
+        void HandleStateChanged(FlowState previous, FlowState next)
+        {
+            if (next == FlowState.Consent) RequestPlacement();
+            // Capture started while placement was still waiting for stable tracking: cancel it.
+            if (PlacementGate.IsMeasuring(next)) _placement.Cancel();
+        }
+
+        FlowState CurrentState => Controller != null && Controller.Flow != null ? Controller.Flow.State : FlowState.Consent;
 
         void Update()
         {
@@ -109,10 +139,38 @@ namespace App.Quest
                 _display = OVRManager.display;
                 if (_display != null) _display.RecenteredPose += HandleRecenter;
             }
-            if (!_placed && Head != null && InputDevices.GetDeviceAtXRNode(XRNode.Head)
-                .TryGetFeatureValue(UnityEngine.XR.CommonUsages.isTracked, out var tracked) && tracked)
-            { Presentation.PlaceInFrontOfHead(); _placed = true; }
+            if (Debug.isDebugBuild && Time.unscaledTime >= _nextDiagnostic) LogInputDiagnostic();
         }
+
+        // Development builds only: one line per second in logcat (tag Unity, prefix [QuestInput]) to see on the device
+        // whether each trigger path fires and what each ray hits. No eye data, tokens or identifiers.
+        void LogInputDiagnostic()
+        {
+            _nextDiagnostic = Time.unscaledTime + 1f;
+            string Ray(XRRayInteractor ray)
+            {
+                if (ray == null) return "none";
+                var reader = ray.uiPressInput.bypass as QuestTriggerReader;
+                var hit = ray.TryGetCurrentUIRaycastResult(out var result) ? result.gameObject.name : "-";
+                return $"inputSystem={reader?.InputSystemPressed}, ovr={reader?.OvrPressed}, uiHit={hit}";
+            }
+            var events = EventSystem.current;
+            var module = events != null ? events.currentInputModule : null;
+            Debug.Log($"[QuestInput] L({Ray(_leftRay)}) R({Ray(_rightRay)}) module={(module != null ? module.GetType().Name : "none")} state={CurrentState}");
+        }
+
+        // After OVRCameraRig has moved the head anchor this frame; wait for stable tracking so the start screen
+        // lands where the person is actually looking, not where the headset pointed while being put on.
+        void LateUpdate()
+        {
+            if (!_placement.Pending || Head == null) return;
+            var tracked = InputDevices.GetDeviceAtXRNode(XRNode.Head)
+                .TryGetFeatureValue(UnityEngine.XR.CommonUsages.isTracked, out var isTracked) && isTracked;
+            if (_placement.Tick(tracked, Time.unscaledDeltaTime, CurrentState)) Presentation.PlaceInFrontOfHead();
+        }
+
+        /// <summary>Places the panel in view again once tracking is stable, except during a measured phase.</summary>
+        public void RequestPlacement() => _placement.Request(CurrentState);
 
         public void PauseAndBringPanel()
         {
@@ -143,8 +201,87 @@ namespace App.Quest
         void OnApplicationFocus(bool focused) { if (!focused) Interrupt("Headset focus lost. Review the session before continuing."); }
         void OnDestroy()
         {
+            OVRManager.HMDMounted -= RequestPlacement;
+            if (Controller != null && Controller.Flow != null) Controller.Flow.StateChanged -= HandleStateChanged;
             if (_display != null) _display.RecenteredPose -= HandleRecenter;
             _pause?.Dispose();
         }
+    }
+
+    /// <summary>
+    /// Timing for placing the panel in view: only after head tracking has been stable for
+    /// <see cref="QuestAssessmentRig.PlacementSettleSeconds"/>, and never during Baseline or LoadTask, so both phases
+    /// keep identical viewing conditions. Pure logic, so the start/capture race is unit-testable.
+    /// </summary>
+    public sealed class PlacementGate
+    {
+        float _trackedFor;
+
+        /// <summary>A placement is waiting. True initially: the first start screen must be placed.</summary>
+        public bool Pending { get; private set; } = true;
+
+        public static bool IsMeasuring(FlowState state) => state == FlowState.Baseline || state == FlowState.LoadTask;
+
+        /// <summary>Ask for a new placement; ignored while a measured phase is running.</summary>
+        public void Request(FlowState state)
+        {
+            if (IsMeasuring(state)) return;
+            Pending = true;
+            _trackedFor = 0;
+        }
+
+        public void Cancel()
+        {
+            Pending = false;
+            _trackedFor = 0;
+        }
+
+        /// <summary>Advance one frame; returns true exactly once, when the panel should be placed now.</summary>
+        public bool Tick(bool headTracked, float deltaSeconds, FlowState state)
+        {
+            if (!Pending) return false;
+            // Re-check at the moment of placing: capture may have started during the settle delay.
+            if (IsMeasuring(state)) { Cancel(); return false; }
+            _trackedFor = headTracked ? _trackedFor + deltaSeconds : 0;
+            if (_trackedFor < QuestAssessmentRig.PlacementSettleSeconds) return false;
+            Pending = false;
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// UI press for one controller: pressed when the Input System trigger binding OR (on the device) Meta OVRInput
+    /// reports the index trigger. Tracks per-frame transitions for XRI.
+    /// </summary>
+    public sealed class QuestTriggerReader : IXRInputButtonReader
+    {
+        readonly InputAction _action;
+        readonly OVRInput.RawButton _button;
+        readonly bool _useOvr = !Application.isEditor && Application.platform == RuntimePlatform.Android;
+        int _frame = -1;
+        bool _now, _previous;
+
+        public QuestTriggerReader(InputAction action, OVRInput.RawButton button)
+        {
+            _action = action;
+            _button = button;
+        }
+
+        public bool InputSystemPressed => _action != null && _action.enabled && _action.IsPressed();
+        public bool OvrPressed => _useOvr && OVRInput.Get(_button);
+
+        void Sample()
+        {
+            if (Time.frameCount == _frame) return;
+            _frame = Time.frameCount;
+            _previous = _now;
+            _now = InputSystemPressed || OvrPressed;
+        }
+
+        public bool ReadIsPerformed() { Sample(); return _now; }
+        public bool ReadWasPerformedThisFrame() { Sample(); return _now && !_previous; }
+        public bool ReadWasCompletedThisFrame() { Sample(); return !_now && _previous; }
+        public float ReadValue() => ReadIsPerformed() ? 1f : 0f;
+        public bool TryReadValue(out float value) { value = ReadValue(); return true; }
     }
 }

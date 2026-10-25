@@ -19,7 +19,7 @@ namespace App.Tests
     /// <summary>Desktop smoke test: the generated Assessment scene completes one synthetic session offline.</summary>
     public class AssessmentFlowSmokeTest
     {
-        static IEnumerator CaptureEvidence(string name)
+        internal static IEnumerator CaptureEvidence(string name)
         {
             var directory = Environment.GetEnvironmentVariable("VR_UI_SCREENSHOT_DIR");
             if (string.IsNullOrEmpty(directory)) yield break;
@@ -77,7 +77,7 @@ namespace App.Tests
             if (eye == 7) checkIn.FreeText.text = "I feel nauseous";
             yield return CaptureEvidence("check-in");
             checkIn.SubmitButton.onClick.Invoke();
-            if (waitForAnalysis) yield return WaitUntil(() => controller.Flow.Context.Analysis != null);
+            if (waitForAnalysis) yield return WaitUntil(() => controller.Flow.Context.Analysis != null && !controller.AnalysisInProgress);
         }
 
         [UnityTest]
@@ -106,13 +106,13 @@ namespace App.Tests
                 {
                     yield return SceneManager.LoadSceneAsync("Assessment");
                     var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
-                    c.BackendBaseUrl = url;
+                    c.ConfigureBackend(url, Environment.GetEnvironmentVariable("VR_BACKEND_ACCESS_TOKEN") ?? "", true, true, true);
                     yield return ShortSession(c, mode: AnalysisMode.Http, waitForAnalysis: false);
                     yield return WaitUntil(() => received.Task.IsCompleted);
                     Assert.IsTrue(c.AnalysisInProgress);
-                    Assert.IsFalse(c.Panels.OfType<SummaryPanel>().Single().FinishReportButton.interactable);
-                    Assert.IsFalse(c.Panels.OfType<SummaryPanel>().Single().EnterSceneButton.interactable);
-                    Assert.Throws<InvalidOperationException>(() => c.FinishWithReport());
+                    Assert.IsTrue(c.Panels.OfType<SummaryPanel>().Single().FinishReportButton.interactable);
+                    Assert.IsTrue(c.Panels.OfType<SummaryPanel>().Single().EnterSceneButton.interactable);
+                    Assert.NotNull(c.Flow.Context.Analysis, "local report is available while optional HTTP is pending");
                     var previousId = c.Flow.Context.SessionId;
                     c.Exit();
                     c.Restart();
@@ -226,7 +226,7 @@ namespace App.Tests
                 .GetValue(c);
             var row = task.Samples[0]; row.SensorTimestamp = double.NaN; task.Samples[0] = row;
             c.SubmitCheckIn(new SelfReport { Phase = ReportPhase.PostTask, EyeStrain = 3, MentalFatigue = 3 }, null);
-            yield return WaitUntil(() => c.Flow.Context.Analysis != null);
+            yield return WaitUntil(() => c.Flow.Context.Analysis != null && !c.AnalysisInProgress);
 
             var summary = c.Flow.Context.Summary;
             Assert.AreEqual(QualityStatus.InsufficientData, summary.Quality.Status);
@@ -301,7 +301,7 @@ namespace App.Tests
             Assert.AreEqual(App.Capture.EyeSourceMode.Replay, c.EyeSource);
             Assert.AreEqual(AnalysisMode.Http, c.Analysis);
             // Keep the actual scene's durations: 130 + 60 replay seconds at the scene's replay speed.
-            c.BackendBaseUrl = ConfiguredUrl(c);
+            c.ConfigureBackend(ConfiguredUrl(c), Environment.GetEnvironmentVariable("VR_BACKEND_ACCESS_TOKEN") ?? "", true, true, true);
             c.AcceptConsent();
             yield return WaitUntil(() => !c.IsCapturing, c.BaselineSeconds / c.ReplaySpeed + 10);
             c.SubmitBaseline(2, 2);
@@ -311,7 +311,7 @@ namespace App.Tests
                 Phase = ReportPhase.PostTask, EyeStrain = 3, MentalFatigue = 3,
                 Chips = new List<Chip> { Chip.WantQuiet }, FreeText = "private check-in stays here",
             }, null);
-            yield return WaitUntil(() => c.Flow.Context.Analysis != null, 20);
+            yield return WaitUntil(() => c.Flow.Context.Analysis != null && !c.AnalysisInProgress, 20);
             var ctx = c.Flow.Context;
             Assert.AreEqual(AiSource.Fallback, ctx.Analysis.AiSource);
             Assert.AreEqual("cloud use disabled for this check-in", ctx.AnalysisFallbackReason,
@@ -412,7 +412,7 @@ namespace App.Tests
             c.BaselineSeconds = 1;
             c.TaskSeconds = 1;
             c.Analysis = AnalysisMode.Http;
-            c.BackendBaseUrl = "http://127.0.0.1:9"; // nothing listens here: must fall back locally
+            c.ConfigureBackend("http://127.0.0.1:9", Environment.GetEnvironmentVariable("VR_BACKEND_ACCESS_TOKEN") ?? "", true, true, true); // nothing listens here: must fall back locally
             Assert.AreEqual(FlowState.Consent, c.Flow.State);
 
             c.AcceptConsent();
@@ -426,7 +426,7 @@ namespace App.Tests
                 Phase = ReportPhase.PostTask, EyeStrain = 5, MentalFatigue = 4,
                 Chips = new List<Chip> { Chip.TiredEyes, Chip.WantQuiet }, FreeText = "a bit dizzy",
             }, null);
-            yield return WaitUntil(() => c.Flow.Context.Analysis != null, 20);
+            yield return WaitUntil(() => c.Flow.Context.Analysis != null && !c.AnalysisInProgress, 20);
 
             var ctx = c.Flow.Context;
             Assert.AreEqual(DataSource.Synthetic, ctx.Summary.DataSource);
@@ -462,7 +462,7 @@ namespace App.Tests
             c.BaselineSeconds = 2;
             c.TaskSeconds = 2;
             c.Analysis = AnalysisMode.Http;
-            c.BackendBaseUrl = url;
+            c.ConfigureBackend(url, Environment.GetEnvironmentVariable("VR_BACKEND_ACCESS_TOKEN") ?? "", true, true, true);
 
             c.AcceptConsent();
             yield return WaitUntil(() => !c.IsCapturing);
@@ -473,7 +473,7 @@ namespace App.Tests
                 Phase = ReportPhase.PostTask, EyeStrain = 5, MentalFatigue = 5,
                 Chips = new List<Chip> { Chip.TiredEyes, Chip.WantQuiet }, FreeText = "private text stays local",
             }, null);
-            yield return WaitUntil(() => c.Flow.Context.Analysis != null, 20);
+            yield return WaitUntil(() => c.Flow.Context.Analysis != null && !c.AnalysisInProgress, 20);
 
             var a = c.Flow.Context.Analysis;
             StringAssert.StartsWith("local-", a.PromptVersion, "the backend's offline rules must have answered: " + c.Flow.Context.AnalysisFallbackReason);
@@ -507,7 +507,7 @@ namespace App.Tests
             c.SubmitBaseline(2, 2);
             yield return WaitUntil(() => c.Flow.State == FlowState.CheckIn, 20);
             c.SubmitCheckIn(new SelfReport { Phase = ReportPhase.PostTask, EyeStrain = 5, MentalFatigue = 4, Chips = new List<Chip> { Chip.TiredEyes } }, null);
-            yield return WaitUntil(() => c.Flow.Context.Analysis != null, 20);
+            yield return WaitUntil(() => c.Flow.Context.Analysis != null && !c.AnalysisInProgress, 20);
 
             var s = c.Flow.Context.Summary;
             Assert.AreEqual(ReplayOrigin.Synthetic, s.ReplayOrigin);

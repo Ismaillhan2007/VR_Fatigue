@@ -84,3 +84,5 @@ No pinned Unity editor is installed on this machine. Native Unity EditMode/PlayM
 - Docker Desktop on local Linux/arm64: `vr-fatigue-hosted:issue15` built successfully using Python 3.12.13 and uv 0.11.16. All **7 packaged-image checks** passed: missing-token refusal, platform port/health, Unity-wire auth/status/provenance, participant-eye rejection, no token in responses/probe output, nonroot/no-dotenv/no-fixtures/no-dev packages, and the exact Docker health command. Temporary test containers were removed. CI repeats the build/smoke on its Linux runner.
 - Documentation links/code fences, changed-file whitespace and the repository private-file scan passed; the scan returned only `backend/.env.example`.
 - No public deployment or live Gemini call was made. Railway account discovery returned **Unauthorized**; staging project selection/sign-in and explicit public-deployment authorization are still needed. Native Unity, Quest and two-network HTTPS results remain unrun.
+
+Current continuation: [October 25 staging checkpoint, verified image and deployment proposal](ISSUE_15_STAGING_HANDOFF.md).

@@ -42,8 +42,89 @@ namespace App.UI
 
         [Header("Analysis")]
         public AnalysisMode Analysis = AnalysisMode.Http;
-        [Tooltip("Override at runtime with the command-line argument -backendUrl http://<laptop-ip>:8000")]
+        [Tooltip("Non-secret default only. Runtime backend settings override it; local HTTP requires explicit development mode.")]
         public string BackendBaseUrl = HttpAnalysisClient.DefaultBaseUrl;
+
+        // Properties cannot be serialised into a Unity scene/prefab. Token and transfer flags live in memory only.
+        public string BackendToken { get; private set; } = "";
+        public bool BackendLocalDevelopment { get; private set; }
+        public bool InventedDemoSession { get; private set; }
+        public bool AllowBackendUpload { get; private set; }
+        public string BackendConnectionStatus { get; private set; } = "On-device report available. Backend has not been checked.";
+        public bool BackendCheckInProgress { get; private set; }
+
+        public void ConfigureBackend(string url, string token, bool localDevelopment, bool invented, bool allowUpload)
+        {
+            if (Flow.State != FlowState.Consent) throw new InvalidOperationException("Configure backend before capture");
+            if (ReplayLoading) throw new InvalidOperationException("Wait for replay loading before configuring backend");
+            if (url == BackendBaseUrl && (token ?? "") == BackendToken && localDevelopment == BackendLocalDevelopment
+                && invented == InventedDemoSession && allowUpload == AllowBackendUpload) return;
+            CancelBackendCheck();
+            BackendBaseUrl = url;
+            BackendToken = token ?? "";
+            BackendLocalDevelopment = localDevelopment;
+            InventedDemoSession = invented;
+            AllowBackendUpload = allowUpload;
+            BackendConnectionStatus = BackendSettings.TryCreate(url, token, localDevelopment, out _, out var error)
+                ? "Settings applied in memory. Check the backend using invented data." : error;
+        }
+
+        public async void CheckBackendConnection()
+        {
+            if (Flow.State != FlowState.Consent || BackendCheckInProgress) return;
+            if (!BackendSettings.TryCreate(BackendBaseUrl, BackendToken, BackendLocalDevelopment, out var settings, out var error))
+            { BackendConnectionStatus = error; RefreshVisible(); return; }
+            if (ReplayLoading) return;
+            var revision = ++_backendRevision;
+            var check = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
+            _backendCheck = check;
+            BackendCheckInProgress = true;
+            BackendConnectionStatus = "Checking authentication and analyze contract using invented data...";
+            RefreshVisible();
+            try
+            {
+                var request = ContractJson.Parse<AnalyzeRequest>(Resources.Load<TextAsset>("backend-connection-probe").text);
+                request.SessionSummary.SessionId = Guid.NewGuid().ToString();
+                request.CloudPolicy = CloudPolicy.LocalOnly;
+                var client = new HttpAnalysisClient(settings.BaseUrl, settings.AccessToken);
+                var result = await client.AnalyzeAsync(request, check.Token);
+                if (this == null || revision != _backendRevision || Flow.State != FlowState.Consent) return;
+                BackendConnectionStatus = client.BackendResponseAccepted
+                    ? "Connected: analyze/auth/contract accepted. Explanation: " + result.Response.AiSource.ToString().ToLowerInvariant()
+                        + (result.FallbackReason == null ? "." : " (" + result.FallbackReason + ").")
+                    : "Connection check failed: " + result.FallbackReason + ". On-device report remains available.";
+            }
+            catch (Exception)
+            {
+                if (this != null && revision == _backendRevision) BackendConnectionStatus = "Connection check unavailable. On-device report remains available.";
+            }
+            finally
+            {
+                if (ReferenceEquals(_backendCheck, check)) _backendCheck = null;
+                check.Dispose();
+                if (this != null && revision == _backendRevision) { BackendCheckInProgress = false; RefreshVisible(); }
+            }
+        }
+
+        void ClearBackendSession()
+        {
+            CancelBackendCheck();
+            BackendToken = "";
+            InventedDemoSession = AllowBackendUpload = BackendCheckInProgress = false;
+            BackendConnectionStatus = "Backend token and upload permission cleared. On-device report available.";
+            foreach (var panel in Panels) if (panel is ConsentPanel consent && consent != null) consent.ClearCredentials();
+        }
+
+        void CancelBackendCheck()
+        {
+            _backendRevision++;
+            _backendCheck?.Cancel();
+            _backendCheck = null;
+            BackendCheckInProgress = false;
+        }
+
+        int _backendRevision;
+        CancellationTokenSource _backendCheck;
 
         [Header("Durations in replay/eye-data seconds (demo_session.json: 130 s baseline + 60 s task)")]
         public float BaselineSeconds = 130;
@@ -57,6 +138,24 @@ namespace App.UI
 
         public SessionFlow Flow { get; private set; }
         public string ProviderNote { get; private set; }
+        public string HardwareSetupStatus { get; private set; }
+        public bool NativeDiagnostic { get; private set; }
+        public bool NativeDiagnosticComplete { get; private set; }
+        public bool HardwareCalibrationConfirmed => (_provider as App.Capture.HardwareEyeProvider)?.CalibrationConfirmed == true;
+        public string NativeDiagnosticSummary => (_provider as App.Capture.HardwareEyeProvider)?.DiagnosticSummary;
+        public string HardwareDiagnostics => (_provider as App.Capture.HardwareEyeProvider)?.AggregateDiagnostics;
+        public string HardwareReadinessText
+        {
+            get
+            {
+                if (!(_provider is App.Capture.HardwareEyeProvider native)) return HardwareSetupStatus ?? "Select native eyes, then grant permission and confirm calibration.";
+                try
+                {
+                    return native.ReadinessDescription + HardwareSetupStatus;
+                }
+                catch { return "Native runtime unavailable. Explicit replay remains available."; }
+            }
+        }
         public string MetricsFailureMessage { get; private set; }
         public bool IsCapturing => _recording != null;
         /// <summary>Remaining phase time in real seconds (replay may run faster than real time).</summary>
@@ -76,7 +175,9 @@ namespace App.UI
         public bool AnalysisInProgress { get; private set; }
         public string SceneStatus { get; private set; } = "";
 
-        public string EyeSourceDescription => _provider != null
+        public string EyeSourceDescription => _provider is App.Capture.HardwareEyeProvider native && !native.IsRunning && !native.Completed
+            ? "Native eye capture: preparing (no samples collected)"
+            : _provider != null
             ? $"{_provider.Name} ({_provider.DataSource.ToString().ToLowerInvariant()})"
             : EyeSource == EyeSourceMode.Synthetic ? "synthetic generator (no headset)" : EyeSource.ToString();
 
@@ -97,11 +198,17 @@ namespace App.UI
 
         void Awake()
         {
-            BackendBaseUrl = CommandLineValue("-backendUrl") ?? BackendBaseUrl;
+            var desktop = !Application.isMobilePlatform;
+            BackendBaseUrl = BackendSettings.InitialUrl(BackendBaseUrl,
+                desktop ? Environment.GetEnvironmentVariable("VR_BACKEND_URL") : null,
+                desktop ? CommandLineValue("-backendUrl") : null, desktop);
+            BackendToken = desktop ? Environment.GetEnvironmentVariable("VR_BACKEND_ACCESS_TOKEN") ?? "" : "";
             Flow = new SessionFlow();
             Flow.StateChanged += (_, __) => ShowCurrent();
             Flow.PauseChanged += paused =>
             {
+                if (paused && Flow.State != FlowState.Consent && _provider is App.Capture.HardwareEyeProvider native && !native.Completed)
+                { AbortHardware("assessment_paused"); return; }
                 if (_recording != null && _provider is IHoldableProvider h) h.SetHold(paused, Now);
                 ShowCurrent();
             };
@@ -115,12 +222,30 @@ namespace App.UI
         void OnDestroy()
         {
             ClearReplayLoad();
+            ClearBackendSession();
             _cts.Cancel();
+            _cts.Dispose();
             _provider?.Stop();
         }
 
         void Update()
         {
+            if (_provider is App.Capture.HardwareEyeProvider native && !native.Completed && Flow.State != FlowState.Consent)
+            {
+                try
+                {
+                    native.ReadSamples(_recording?.Samples ?? _discard, Now);
+                    _discard.Clear();
+                    if (!native.IsRunning) { AbortHardware(native.Status); return; }
+                    if (_recording == null) return; // Still poll faults between baseline and task.
+                    _phaseElapsed = (float)(native.AcquisitionTime() - _recording.SensorStartTime.Value);
+                    UpdateProbes();
+                    if (_phaseElapsed >= _phaseDuration) EndCapture();
+                    RefreshVisible();
+                }
+                catch { AbortHardware(native.Status); }
+                return;
+            }
             if (_recording == null || _provider == null) return;
             if (Flow.IsPaused)
             {
@@ -144,13 +269,99 @@ namespace App.UI
         public void AcceptConsent()
         {
             if (ReplayLoading || Flow.State != FlowState.Consent || Flow.IsPaused) return;
+            CancelBackendCheck();
             var path = ResolveReplayPath(ReplayCsvPath);
             if (EyeSource == EyeSourceMode.Replay && ReplayAssetLoader.IsAssetUrl(path))
             {
                 StartCoroutine(LoadReplayAndAccept(path));
                 return;
             }
+            if (EyeSource == EyeSourceMode.Hardware)
+            {
+                try
+                {
+                    if (!(_provider is App.Capture.HardwareEyeProvider))
+                    { HardwareSetupStatus = "Grant eye permission and confirm headset calibration before starting."; RefreshVisible(); return; }
+                    StartHardwareCapture();
+                }
+                catch { HardwareSetupStatus = NativeStartMessage((_provider as App.Capture.HardwareEyeProvider)?.Status); RefreshVisible(); }
+                return;
+            }
             StartConsentedCapture(null);
+        }
+
+        public void SelectEyeSource(EyeSourceMode source)
+        {
+            if (Flow.State != FlowState.Consent || Flow.IsPaused) return;
+            ClearReplayLoad(); StopCapture(); EyeSource = source; HardwareSetupStatus = null;
+            ProviderNote = null; RefreshVisible();
+        }
+
+        public void RequestHardwarePermission()
+        {
+            if (Flow.State != FlowState.Consent || Flow.IsPaused || EyeSource != EyeSourceMode.Hardware) return;
+            try
+            {
+                if (_provider == null) _provider = EyeProviderFactory.CreateHardware();
+                var native = (App.Capture.HardwareEyeProvider)_provider;
+                HardwareSetupStatus = native.RequestPermissionAfterConsent()
+                    ? "Permission requested; wait for the headset's decision, then confirm calibration and press Start."
+                    : "Permission request unavailable. Check Quest setup or explicitly select replay.";
+            }
+            catch { HardwareSetupStatus = "Quest native runtime is unavailable. Check setup or explicitly select replay."; }
+            RefreshVisible();
+        }
+
+        public void ConfirmHardwareCalibration(bool confirmed)
+        {
+            if (Flow.State == FlowState.Consent && _provider is App.Capture.HardwareEyeProvider native)
+                native.ConfirmCalibration(confirmed);
+        }
+
+        public void StartNativeDiagnostic()
+        {
+            if (Flow.State != FlowState.Consent || Flow.IsPaused || EyeSource != EyeSourceMode.Hardware || !(_provider is App.Capture.HardwareEyeProvider)) return;
+            try { StartHardwareCapture(true); }
+            catch { HardwareSetupStatus = NativeStartMessage((_provider as App.Capture.HardwareEyeProvider)?.Status); RefreshVisible(); }
+        }
+
+        static string NativeStartMessage(string reason)
+        {
+            switch (reason)
+            {
+                case "consent_required": return "Consent to request eye permission before starting.";
+                case "calibration_confirmation_required": return "Complete headset eye calibration and confirm it for this wearer.";
+                case "permission_required": return "Eye permission is not granted. Use the permission button or explicitly select replay.";
+                case "focus_required": return "Return to the app in the headset before starting.";
+                case "hardware_unsupported": return "Native eyes are unavailable on this device. Explicit replay is available.";
+                case "rendering_not_ready": return "The headset display is not ready. Wait, then press Start again.";
+                default: return "Native capture could not start. Check system eye tracking and calibration, then retry or select replay.";
+            }
+        }
+
+        void StartHardwareCapture(bool diagnostic = false)
+        {
+            CancelBackendCheck();
+            var native = (App.Capture.HardwareEyeProvider)_provider;
+            // Real eye summaries stay local for this task; participant transfer consent/network setup is #20.
+            Analysis = AnalysisMode.Local;
+            native.Start(Now);
+            NativeDiagnostic = diagnostic; NativeDiagnosticComplete = false;
+            Flow.AcceptConsent(native.DataSource, null, native.Capabilities, native.Name);
+            _baseline.Recording.Clear(); _baseline.SelfReport = null; _task.Clear();
+            HardwareSetupStatus = null; MetricsFailureMessage = null;
+            BeginCapture(_baseline.Recording, diagnostic ? 60 : BaselineSeconds, "b", false);
+        }
+
+        public void AbortHardware(string reason)
+        {
+            if (!(_provider is App.Capture.HardwareEyeProvider native) || native.Completed) return;
+            // The OS permission dialog can temporarily steal focus before acquisition starts.
+            if (Flow.State == FlowState.Consent) return;
+            native.Abort(reason);
+            Exit(); // Clears all app/provider-owned rows and reports; restarting requires new consent/calibration.
+            ProviderNote = "Native assessment interrupted. Start a new session and baseline; no report was retained.";
+            RefreshVisible();
         }
 
         System.Collections.IEnumerator LoadReplayAndAccept(string path)
@@ -208,19 +419,24 @@ namespace App.UI
 
         public void EndCaptureEarly()
         {
+            if (EyeSource == EyeSourceMode.Hardware) return; // Device acceptance uses complete phases.
             if (_recording != null) EndCapture();
         }
 
         public void SubmitBaseline(int eyeStrain, int mentalFatigue)
         {
+            if (NativeDiagnostic) return; // The separate 60s diagnostic is never promoted into an eligible baseline.
             var report = new SelfReport { Phase = ReportPhase.Baseline, EyeStrain = eyeStrain, MentalFatigue = mentalFatigue };
             Flow.CompleteBaseline(report);
             _baseline.SelfReport = report;
             BeginCapture(_task, TaskSeconds, "l", loaded: true);
         }
 
-        public async void SubmitCheckIn(SelfReport report, Preferences preferences)
+        CancellationTokenSource _analysisRequest;
+
+        public async void SubmitCheckIn(SelfReport report, Preferences preferences, bool consentedCloud = false)
         {
+            if (Flow.State != FlowState.CheckIn || Flow.IsPaused) return;
             Flow.SubmitCheckIn(report, preferences);
             var sessionId = Flow.Context.SessionId;
             var succeeded = MetricsEngineFactory.TryCompute(_metrics, _task, _baseline, ContextForMetrics(report), out var summary);
@@ -228,25 +444,40 @@ namespace App.UI
             Flow.SetSummary(summary);
 
             var request = AnalyzeRequest.Create(summary, Flow.Context.BaselineReport, preferences);
+            // The report is complete locally before optional HTTP/AI work starts.
+            Flow.SetAnalysis(LocalFallbackAnalysis.Analyze(request), "on-device report ready");
+            if (consentedCloud) request.CloudPolicy = CloudPolicy.ConsentedSummary;
             AnalysisInProgress = true;
             RefreshVisible();
+            var pending = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
+            _analysisRequest = pending;
             AnalysisResult result;
             try
             {
-                result = await CreateClient().AnalyzeAsync(request, _cts.Token);
+                result = await CreateClient(consentedCloud).AnalyzeAsync(request, pending.Token);
             }
             catch (Exception e)
             {
                 Debug.LogWarning($"[SessionController] analysis client threw: {e.GetType().Name}");
                 result = new AnalysisResult { Response = LocalFallbackAnalysis.Analyze(request), FallbackReason = "client error" };
             }
+            finally
+            {
+                if (_analysisRequest == pending) _analysisRequest = null;
+                pending.Dispose();
+            }
             if (this == null || Flow.State != FlowState.Summary || Flow.Context.SessionId != sessionId) return;
             AnalysisInProgress = false;
             Flow.SetAnalysis(result.Response, result.FallbackReason);
         }
 
-        public void FinishWithReport() => Flow.FinishWithReport();
-        public void ChooseRelaxation() => Flow.ChooseRelaxation();
+        void CancelOptionalAnalysis()
+        {
+            _analysisRequest?.Cancel();
+            AnalysisInProgress = false;
+        }
+        public void FinishWithReport() { CancelOptionalAnalysis(); Flow.FinishWithReport(); }
+        public void ChooseRelaxation() { CancelOptionalAnalysis(); Flow.ChooseRelaxation(); }
         public void CancelRelaxation() => Flow.CancelRelaxation();
         public void SkipReRating() => Flow.SkipReRating();
 
@@ -291,7 +522,7 @@ namespace App.UI
         public void FinishScene()
         {
             Flow.FinishScene();
-            StartCoroutine(_scene.Exit());
+            if (isActiveAndEnabled) StartCoroutine(_scene.Exit());
         }
 
         public void SubmitReRating(int eyeStrain, int mentalFatigue) =>
@@ -306,12 +537,15 @@ namespace App.UI
         public void Exit()
         {
             ClearReplayLoad();
+            ClearBackendSession();
+            HardwareSetupStatus = null;
+            NativeDiagnostic = NativeDiagnosticComplete = false;
             MetricsFailureMessage = null;
             _cts.Cancel();
             _cts.Dispose();
             _cts = new CancellationTokenSource();
             StopCapture();
-            StartCoroutine(_scene.Exit());
+            if (isActiveAndEnabled) StartCoroutine(_scene.Exit());
             SceneConfigHandoff.Clear();
             _baseline.Recording.Clear();
             _baseline.SelfReport = null;
@@ -326,6 +560,7 @@ namespace App.UI
             if (Flow.State != FlowState.Done && Flow.State != FlowState.Exited)
                 throw new InvalidOperationException("finish or exit before restarting");
             ClearReplayLoad();
+            ClearBackendSession();
             _cts.Cancel();
             _cts.Dispose();
             _cts = new CancellationTokenSource();
@@ -337,7 +572,8 @@ namespace App.UI
             SceneConfigHandoff.Clear();
             SceneStatus = "";
             AnalysisInProgress = false;
-            ProviderNote = null;
+            ProviderNote = null; HardwareSetupStatus = null;
+            NativeDiagnostic = NativeDiagnosticComplete = false;
             Flow.Restart();
         }
 
@@ -348,6 +584,7 @@ namespace App.UI
             var now = Now;
             recording.Clear();
             recording.StartTime = now;
+            if (_provider is App.Capture.HardwareEyeProvider native) native.BeginPhase(recording, now, Math.Max(1, seconds));
             if (_provider is IHoldableProvider holdable) holdable.SetHold(false, now);
             _provider.ReadSamples(_discard, now); // drop anything produced before this phase
             _discard.Clear();
@@ -372,6 +609,8 @@ namespace App.UI
         /// </summary>
         void UpdateProbes()
         {
+            if (_provider is App.Capture.HardwareEyeProvider native)
+            { UpdateNativeProbes(native); return; }
             if (_provider is IProbeSource source) source.ReadProbes(_recording.Probes, Now);
             else
             {
@@ -391,17 +630,54 @@ namespace App.UI
             else ProbeRunner?.Hide();
         }
 
+        void UpdateNativeProbes(App.Capture.HardwareEyeProvider native)
+        {
+            var probes = _recording.Probes;
+            if (probes.Count > 0)
+            {
+                var i = probes.Count - 1; var trial = probes[i];
+                if (!trial.SensorHoldStartTime.HasValue && Now >= trial.HoldStartTime)
+                    trial.SensorHoldStartTime = native.StampProbe(trial.TrialId, "hold_start", trial.TargetDirection);
+                if (!trial.SensorEndTime.HasValue && Now >= trial.EndTime)
+                    trial.SensorEndTime = native.StampProbe(trial.TrialId, "target_end", trial.TargetDirection);
+                probes[i] = trial;
+            }
+            var index = ProbeSchedule.TrialIndex(_phaseElapsed);
+            if (index != _lastTrial && (index + 1) * ProbeSchedule.TrialSeconds <= _phaseDuration)
+            {
+                _lastTrial = index;
+                var trial = ProbeSchedule.Trial(_probePrefix, index, Now);
+                // Show first, then stamp the native runtime clock; never infer target onset from gaze receipt times.
+                ProbeRunner?.Show(trial.TargetDirection);
+                trial.SensorOnsetTime = native.StampProbe(trial.TrialId, "target_onset", trial.TargetDirection);
+                probes.Add(trial);
+            }
+            if (probes.Count == 0 || probes[probes.Count - 1].SensorEndTime.HasValue) ProbeRunner?.Hide();
+            else ProbeRunner?.Show(probes[probes.Count - 1].TargetDirection);
+        }
+
+        void OnApplicationPause(bool paused) { if (paused) AbortHardware("application_paused"); }
+        void OnApplicationFocus(bool focused) { if (!focused) AbortHardware("focus_lost"); }
+        void OnDisable()
+        {
+            if (Flow != null && _provider is App.Capture.HardwareEyeProvider) Exit();
+        }
+
         void EndCapture()
         {
             var now = Now;
             _recording.EndTime = now;
+            if (_provider is App.Capture.HardwareEyeProvider native) native.EndPhase(_recording);
             if (_provider is ReplayEyeProvider replay) _recording.SensorEndTime = replay.SensorTime(now);
             _recording = null;
             ProbeRunner?.Hide();
             if (_provider is IHoldableProvider holdable) holdable.SetHold(true, now);
+            if (NativeDiagnostic && _provider is App.Capture.HardwareEyeProvider diagnostic)
+            { diagnostic.CompleteAssessment(); NativeDiagnosticComplete = true; }
             if (Flow.State == FlowState.LoadTask)
             {
-                _provider.Stop();
+                if (_provider is App.Capture.HardwareEyeProvider completed) completed.CompleteAssessment();
+                else _provider.Stop();
                 Flow.CompleteLoadTask();
             }
             RefreshVisible();
@@ -423,15 +699,22 @@ namespace App.UI
             Capabilities = Flow.Context.Capabilities,
             Unavailable = _provider?.Unavailable,
             PostTaskReport = postTask,
+            ObservedRepeatedFraction = _provider is App.Capture.HardwareEyeProvider
+                ? (double)(_baseline.Recording.NativeDuplicateFrames.GetValueOrDefault() + _task.NativeDuplicateFrames.GetValueOrDefault())
+                    / Math.Max(1, _baseline.Recording.NativeFramesReceived.GetValueOrDefault() + _task.NativeFramesReceived.GetValueOrDefault())
+                : (double?)null,
         };
 
-        IAnalysisClient CreateClient()
+        IAnalysisClient CreateClient(bool consentedCloud = false)
         {
+            if (consentedCloud) return new ConfiguredBackendClient(BackendBaseUrl, BackendToken,
+                BackendLocalDevelopment, false, false, consentedSummary: true);
+            if (_provider is App.Capture.HardwareEyeProvider) return new LocalAnalysisClient();
             switch (Analysis)
             {
                 case AnalysisMode.Mock: return new MockAnalysisClient();
-                // The optional backend token comes only from the VR_BACKEND_ACCESS_TOKEN environment variable.
-                case AnalysisMode.Http: return new HttpAnalysisClient(BackendBaseUrl);
+                case AnalysisMode.Http: return new ConfiguredBackendClient(BackendBaseUrl, BackendToken,
+                    BackendLocalDevelopment, InventedDemoSession, AllowBackendUpload);
                 default: return new LocalAnalysisClient();
             }
         }
