@@ -30,10 +30,15 @@ def main():
     compiler = resources / "Scripting/MonoBleedingEdge/lib/mono/4.5/csc.exe"
     netstandard = resources / "Scripting/MonoBleedingEdge/lib/mono/4.5/Facades/netstandard.dll"
     newtonsoft = resources / "Scripting/Managed/Newtonsoft.Json.dll"
-    nunit = resources / "PackageManager/BuiltInPackages/com.unity.ext.nunit/net40/unity-custom/nunit.framework.dll"
-    for path in (mono, compiler, netstandard, newtonsoft, nunit):
+    nunit_package = resources / "PackageManager/BuiltInPackages/com.unity.ext.nunit"
+    # Unity 6000.3 bundles net40; 6000.5 bundles net472. Prefer the newer profile when both exist.
+    nunit = next((path for profile in ("net472", "net40")
+                  if (path := nunit_package / profile / "unity-custom/nunit.framework.dll").is_file()), None)
+    for path in (mono, compiler, netstandard, newtonsoft):
         if not path.is_file():
             parser.error(f"Missing toolchain component: {path}")
+    if nunit is None:
+        parser.error(f"Missing NUnit framework in {nunit_package} (expected net472 or net40/unity-custom)")
     env = os.environ.copy()
     env["MONO_PATH"] = os.pathsep.join([str(newtonsoft.parent), str(nunit.parent)])
     env["VR_FATIGUE_ROOT"] = str(ROOT)
