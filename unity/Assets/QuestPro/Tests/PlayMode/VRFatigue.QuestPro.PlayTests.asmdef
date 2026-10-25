@@ -1,0 +1,7 @@
+{
+  "name": "VRFatigue.QuestPro.PlayTests",
+  "references": ["VRFatigue.QuestPro", "VRFatigue.Signals"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+  "autoReferenced": false
+}

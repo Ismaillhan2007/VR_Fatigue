@@ -7,6 +7,10 @@ Use is governed by the [Meta SDK license](https://developers.meta.com/horizon/li
 Package setup and validation status are in [QUEST_PRO_INTEGRATION.md](QUEST_PRO_INTEGRATION.md).
 No purchased art, audio or third-party scene assets have been added by this module.
 
+Quest Pro rendering/geometry adaptations from the supplied ETRA2027 acquisition
+source, Texas State University, use PolyForm Noncommercial 1.0.0; required notices
+and full terms are preserved in [licenses/ETRA2027-QP-LICENSE.md](licenses/ETRA2027-QP-LICENSE.md).
+
 ## Forest scene assets
 
 - **Quaternius Ultimate Nature Pack** (45 FBX models used, `unity/Assets/App/Forest/Art/Models`): CC0 1.0, license text kept in

@@ -1,0 +1,7 @@
+{
+  "name": "VRFatigue.QuestPro.Tests",
+  "references": ["VRFatigue.QuestPro", "VRFatigue.QuestPro.Editor", "Unity.XR.OpenXR", "Unity.XR.Management", "Unity.XR.Management.Editor", "Oculus.VR", "Oculus.VR.Editor"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "autoReferenced": false
+}
