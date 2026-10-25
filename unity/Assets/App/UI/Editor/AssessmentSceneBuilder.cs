@@ -331,15 +331,16 @@ namespace App.UI.Editor
         {
             var root = new GameObject("ProvenanceBar", typeof(RectTransform), typeof(Image), typeof(HorizontalLayoutGroup));
             var rt = (RectTransform)root.transform;
-            rt.anchorMin = new Vector2(0.08f, 0.895f);
-            rt.anchorMax = new Vector2(0.92f, 0.995f);
+            // 0.882-0.998 (125 units): three label rows plus padding are not clipped; panels end at 0.88.
+            rt.anchorMin = new Vector2(0.08f, 0.882f);
+            rt.anchorMax = new Vector2(0.92f, 0.998f);
             rt.offsetMin = rt.offsetMax = Vector2.zero;
             var barImage = root.GetComponent<Image>();
             barImage.sprite = UiTheme.Fill;
             barImage.type = Image.Type.Sliced;
             barImage.color = UiTheme.Bar;
             var h = root.GetComponent<HorizontalLayoutGroup>();
-            h.padding = new RectOffset(28, 14, 6, 6);
+            h.padding = new RectOffset(28, 14, 10, 10);
             h.spacing = 14;
             h.childAlignment = TextAnchor.MiddleLeft;
             h.childControlWidth = h.childControlHeight = true;

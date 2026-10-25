@@ -36,7 +36,7 @@ not done. Until then the headset uses the Unity legacy font in bold.
 - **Buttons are larger**: 380 x 76 units (was 240 x 48), 28 pt bold, rows 84 high; the Quest presentation now only raises
   button sizes (min 330 x 60) instead of forcing 60.
 - Toggles: 40-unit outlined box, 24 pt bold label, 52 high. Chips 296 x 52. Sliders: 48 high, thick track, ink fill, 48-unit
-  orange handle. Input: 110 high. Provenance bar: ink with paper text.
+  orange handle. Input: 110 high. Provenance bar: ink with paper text, 130 units high (anchors 0.88-1) so its three label rows are not clipped.
 
 ## Comfort caveat
 
