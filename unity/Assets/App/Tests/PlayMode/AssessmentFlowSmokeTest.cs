@@ -19,7 +19,7 @@ namespace App.Tests
     /// <summary>Desktop smoke test: the generated Assessment scene completes one synthetic session offline.</summary>
     public class AssessmentFlowSmokeTest
     {
-        static IEnumerator CaptureEvidence(string name)
+        internal static IEnumerator CaptureEvidence(string name)
         {
             var directory = Environment.GetEnvironmentVariable("VR_UI_SCREENSHOT_DIR");
             if (string.IsNullOrEmpty(directory)) yield break;
@@ -106,7 +106,7 @@ namespace App.Tests
                 {
                     yield return SceneManager.LoadSceneAsync("Assessment");
                     var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
-                    c.BackendBaseUrl = url;
+                    c.ConfigureBackend(url, Environment.GetEnvironmentVariable("VR_BACKEND_ACCESS_TOKEN") ?? "", true, true, true);
                     yield return ShortSession(c, mode: AnalysisMode.Http, waitForAnalysis: false);
                     yield return WaitUntil(() => received.Task.IsCompleted);
                     Assert.IsTrue(c.AnalysisInProgress);
@@ -301,7 +301,7 @@ namespace App.Tests
             Assert.AreEqual(App.Capture.EyeSourceMode.Replay, c.EyeSource);
             Assert.AreEqual(AnalysisMode.Http, c.Analysis);
             // Keep the actual scene's durations: 130 + 60 replay seconds at the scene's replay speed.
-            c.BackendBaseUrl = ConfiguredUrl(c);
+            c.ConfigureBackend(ConfiguredUrl(c), Environment.GetEnvironmentVariable("VR_BACKEND_ACCESS_TOKEN") ?? "", true, true, true);
             c.AcceptConsent();
             yield return WaitUntil(() => !c.IsCapturing, c.BaselineSeconds / c.ReplaySpeed + 10);
             c.SubmitBaseline(2, 2);
@@ -412,7 +412,7 @@ namespace App.Tests
             c.BaselineSeconds = 1;
             c.TaskSeconds = 1;
             c.Analysis = AnalysisMode.Http;
-            c.BackendBaseUrl = "http://127.0.0.1:9"; // nothing listens here: must fall back locally
+            c.ConfigureBackend("http://127.0.0.1:9", Environment.GetEnvironmentVariable("VR_BACKEND_ACCESS_TOKEN") ?? "", true, true, true); // nothing listens here: must fall back locally
             Assert.AreEqual(FlowState.Consent, c.Flow.State);
 
             c.AcceptConsent();
@@ -462,7 +462,7 @@ namespace App.Tests
             c.BaselineSeconds = 2;
             c.TaskSeconds = 2;
             c.Analysis = AnalysisMode.Http;
-            c.BackendBaseUrl = url;
+            c.ConfigureBackend(url, Environment.GetEnvironmentVariable("VR_BACKEND_ACCESS_TOKEN") ?? "", true, true, true);
 
             c.AcceptConsent();
             yield return WaitUntil(() => !c.IsCapturing);

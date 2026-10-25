@@ -135,7 +135,7 @@ public class QuestPresentationTests
     {
         _controller.EyeSource = EyeSourceMode.Synthetic;
         _controller.Analysis = AnalysisMode.Http;
-        _controller.BackendBaseUrl = "http://127.0.0.1:9";
+        _controller.ConfigureBackend("http://127.0.0.1:9", System.Environment.GetEnvironmentVariable("VR_BACKEND_ACCESS_TOKEN") ?? "", true, true, true);
         _controller.AcceptConsent();
         _controller.EndCaptureEarly();
         _controller.SubmitBaseline(2, 2);
@@ -233,6 +233,35 @@ public class QuestPresentationTests
             InputSystem.RemoveDevice(device); InputSystem.RemoveLayout(layout);
             Object.Destroy(anchor); Object.Destroy(manager.gameObject);
         }
+    }
+
+    [UnityTest]
+    public IEnumerator TrackedRayOpensBackendSettingsAndReturnsToConsent()
+    {
+        var panel = Object.FindAnyObjectByType<ConsentPanel>();
+        var pointer = new Pointer(_module, _view.Head);
+        _module.RegisterInteractor(pointer);
+        try
+        {
+            yield return Click(pointer, panel.OpenSettingsButton);
+            Assert.IsTrue(panel.SettingsRoot.activeSelf);
+            Assert.AreEqual(InputField.ContentType.Password, panel.BackendToken.contentType);
+            Canvas.ForceUpdateCanvases();
+            var corners = new Vector3[4];
+            foreach (var field in new[] { panel.BackendUrl, panel.BackendToken })
+            {
+                ((RectTransform)field.transform).GetWorldCorners(corners);
+                foreach (var corner in corners)
+                {
+                    var point = _view.Canvas.transform.InverseTransformPoint(corner);
+                    Assert.IsTrue(((RectTransform)_view.Canvas.transform).rect.Contains(point), "settings input stays within the tracked canvas");
+                }
+            }
+            yield return Click(pointer, panel.SaveSettingsButton);
+            Assert.IsFalse(panel.SettingsRoot.activeSelf);
+            Assert.AreEqual(FlowState.Consent, _controller.Flow.State);
+        }
+        finally { _module.UnregisterInteractor(pointer); }
     }
 
     static IEnumerator Click(Pointer pointer, Button button)
