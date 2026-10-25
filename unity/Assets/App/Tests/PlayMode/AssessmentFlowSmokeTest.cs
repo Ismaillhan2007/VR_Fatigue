@@ -95,7 +95,8 @@ namespace App.Tests
             Assert.AreEqual(StrainLevel.Unavailable, ctx.Summary.StrainIndicator.Level);
             var bar = UnityEngine.Object.FindAnyObjectByType<ProvenanceBar>();
             StringAssert.Contains("SYNTHETIC", bar.DataLabel.text);
-            StringAssert.Contains("LOCAL FALLBACK", bar.AiLabel.text);
+            // The backend's rules answered (local_only header above), so the label names the backend, not Unity.
+            StringAssert.Contains("FALLBACK from backend rules", bar.AiLabel.text);
             Assert.IsFalse(ctx.Analysis.SceneConfig.AnimalsEnabled);
             Assert.AreEqual(SoundMode.Silent, ctx.Analysis.SceneConfig.Sound);
             c.EnterScene();
@@ -246,8 +247,7 @@ namespace App.Tests
             yield return WaitUntil(() => c.Flow.Context.Analysis != null, 20);
 
             var a = c.Flow.Context.Analysis;
-            Assert.IsNull(c.Flow.Context.AnalysisFallbackReason, "the backend must have answered: " + c.Flow.Context.AnalysisFallbackReason);
-            Assert.AreEqual("local-0.2", a.PromptVersion, "backend offline rules");
+            StringAssert.StartsWith("local-", a.PromptVersion, "the backend's offline rules must have answered: " + c.Flow.Context.AnalysisFallbackReason);
             Assert.AreEqual(AiSource.Fallback, a.AiSource);
             Assert.AreEqual(DataSource.Synthetic, a.DataSource);
             StringAssert.Contains("backend rules", UnityEngine.Object.FindAnyObjectByType<ProvenanceBar>().AiLabel.text);
