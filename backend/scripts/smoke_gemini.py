@@ -73,10 +73,27 @@ async def check(args):
     real_body = copy.deepcopy(body)
     real_body["session_summary"].update(data_source="live", replay_origin=None)
     real_body["session_summary"]["capabilities"]["native_eye_gaze"] = True
-    real = await service.analyze(AnalysisRequest.model_validate(real_body))
+    real = await service.analyze_with_diagnostics(AnalysisRequest.model_validate(real_body))
+    recorded_body = copy.deepcopy(real_body)
+    recorded_body["session_summary"].update(data_source="replay", replay_origin="recorded")
+    recorded = await service.analyze_with_diagnostics(
+        AnalysisRequest.model_validate(recorded_body)
+    )
     participant_body = copy.deepcopy(body)
     participant_body["cloud_policy"] = "local_only"
-    participant = await service.analyze(AnalysisRequest.model_validate(participant_body))
+    participant = await service.analyze_with_diagnostics(
+        AnalysisRequest.model_validate(participant_body)
+    )
+    # An invented marker exercises the interactive free-text boundary without
+    # putting participant content in this probe or its output.
+    participant_body["session_summary"]["self_report"]["free_text"] = (
+        "invented-interactive-checkin-marker"
+    )
+    try:
+        AnalysisRequest.model_validate(participant_body)
+        free_text_rejected = False
+    except ValidationError:
+        free_text_rejected = True
     registry = Registry()
     for path in (root / "contracts/v1").glob("*.schema.json"):
         schema = json.loads(path.read_text())
@@ -87,12 +104,25 @@ async def check(args):
         "live_generation": first.ai_source == "live",
         "cache_hit": cached.ai_source == "cached" and adapter.calls == 1,
         "cache_session_rebound": cached.session_id == cached_body["session_summary"]["session_id"],
-        "real_data_stays_local": real.ai_source == "fallback",
-        "participant_checkin_stays_local": (
-            participant.ai_source == "fallback" and adapter.calls == 1
+        "real_data_not_sent_to_gemini": (
+            real.response.ai_source == "fallback"
+            and real.fallback_reason == "non_synthetic_input"
+            and adapter.calls == 1
         ),
+        "recorded_data_not_sent_to_gemini": (
+            recorded.response.ai_source == "fallback"
+            and recorded.fallback_reason == "non_synthetic_input"
+            and adapter.calls == 1
+        ),
+        "interactive_checkin_not_sent_to_gemini": (
+            participant.response.ai_source == "fallback"
+            and participant.fallback_reason == "local_only"
+            and adapter.calls == 1
+        ),
+        "free_text_rejected_before_analysis": free_text_rejected and adapter.calls == 1,
         "shared_contracts": all(
-            validator.is_valid(r.model_dump()) for r in (first, cached, real, participant)
+            validator.is_valid(r.model_dump())
+            for r in (first, cached, real.response, recorded.response, participant.response)
         ),
         "preference_overrides": (
             first.scene_config.sound == "silent"
