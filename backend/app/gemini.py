@@ -30,8 +30,12 @@ def output_schema() -> dict:
 
 
 def build_prompt(request: AnalysisRequest, observations: list[Observation]) -> str:
-    # Never include session identity, free text, or raw streams, even for synthetic input.
     session = request.session_summary
+    if request.cloud_policy != "synthetic_demo" or not (
+        session.data_source == "synthetic" or session.replay_origin == "synthetic"
+    ):
+        raise ValueError("Cloud input must be an explicitly synthetic demo")
+    # Never include session identity, free text, or raw streams, even for synthetic input.
     report = session.self_report
     data = {
         "input_is_synthetic": True,

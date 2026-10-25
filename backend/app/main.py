@@ -1,7 +1,7 @@
 import secrets
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -69,8 +69,11 @@ def create_app(settings: Settings | None = None, adapter: Adapter | None = None)
         tags=["analysis"],
         dependencies=[Depends(require_access)],
     )
-    async def analyze(body: AnalysisRequest):
-        return await service.analyze(body)
+    async def analyze(body: AnalysisRequest, response: Response):
+        outcome = await service.analyze_with_diagnostics(body)
+        if outcome.fallback_reason:
+            response.headers["X-VR-Fallback-Reason"] = outcome.fallback_reason
+        return outcome.response
 
     return app
 

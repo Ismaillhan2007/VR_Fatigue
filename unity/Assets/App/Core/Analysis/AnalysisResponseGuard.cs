@@ -33,7 +33,8 @@ namespace App.Core.Analysis
         {
             var problems = Check(request, response);
             if (problems.Count > 0) throw new ContractException("Backend response rejected", problems);
-            response.SceneConfig = SceneConfigSanitizer.Sanitize(response.SceneConfig, request.Preferences);
+            response.SceneConfig = SceneConfigSanitizer.Sanitize(response.SceneConfig, request.Preferences,
+                response.SafetyNotice);
             return response;
         }
     }

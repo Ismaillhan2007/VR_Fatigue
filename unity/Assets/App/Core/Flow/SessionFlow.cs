@@ -131,6 +131,8 @@ namespace App.Core.Flow
         {
             Require(FlowState.Summary);
             if (Context.Analysis == null) throw new InvalidOperationException("no analysis yet");
+            if (Context.Analysis.SafetyNotice == SafetyNotice.StopSession)
+                throw new InvalidOperationException("stop-session notice requires exiting and resting");
             MoveTo(FlowState.Scene);
         }
 

@@ -4,6 +4,12 @@ namespace App.Core.Contracts
 {
     // String values match contracts/v1 exactly. Unknown strings and integer values are rejected by ContractJson.
 
+    public enum CloudPolicy
+    {
+        [EnumMember(Value = "local_only")] LocalOnly,
+        [EnumMember(Value = "synthetic_demo")] SyntheticDemo,
+    }
+
     public enum DataSource
     {
         [EnumMember(Value = "live")] Live,

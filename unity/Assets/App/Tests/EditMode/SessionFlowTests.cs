@@ -144,6 +144,20 @@ namespace App.Tests
             Assert.Throws<InvalidOperationException>(() => f.EnterScene());
         }
 
+        [Test]
+        public void StopSessionPreventsSceneEntryButAllowsExit()
+        {
+            var f = ToSummary();
+            var summary = SummaryFor(f);
+            f.SetSummary(summary);
+            var request = AnalyzeRequest.Create(summary, null, null);
+            request.SafetyNotice = SafetyNotice.StopSession;
+            f.SetAnalysis(LocalFallbackAnalysis.Analyze(request), "test");
+            Assert.Throws<InvalidOperationException>(() => f.EnterScene());
+            f.Exit();
+            Assert.AreEqual(FlowState.Exited, f.State);
+        }
+
         [TestCase(4, 4, false)]
         [TestCase(5, 1, true)]
         [TestCase(1, 5, true)]

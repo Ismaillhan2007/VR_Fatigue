@@ -31,7 +31,8 @@ namespace App.Core.Analysis
                 Limitations = ReportText.Limitations(s),
                 SafetyNotice = request.SafetyNotice,
                 SceneRationale = Rationale(post),
-                SceneConfig = SceneFor(post, request.Preferences),
+                SceneConfig = SceneConfigSanitizer.Sanitize(SceneFor(post, request.Preferences),
+                    request.Preferences, request.SafetyNotice),
                 AiSource = AiSource.Fallback,
                 ModelId = null,
                 PromptVersion = PromptVersion,
@@ -87,17 +88,24 @@ namespace App.Core.Analysis
         {
             if (s.Quality.Status == QualityStatus.InsufficientData)
                 return new List<Observation> { new Observation { Code = ObservationCode.DataQualityLimited } };
-            if (s.Baseline.State == BaselineState.Absent)
+            if (s.Baseline.State == BaselineState.Absent || s.Baseline.Windows < 6)
                 return new List<Observation> { new Observation { Code = ObservationCode.NoBaseline } };
 
             var list = new List<Observation>();
-            foreach (MetricName m in Enum.GetValues(typeof(MetricName)))
+            var hasComparison = false;
+            foreach (var m in new[] { MetricName.ProbeLatencyMs, MetricName.ProbeRmsErrorDeg,
+                MetricName.ProbeMissFraction, MetricName.GazeSpeedP95DegS, MetricName.GazeSpeedMedianDegS,
+                MetricName.GazeDispersionDeg, MetricName.HeadSpeedDegS })
             {
                 var z = s.Deviations.Get(m);
-                if (!z.HasValue) continue;
+                if (!z.HasValue || !s.Metrics.Get(m).HasValue) continue;
+                hasComparison = true;
                 var code = CodeFor(m, z.Value);
-                if (code.HasValue) list.Add(new Observation { Code = code.Value, Metric = m });
+                if (code.HasValue && !list.Any(o => o.Code == code.Value))
+                    list.Add(new Observation { Code = code.Value, Metric = m });
             }
+            if (!hasComparison)
+                return new List<Observation> { new Observation { Code = ObservationCode.DataQualityLimited } };
             if (list.Count == 0) list.Add(new Observation { Code = ObservationCode.WithinBaseline });
             return list.Take(6).ToList();
         }

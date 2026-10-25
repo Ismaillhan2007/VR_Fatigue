@@ -22,11 +22,10 @@ namespace App.Reports
         readonly string _baseUrl;
         readonly string _accessToken;
 
-        /// <param name="accessToken">Optional VR_BACKEND_ACCESS_TOKEN of the backend (LAN demo). Never the Gemini key.</param>
         public HttpAnalysisClient(string baseUrl, string accessToken = null)
         {
             _baseUrl = string.IsNullOrWhiteSpace(baseUrl) ? DefaultBaseUrl : baseUrl.TrimEnd('/');
-            _accessToken = string.IsNullOrWhiteSpace(accessToken) ? null : accessToken.Trim();
+            _accessToken = accessToken ?? Environment.GetEnvironmentVariable("VR_BACKEND_ACCESS_TOKEN");
         }
 
         public string Name => "backend " + _baseUrl;
@@ -35,38 +34,54 @@ namespace App.Reports
         {
             try
             {
-                var body = ContractJson.Serialize(request);
-                using (var web = new UnityWebRequest(_baseUrl + "/api/v1/analyze", UnityWebRequest.kHttpVerbPOST))
+                using (var web = CreateRequest(request))
                 using (cancellationToken.Register(web.Abort))
                 {
-                    web.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body)) { contentType = "application/json" };
-                    web.downloadHandler = new DownloadHandlerBuffer();
-                    web.SetRequestHeader("Accept", "application/json");
-                    if (_accessToken != null) web.SetRequestHeader("Authorization", "Bearer " + _accessToken);
-                    web.timeout = TimeoutSeconds;
                     await Send(web);
                     cancellationToken.ThrowIfCancellationRequested();
 
                     if (web.result != UnityWebRequest.Result.Success)
-                        return Fallback(request, $"backend unreachable ({web.responseCode} {web.error})");
+                        return Fallback(request, web.responseCode > 0
+                            ? $"backend HTTP {web.responseCode}"
+                            : "backend connection failed or timed out");
                     var response = ContractJson.Parse<AnalysisResponse>(web.downloadHandler.text);
-                    return new AnalysisResult { Response = AnalysisResponseGuard.Accept(request, response) };
+                    response = AnalysisResponseGuard.Accept(request, response);
+                    return new AnalysisResult
+                    {
+                        Response = response,
+                        FallbackReason = response.AiSource == AiSource.Fallback
+                            ? BackendFallbackDescription(web.GetResponseHeader("X-VR-Fallback-Reason")) : null,
+                    };
                 }
             }
             catch (OperationCanceledException)
             {
                 return Fallback(request, "request cancelled");
             }
-            catch (ContractException e)
+            catch (ContractException)
             {
-                Debug.LogWarning($"[HttpAnalysisClient] rejected response: {e.Message}");
+                Debug.LogWarning("[HttpAnalysisClient] rejected response");
                 return Fallback(request, "backend response rejected");
             }
             catch (Exception e)
             {
-                Debug.LogWarning($"[HttpAnalysisClient] {e.GetType().Name}: {e.Message}");
+                // Header/transport exceptions may contain the runtime token: log the type only.
+                Debug.LogWarning($"[HttpAnalysisClient] {e.GetType().Name}");
                 return Fallback(request, "backend error");
             }
+        }
+
+        /// <summary>Builds the wire request. The optional demo token is runtime-only, never a scene field.</summary>
+        public UnityWebRequest CreateRequest(AnalyzeRequest request)
+        {
+            var body = ContractJson.Serialize(request);
+            var web = new UnityWebRequest(_baseUrl + "/api/v1/analyze", UnityWebRequest.kHttpVerbPOST);
+            web.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body)) { contentType = "application/json" };
+            web.downloadHandler = new DownloadHandlerBuffer();
+            web.SetRequestHeader("Accept", "application/json");
+            if (!string.IsNullOrEmpty(_accessToken)) web.SetRequestHeader("Authorization", "Bearer " + _accessToken);
+            web.timeout = TimeoutSeconds;
+            return web;
         }
 
         static Task Send(UnityWebRequest web)
@@ -78,5 +93,27 @@ namespace App.Reports
 
         static AnalysisResult Fallback(AnalyzeRequest request, string reason) =>
             new AnalysisResult { Response = LocalFallbackAnalysis.Analyze(request), FallbackReason = reason };
+
+        /// <summary>Never render an arbitrary server header or provider exception in the UI.</summary>
+        public static string BackendFallbackDescription(string code)
+        {
+            switch (code)
+            {
+                case "local_only": return "cloud use disabled for this check-in";
+                case "non_synthetic_input": return "participant eye data stays local";
+                case "safety_stop": return "session stopped for comfort";
+                case "insufficient_data": return "insufficient comparable measurements";
+                case "gemini_disabled": return "Gemini disabled";
+                case "gemini_not_configured": return "Gemini configuration incomplete";
+                case "attempt_limit": return "AI attempt limit reached";
+                case "budget_limit": return "AI budget limit reached";
+                case "timeout": return "AI request timed out";
+                case "provider_rate_limited": return "AI service rate limited";
+                case "provider_unavailable": return "AI service temporarily unavailable";
+                case "invalid_output": return "AI response rejected";
+                case "provider_error": return "AI service error";
+                default: return "backend local rules";
+            }
+        }
     }
 }

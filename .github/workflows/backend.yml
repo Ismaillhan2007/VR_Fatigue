@@ -1,0 +1,39 @@
+name: Backend and contracts
+
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      VR_GEMINI_ENABLED: "false"
+      GEMINI_API_KEY: ""
+      GEMINI_MODEL: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - name: Install locked dependencies
+        working-directory: backend
+        run: uv sync --locked --extra dev
+      - name: Backend tests
+        working-directory: backend
+        run: uv run --no-sync pytest -q
+      - name: Lint
+        working-directory: backend
+        run: uv run --no-sync ruff check app tests scripts
+      - name: Shared contracts
+        working-directory: backend
+        run: uv run --no-sync python ../contracts/validate_examples.py

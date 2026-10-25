@@ -1,0 +1,266 @@
+[
+  {
+    "name": "saved_preset_without_preferences",
+    "chips": [],
+    "preferences": null,
+    "safety_notice": "none",
+    "expected_fixture": "scene_config_calm_forest_sunset.json"
+  },
+  {
+    "name": "quiet_is_low_volume_not_full_silence",
+    "chips": [
+      "tired_eyes",
+      "overstimulated",
+      "want_quiet"
+    ],
+    "preferences": null,
+    "safety_notice": "none",
+    "expected": {
+      "animals_enabled": false,
+      "brightness": 0.65,
+      "light_warmth": 0.85,
+      "fog_density": 0.35,
+      "sound": "forest",
+      "master_volume": 0.2,
+      "motion_speed": 0,
+      "particles": [],
+      "sound_layers": {
+        "wind": 0,
+        "birds": 0,
+        "water": 0,
+        "pad": 0.3
+      }
+    }
+  },
+  {
+    "name": "later_chip_rows_win",
+    "chips": [
+      "tired_eyes",
+      "want_dim",
+      "want_movement"
+    ],
+    "preferences": null,
+    "safety_notice": "none",
+    "expected": {
+      "brightness": 0.5,
+      "motion": "gentle",
+      "motion_speed": 0.3
+    }
+  },
+  {
+    "name": "explicit_choices_win_over_chips",
+    "chips": [
+      "overstimulated",
+      "want_quiet"
+    ],
+    "preferences": {
+      "schema_version": "1.0",
+      "theme": "forest",
+      "animals_enabled": true,
+      "time_of_day": "day",
+      "sound": "forest",
+      "motion": "gentle",
+      "text": null
+    },
+    "safety_notice": "none",
+    "expected": {
+      "animals_enabled": true,
+      "time_of_day": "day",
+      "sound": "forest",
+      "master_volume": 0.2
+    }
+  },
+  {
+    "name": "explicit_silence_and_no_motion",
+    "chips": [
+      "want_nature",
+      "want_movement"
+    ],
+    "preferences": {
+      "schema_version": "1.0",
+      "theme": "forest",
+      "animals_enabled": false,
+      "time_of_day": "sunset",
+      "sound": "silent",
+      "motion": "none",
+      "text": null
+    },
+    "safety_notice": "none",
+    "expected": {
+      "animals_enabled": false,
+      "sound": "silent",
+      "master_volume": 0,
+      "sound_layers": {
+        "wind": 0,
+        "birds": 0,
+        "water": 0,
+        "pad": 0
+      },
+      "motion": "none",
+      "motion_speed": 0
+    }
+  },
+  {
+    "name": "layer_changes_follow_table_order",
+    "chips": [
+      "overstimulated",
+      "low_energy",
+      "want_nature"
+    ],
+    "preferences": null,
+    "safety_notice": "none",
+    "expected": {
+      "time_of_day": "day",
+      "sound_layers": {
+        "wind": 0,
+        "birds": 0.4,
+        "water": 0.2,
+        "pad": 0.3
+      }
+    }
+  },
+  {
+    "name": "stop_session_is_stronger_than_preferences",
+    "chips": [
+      "want_movement"
+    ],
+    "preferences": {
+      "schema_version": "1.0",
+      "theme": "forest",
+      "animals_enabled": true,
+      "time_of_day": "day",
+      "sound": "forest",
+      "motion": "gentle",
+      "text": null
+    },
+    "safety_notice": "stop_session",
+    "expected": {
+      "animals_enabled": false,
+      "motion": "none",
+      "motion_speed": 0,
+      "particles": [],
+      "orb": {
+        "enabled": false
+      }
+    }
+  },
+  {
+    "name": "tired_eyes_alone",
+    "chips": [
+      "tired_eyes"
+    ],
+    "preferences": null,
+    "safety_notice": "none",
+    "expected": {
+      "brightness": 0.65,
+      "light_warmth": 0.85,
+      "fog_density": 0.35,
+      "motion": "gentle",
+      "motion_speed": 0
+    }
+  },
+  {
+    "name": "overstimulated_alone",
+    "chips": [
+      "overstimulated"
+    ],
+    "preferences": null,
+    "safety_notice": "none",
+    "expected": {
+      "animals_enabled": false,
+      "particles": [],
+      "sound_layers": {
+        "wind": 0,
+        "birds": 0,
+        "water": 0,
+        "pad": 0.3
+      }
+    }
+  },
+  {
+    "name": "tense_starts_breathing_orb",
+    "chips": [
+      "tense"
+    ],
+    "preferences": null,
+    "safety_notice": "none",
+    "expected": {
+      "orb": {
+        "enabled": true,
+        "breath_seconds": 6
+      }
+    }
+  },
+  {
+    "name": "restless_starts_breathing_orb",
+    "chips": [
+      "restless"
+    ],
+    "preferences": null,
+    "safety_notice": "none",
+    "expected": {
+      "orb": {
+        "enabled": true,
+        "breath_seconds": 6
+      }
+    }
+  },
+  {
+    "name": "low_energy_alone",
+    "chips": [
+      "low_energy"
+    ],
+    "preferences": null,
+    "safety_notice": "none",
+    "expected": {
+      "time_of_day": "day",
+      "motion": "gentle",
+      "sound_layers": {
+        "birds": 0.5
+      }
+    }
+  },
+  {
+    "name": "want_dim_alone",
+    "chips": [
+      "want_dim"
+    ],
+    "preferences": null,
+    "safety_notice": "none",
+    "expected": {
+      "brightness": 0.5
+    }
+  },
+  {
+    "name": "want_nature_alone",
+    "chips": [
+      "want_nature"
+    ],
+    "preferences": null,
+    "safety_notice": "none",
+    "expected": {
+      "sound_layers": {
+        "birds": 0.5,
+        "water": 0.6
+      }
+    }
+  },
+  {
+    "name": "overstimulated_then_nature",
+    "chips": [
+      "overstimulated",
+      "want_nature"
+    ],
+    "preferences": null,
+    "safety_notice": "none",
+    "expected": {
+      "animals_enabled": false,
+      "sound_layers": {
+        "wind": 0,
+        "birds": 0.2,
+        "water": 0.2,
+        "pad": 0.3
+      }
+    }
+  }
+]

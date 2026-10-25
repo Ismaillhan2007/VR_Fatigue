@@ -13,6 +13,8 @@ JSON Schema draft 2020-12 for the objects named in [docs/PROJECT_PLAN.md](../doc
 
 Rules enforced by the schemas (clients must enforce them too):
 
+- Additive v1 request field `cloud_policy` defaults to `local_only` when absent. Interactive Unity check-ins always use `local_only`, including those with synthetic eye samples. `synthetic_demo` explicitly declares that the entire request (including sliders, chips and preferences) is invented test data. It does not authorize participant data; real/recorded eye input remains excluded. The backend also returns an optional allowlisted `X-VR-Fallback-Reason` HTTP header; response JSON is unchanged. Upgrade the backend before clients that send the new request field.
+
 - `additionalProperties: false` everywhere; unknown `schema_version` is rejected.
 - Unavailable signals are `null` with an entry in `quality.unavailable`, never `0`.
 - Data provenance (`data_source`, `replay_origin`) and AI provenance (`ai_source`, `model_id`) are separate fields. Synthetic data can never claim `native_eye_gaze`; a fallback response never names a model; `insufficient_data` forces the strain indicator to `unavailable`.
@@ -74,3 +76,17 @@ Indicator arithmetic, gates and state transitions are in [docs/INDICATOR.md](../
 
 Hardware adapter setup and synthetic-source verification are in
 [docs/QUEST_PRO_INTEGRATION.md](../docs/QUEST_PRO_INTEGRATION.md).
+
+## Backend 422 rules beyond the JSON Schemas
+
+The FastAPI models are stricter than the schemas. A schema-valid request can still get HTTP 422 when:
+
+- `self_report.free_text` or `preferences.text` is not `null` (decision D1: text stays on the device); the error never echoes the text;
+- `quality.valid_duration_ms + quality.gap_duration_ms != duration_ms`;
+- `strain_indicator.level != "unavailable"` while quality is `insufficient_data`, the baseline is `absent` or has fewer than 6 windows, or any probe metric is `null`;
+- `strain_indicator.level == "unavailable"` with a non-null `value` (or the reverse);
+- the indicator is `unavailable` but `reconciliation` is not `unavailable`;
+- synthetic or synthetic-replay input claims `native_eye_gaze`, or `replay_origin` does not match `data_source`;
+- `probe_miss_fraction` is above 1, or the body exceeds `VR_MAX_REQUEST_BYTES` (413) / has an invalid `Content-Length` (400).
+
+Unity's `AnalyzeRequest.Create` and the metrics bridge produce requests that satisfy these rules; `backend/tests` and the Unity PlayMode backend smoke test check them.

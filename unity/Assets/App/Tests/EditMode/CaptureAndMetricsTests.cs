@@ -99,6 +99,9 @@ namespace App.Tests
             Assert.AreEqual(QualityStatus.Usable, s.Quality.Status);
             Assert.That(s.Quality.RepeatedSampleFraction, Is.GreaterThan(0));
             Assert.AreEqual(6, s.Baseline.Windows);
+            Assert.AreEqual(60000, s.DurationMs, "session quality describes the task, not task plus baseline");
+            Assert.AreEqual(s.DurationMs, s.Quality.ValidDurationMs + s.Quality.GapDurationMs);
+            Assert.AreEqual(120000, s.Baseline.DurationMs);
             Assert.IsFalse(s.Baseline.LowConfidence);
             Assert.AreEqual(StrainLevel.Moderate, s.StrainIndicator.Level);
             StringAssert.Contains("stub", s.MetricVersion);
