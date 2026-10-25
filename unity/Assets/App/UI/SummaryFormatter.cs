@@ -11,7 +11,7 @@ namespace App.UI
     /// <summary>Plain-text summary for the placeholder UI. Wording follows CONCEPT 5.3.</summary>
     public static class SummaryFormatter
     {
-        public static string Format(SessionContext c, bool analysisInProgress)
+        public static string Format(SessionContext c, bool analysisInProgress, string probeStats = null)
         {
             var s = c.Summary;
             if (s == null) return "Computing measurements...";
@@ -39,6 +39,8 @@ namespace App.UI
                 b.AppendLine($"  {m}: {(v.HasValue ? v.Value.ToString("0.###", CultureInfo.InvariantCulture) : "unavailable")}"
                     + (z.HasValue ? $"  (z {z.Value:+0.0;-0.0;0.0})" : ""));
             }
+
+            if (!string.IsNullOrEmpty(probeStats)) b.AppendLine(probeStats);
 
             if (a == null) return b.ToString();
             b.AppendLine();

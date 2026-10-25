@@ -50,7 +50,8 @@ namespace App.UI.Editor
             };
             var bar = Save(Bar());
             var pause = Save(Pause());
-            BuildScene(prefabs, bar, pause);
+            var probe = Save(ProbeOverlay());
+            BuildScene(prefabs, bar, pause, probe);
             AssetDatabase.SaveAssets();
             Debug.Log("[AssessmentSceneBuilder] prefabs and Assessment scene written");
         }
@@ -208,9 +209,32 @@ namespace App.UI.Editor
             return root;
         }
 
+        /// <summary>Own overlay canvas above the panels; the dot is placed by ProbeTaskRunner each frame.</summary>
+        static GameObject ProbeOverlay()
+        {
+            var root = new GameObject("ProbeOverlay", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler));
+            var canvas = root.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 50;
+            var dot = new GameObject("ProbeTarget", typeof(RectTransform), typeof(Image));
+            dot.transform.SetParent(root.transform, false);
+            var rt = (RectTransform)dot.transform;
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(26, 26);
+            var image = dot.GetComponent<Image>();
+            image.sprite = _res.knob;
+            image.color = new Color(1f, 0.85f, 0.2f);
+            image.raycastTarget = false;
+            dot.SetActive(false);
+            var runner = root.AddComponent<ProbeTaskRunner>();
+            runner.CanvasRect = (RectTransform)root.transform;
+            runner.Target = rt;
+            return root;
+        }
+
         // ----- scene -----
 
-        static void BuildScene(GameObject[] panelPrefabs, GameObject barPrefab, GameObject pausePrefab)
+        static void BuildScene(GameObject[] panelPrefabs, GameObject barPrefab, GameObject pausePrefab, GameObject probePrefab)
         {
             var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
 
@@ -235,6 +259,7 @@ namespace App.UI.Editor
             var pause = (GameObject)PrefabUtility.InstantiatePrefab(pausePrefab, canvasGo.transform);
             pause.SetActive(false);
             controller.PauseOverlay = pause.GetComponent<PauseOverlay>();
+            controller.ProbeRunner = ((GameObject)PrefabUtility.InstantiatePrefab(probePrefab)).GetComponent<ProbeTaskRunner>();
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             var others = EditorBuildSettings.scenes.Where(s => s.path != ScenePath);

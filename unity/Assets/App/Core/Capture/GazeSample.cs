@@ -20,20 +20,27 @@ namespace App.Core.Capture
         public Vector3 RightDirection;
         /// <summary>Combined gaze direction (average of valid eyes).</summary>
         public Vector3 CyclopeanDirection;
-        /// <summary>Head pose in tracking space (metres / rotation).</summary>
+        /// <summary>False when the source has no head pose for this row; head metrics then stay unavailable.</summary>
+        public bool HeadTracked;
+        /// <summary>Head pose in tracking space (metres / rotation). Meaningful only when <see cref="HeadTracked"/>.</summary>
         public Vector3 HeadPosition;
         public Quaternion HeadRotation;
         /// <summary>Null when the provider has no confidence. Constant on Quest Pro: never filter on it.</summary>
         public float? Confidence;
     }
 
-    /// <summary>A probe target shown during a task (CONCEPT 5.1). Metrics compare gaze against it.</summary>
+    /// <summary>
+    /// One probe trial (CONCEPT 5.1), all times on the app frame clock (the same clock as <see cref="GazeSample.FrameTime"/>).
+    /// The metrics bridge maps them onto the sensor clock. Onset -> HoldStart is the acquisition window.
+    /// </summary>
     public struct ProbeEvent
     {
-        /// <summary>Target onset on the same clock as <see cref="GazeSample.FrameTime"/>.</summary>
+        /// <summary>Unique within a session, e.g. "b012" (baseline) or "l004" (loaded task).</summary>
+        public string TrialId;
         public double OnsetTime;
-        public double HoldSeconds;
-        /// <summary>Target direction in the head frame.</summary>
+        public double HoldStartTime;
+        public double EndTime;
+        /// <summary>Target direction in the head frame (head-locked target).</summary>
         public Vector3 TargetDirection;
     }
 }

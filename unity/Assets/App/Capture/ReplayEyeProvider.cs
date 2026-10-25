@@ -9,21 +9,30 @@ using App.Core.Contracts;
 namespace App.Capture
 {
     /// <summary>
-    /// Replays a gaze CSV (format in docs/ARCHITECTURE.md) on the app clock. Labelled data_source = replay with the
-    /// given origin. STUB: minimal parser for feat/replay-metrics to extend; real recordings stay out of Git.
+    /// Replays an eye-session.v1 JSON file (with its probe trials) or a gaze CSV (format in docs/ARCHITECTURE.md) on the
+    /// app clock. Labelled data_source = replay with the given origin; a synthetic file stays synthetic.
+    /// <see cref="Speed"/> > 1 plays faster on the frame clock; sensor timestamps (and therefore metrics) are unchanged.
+    /// The clock can be held between phases so nothing is skipped while the participant answers.
     /// </summary>
-    public sealed class ReplayEyeProvider : IEyeTrackingProvider
+    public sealed class ReplayEyeProvider : IEyeTrackingProvider, IProbeSource, IHoldableProvider
     {
         public const string Header =
             "frame_time_s,sensor_time_s,valid,left_valid,right_valid,left_x,left_y,left_z,right_x,right_y,right_z,head_px,head_py,head_pz,head_qx,head_qy,head_qz,head_qw,confidence";
 
         readonly List<GazeSample> _rows;
-        double _start;
-        int _cursor;
+        readonly List<ProbeEvent> _probes;
+        double _start, _replayed, _lastNow;
+        bool _held;
+        int _cursor, _probeCursor;
 
-        public ReplayEyeProvider(IEnumerable<GazeSample> rows, ReplayOrigin origin, Capabilities capabilities = null)
+        /// <summary>Replay seconds per frame-clock second.</summary>
+        public double Speed { get; set; } = 1;
+
+        public ReplayEyeProvider(IEnumerable<GazeSample> rows, ReplayOrigin origin, Capabilities capabilities = null,
+            IEnumerable<ProbeEvent> probes = null)
         {
             _rows = new List<GazeSample>(rows);
+            _probes = new List<ProbeEvent>(probes ?? Array.Empty<ProbeEvent>());
             ReplayOrigin = origin;
             Capabilities = capabilities ?? new Capabilities { GazePose = true, ConfidenceInformative = false };
             if (origin == Core.Contracts.ReplayOrigin.Synthetic) Capabilities.NativeEyeGaze = false;
@@ -65,19 +74,35 @@ namespace App.Capture
                     LeftDirection = left,
                     RightDirection = right,
                     CyclopeanDirection = lv && rv ? Vector3.Normalize(left + right) : lv ? left : right,
+                    HeadTracked = s.Head != null,
                     HeadPosition = s.Head == null ? Vector3.Zero : V(s.Head.PositionMetres),
                     HeadRotation = s.Head == null ? Quaternion.Identity
                         : new Quaternion((float)s.Head.RotationX, (float)s.Head.RotationY, (float)s.Head.RotationZ, (float)s.Head.RotationW),
                     Confidence = (float?)(s.Left?.Confidence ?? s.Right?.Confidence),
                 });
             }
+            var probes = new List<ProbeEvent>();
+            foreach (var g in System.Linq.Enumerable.GroupBy(session.ProbeEvents, e => e.ProbeId))
+            {
+                double? onset = null, hold = null, end = null;
+                var target = Vector3.UnitZ;
+                foreach (var e in g)
+                {
+                    if (e.Kind == "target_onset") { onset = e.TimestampUs / 1e6; target = V(e.TargetDirection); }
+                    else if (e.Kind == "hold_start") hold = e.TimestampUs / 1e6;
+                    else if (e.Kind == "target_end") end = e.TimestampUs / 1e6;
+                }
+                if (onset.HasValue && hold.HasValue && end.HasValue)
+                    probes.Add(new ProbeEvent { TrialId = g.Key, OnsetTime = onset.Value, HoldStartTime = hold.Value, EndTime = end.Value, TargetDirection = target });
+            }
+            probes.Sort((a, b) => a.OnsetTime.CompareTo(b.OnsetTime));
             var gaze = session.Info.Capabilities.Gaze.Available;
             return new ReplayEyeProvider(rows, actualOrigin, new Capabilities
             {
                 GazePose = gaze,
                 NativeEyeGaze = false,
                 ConfidenceInformative = session.Info.Capabilities.ConfidenceInformative,
-            });
+            }, probes);
         }
 
         static Vector3 V(VRFatigue.Signals.Direction3 d) => new Vector3((float)d.X, (float)d.Y, (float)d.Z);
@@ -90,30 +115,75 @@ namespace App.Capture
         public bool IsRunning { get; private set; }
         public int RowCount => _rows.Count;
 
+        public int ProbeCount => _probes.Count;
+
         public void Start(double now)
         {
-            _start = now;
-            _cursor = 0;
+            _start = _lastNow = now;
+            _replayed = 0;
+            _held = false;
+            _cursor = _probeCursor = 0;
             IsRunning = true;
         }
 
         public void Stop() => IsRunning = false;
 
+        public void SetHold(bool hold, double now)
+        {
+            Advance(now);
+            _held = hold;
+        }
+
         public int ReadSamples(List<GazeSample> buffer, double now)
         {
             if (!IsRunning || _rows.Count == 0) return 0;
+            Advance(now);
             var t0 = _rows[0].FrameTime;
             var added = 0;
-            while (_cursor < _rows.Count && _rows[_cursor].FrameTime - t0 <= now - _start)
+            while (_cursor < _rows.Count && _rows[_cursor].FrameTime - t0 <= _replayed)
             {
                 var s = _rows[_cursor++];
-                s.FrameTime = _start + (s.FrameTime - t0);
+                s.FrameTime = ToFrameClock(s.FrameTime - t0);
                 buffer.Add(s);
                 added++;
             }
             if (_cursor >= _rows.Count) IsRunning = false;
             return added;
         }
+
+        public int ReadProbes(List<ProbeEvent> buffer, double now)
+        {
+            if (_rows.Count == 0) return 0;
+            Advance(now);
+            var t0 = _rows[0].FrameTime;
+            var added = 0;
+            while (_probeCursor < _probes.Count && _probes[_probeCursor].OnsetTime - t0 <= _replayed)
+            {
+                var p = _probes[_probeCursor++];
+                p.OnsetTime = ToFrameClock(p.OnsetTime - t0);
+                p.HoldStartTime = ToFrameClock(p.HoldStartTime - t0);
+                p.EndTime = ToFrameClock(p.EndTime - t0);
+                buffer.Add(p);
+                added++;
+            }
+            return added;
+        }
+
+        /// <summary>Replay seconds played so far (excludes held time); the app uses it as the phase clock.</summary>
+        public double ReplayedSeconds(double now)
+        {
+            Advance(now);
+            return _replayed;
+        }
+
+        void Advance(double now)
+        {
+            if (!_held && now > _lastNow) _replayed += (now - _lastNow) * Math.Max(0.01, Speed);
+            _lastNow = now;
+        }
+
+        /// <summary>Approximate frame time of a replay offset (exact while not held; held spans shift later rows).</summary>
+        double ToFrameClock(double replayOffset) => _lastNow - (_replayed - replayOffset) / Math.Max(0.01, Speed);
 
         /// <summary>Parses rows with the <see cref="Header"/> columns. Empty confidence = unavailable.</summary>
         public static List<GazeSample> Parse(string csvText)
@@ -141,6 +211,7 @@ namespace App.Capture
                     LeftDirection = left,
                     RightDirection = right,
                     CyclopeanDirection = cyc,
+                    HeadTracked = true,
                     HeadPosition = V(f, 11),
                     HeadRotation = new Quaternion(F(f[14]), F(f[15]), F(f[16]), F(f[17])),
                     Confidence = string.IsNullOrEmpty(f[18]) ? (float?)null : F(f[18]),

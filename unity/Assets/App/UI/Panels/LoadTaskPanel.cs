@@ -17,7 +17,7 @@ namespace App.UI.Panels
         void Awake() => SkipButton.onClick.AddListener(() => Controller.EndCaptureEarly());
 
         public override void Refresh() => Status.text =
-            "Task (placeholder): the reading / visual-search task with probe targets will appear here.\n"
-            + $"{Controller.PhaseRemainingSeconds:0} s left ({Controller.SampleCount} samples, {Controller.EyeSourceDescription})";
+            "Task: keep following the yellow target (same layout as the baseline; the reading/visual-search load is a placeholder).\n"
+            + $"{Controller.PhaseRemainingSeconds:0} s left ({Controller.SampleCount} samples, {Controller.ProbeCount} targets, {Controller.EyeSourceDescription})";
     }
 }

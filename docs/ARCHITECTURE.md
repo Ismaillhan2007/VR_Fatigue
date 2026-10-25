@@ -82,6 +82,10 @@ Changes to `Core/Contracts` or `contracts/v1` go through a contract PR that upda
 - Request: `analyze_request.schema.json`. Response: `analysis_response.schema.json`.
 - The app rejects a response (and uses its local fallback) if it changes `session_id`, `data_source`, `replay_origin`, `quality.status` or `reconciliation`, lowers `safety_notice`, says `live` without a `model_id`, or fails schema validation. Timeout: 15 s.
 
+## Probe task (CONCEPT 5.1)
+
+`App.Core.Capture.ProbeSchedule` defines the layout (`probe_cycle_10_v1`: ten head-local positions, a jump every 2 s, 10-30 degrees apart, acquisition window 0.5 s). `SessionController` runs it in Baseline and Task, records `ProbeEvent`s (trial id, onset/hold-start/end on the frame clock, head-local target) and shows the target through `ProbeTaskRunner`. A replay that carries its own trials (`IProbeSource`) supplies them instead; a synthetic provider (`IProbeFollower`) moves its gaze to the shown target. `SignalsMetricsEngine` maps probe times onto the sensor clock, uses a stricter policy (2 degrees within 500 ms) and sets `conditions_id` to the layout id for phases with probes (`assessment_canvas_no_probes` otherwise), so a phase with probes is never compared with one without.
+
 ## Replay CSV format (stub)
 
 Header (exact), one row per frame, times in seconds, directions are head-frame unit vectors, `valid` flags `1`/`0`, empty `confidence` = unavailable:
