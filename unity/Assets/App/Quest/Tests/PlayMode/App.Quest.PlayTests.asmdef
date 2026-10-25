@@ -7,7 +7,10 @@
     "Unity.XR.Interaction.Toolkit",
     "UnityEngine.UI",
     "UnityEngine.TestRunner",
-    "UnityEditor.TestRunner"
+    "UnityEditor.TestRunner",
+    "Unity.InputSystem",
+    "Unity.XR.OpenXR",
+    "Unity.Collections"
   ],
   "overrideReferences": true,
   "precompiledReferences": [

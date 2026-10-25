@@ -86,7 +86,8 @@ namespace App.Quest
             go.transform.SetParent(anchor, false);
             var ray = go.AddComponent<XRRayInteractor>();
             ray.maxRaycastDistance = 5;
-            ray.raycastMask = 0; // UI only; never move/select the forest or the camera.
+            ray.referenceFrame = anchor.root;
+            ray.raycastMask = 1 << LayerMask.NameToLayer("UI"); // UI only; never move/select the forest or the camera.
             ray.enableUIInteraction = true;
             ray.uiPressInput = new XRInputButtonReader("UI press", inputSourceMode: XRInputButtonReader.InputSourceMode.InputAction)
             { inputActionPerformed = new InputAction("UI press", InputActionType.Button, $"<XRController>{{{hand}}}/triggerPressed") };

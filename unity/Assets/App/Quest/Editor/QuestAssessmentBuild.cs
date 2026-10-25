@@ -81,7 +81,7 @@ namespace App.Quest.Editor
                 throw new BuildFailedException("Install Unity 6000.6.7f1 Android Build Support with SDK/NDK/OpenJDK first");
             var errors = Validate();
             if (errors.Length > 0) throw new BuildFailedException(string.Join("; ", errors));
-            // This branch deliberately does not copy or merge #16. Final report-only assets need that dependency.
+            // Reject old/incomplete checkouts rather than shipping a scene without normal report completion.
             if (typeof(SessionController).GetMethod("FinishWithReport") == null)
                 throw new BuildFailedException("Integrate report-only completion (#16 / PR #26) before generating the Quest assessment APK");
             CreateResources();
@@ -89,15 +89,19 @@ namespace App.Quest.Editor
             var output = Environment.GetEnvironmentVariable("VR_QUEST_APK_PATH");
             if (string.IsNullOrWhiteSpace(output)) output = Path.GetFullPath("../builds/quest/VRFatigue-development.apk");
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output)));
-            var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+            try
             {
-                scenes = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray(),
-                target = BuildTarget.Android, locationPathName = output,
-                options = BuildOptions.Development,
-            });
-            if (report.summary.result != BuildResult.Succeeded)
-                throw new BuildFailedException("Quest APK build failed: " + report.summary.result);
-            Debug.Log("Quest APK built: " + report.summary.outputPath + "; bytes=" + report.summary.totalSize);
+                var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+                {
+                    scenes = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray(),
+                    target = BuildTarget.Android, locationPathName = output,
+                    options = BuildOptions.Development,
+                });
+                if (report.summary.result != BuildResult.Succeeded)
+                    throw new BuildFailedException("Quest APK build failed: " + report.summary.result);
+                Debug.Log("Quest APK built: " + report.summary.outputPath + "; bytes=" + report.summary.totalSize);
+            }
+            finally { QuestBuildPrivacy.Restore(); }
         }
 
         public void OnPreprocessBuild(BuildReport report)

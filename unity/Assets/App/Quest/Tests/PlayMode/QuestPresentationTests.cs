@@ -13,6 +13,12 @@ using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
 using UnityEngine.XR.Interaction.Toolkit.UI;
+using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Interactors;
+using UnityEngine.XR.OpenXR.Features.Interactions;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
+using UnityEngine.InputSystem.LowLevel;
 
 public class QuestPresentationTests
 {
@@ -179,6 +185,54 @@ public class QuestPresentationTests
             StringAssert.Contains("Limitations:", Object.FindAnyObjectByType<DonePanel>().Body.text);
         }
         finally { _module.UnregisterInteractor(pointer); }
+    }
+
+    [UnityTest]
+    public IEnumerator ProductionRayAndTriggerBindingReachUi()
+    {
+        const string layout = "QuestUiSyntheticController";
+        InputSystem.RegisterLayout<OculusTouchControllerProfile.OculusTouchController>(layout);
+        var device = InputSystem.AddDevice(layout);
+        InputSystem.SetDeviceUsage(device, UnityEngine.InputSystem.CommonUsages.RightHand);
+        var anchor = new GameObject("Synthetic controller pose");
+        var manager = new GameObject("Synthetic XRI manager").AddComponent<XRInteractionManager>();
+        try
+        {
+            _controller.EyeSource = EyeSourceMode.Synthetic;
+            _controller.BaselineSeconds = 100;
+            var button = Object.FindAnyObjectByType<ConsentPanel>().StartButton;
+            var target = button.transform.TransformPoint(((RectTransform)button.transform).rect.center);
+            anchor.transform.position = _view.Head.transform.position;
+            anchor.transform.rotation = Quaternion.LookRotation(target - anchor.transform.position);
+            typeof(QuestAssessmentRig).GetMethod("ConfigureRay", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
+                .Invoke(null, new object[] { anchor.transform, "RightHand" });
+            var ray = anchor.GetComponentInChildren<XRRayInteractor>();
+            for (int i = 0; i < 3; i++) yield return null;
+            Assert.IsTrue(ray.TryGetCurrentUIRaycastResult(out var hit), "production ray must hit the UI layer");
+            Assert.NotNull(hit.gameObject.GetComponentInParent<Button>());
+            using (StateEvent.From(device, out var pressEvent))
+            {
+                ((ButtonControl)device["triggerPressed"]).WriteValueIntoEvent(1f, pressEvent);
+                InputSystem.QueueEvent(pressEvent);
+            }
+            yield return null;
+            Assert.IsTrue(ray.uiPressInput.ReadIsPerformed(), "the production OpenXR trigger binding must be enabled and resolve");
+            Assert.Greater(ray.uiScrollInput.inputAction.controls.Count, 0, "thumbstick scroll binding must resolve");
+            yield return null;
+            using (StateEvent.From(device, out var releaseEvent))
+            {
+                ((ButtonControl)device["triggerPressed"]).WriteValueIntoEvent(0f, releaseEvent);
+                InputSystem.QueueEvent(releaseEvent);
+            }
+            yield return null; yield return null;
+            Assert.AreEqual(FlowState.Baseline, _controller.Flow.State);
+            _controller.Exit();
+        }
+        finally
+        {
+            InputSystem.RemoveDevice(device); InputSystem.RemoveLayout(layout);
+            Object.Destroy(anchor); Object.Destroy(manager.gameObject);
+        }
     }
 
     static IEnumerator Click(Pointer pointer, Button button)

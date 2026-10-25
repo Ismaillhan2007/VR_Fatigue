@@ -9,6 +9,23 @@ using UnityEngine.XR.OpenXR.Features.MetaQuestSupport;
 
 public class QuestBuildSettingsTests
 {
+    [TestCase(true)]
+    [TestCase(false)]
+    public void ManifestOverridesRequiredEyesAndPreservesPermission(bool existing)
+    {
+        var xml = new System.Xml.XmlDocument();
+        xml.LoadXml("<manifest xmlns:android='http://schemas.android.com/apk/res/android'>"
+            + (existing ? "<uses-feature android:name='oculus.software.eye_tracking' android:required='true'/>" : "")
+            + "<uses-permission android:name='com.oculus.permission.EYE_TRACKING'/></manifest>");
+        QuestAndroidManifest.KeepEyeTrackingOptional(xml);
+        QuestAndroidManifest.KeepEyeTrackingOptional(xml);
+        var feature = (System.Xml.XmlElement)xml.SelectSingleNode("/manifest/uses-feature");
+        Assert.AreEqual(1, xml.SelectNodes("/manifest/uses-feature").Count);
+        Assert.AreEqual("false", feature.GetAttribute("required", "http://schemas.android.com/apk/res/android"));
+        Assert.AreEqual("android:required", feature.GetAttribute("replace", "http://schemas.android.com/tools"));
+        Assert.AreEqual(1, xml.SelectNodes("/manifest/uses-permission").Count);
+    }
+
     [TestCase("touch")]
     [TestCase("keyboard")]
     [TestCase("architecture")]

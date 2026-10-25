@@ -12,8 +12,8 @@ Only probes stay parented to the tracked head. Their target position is the same
 
 ## Dependencies and branch boundaries
 
-- Based on `dev` after #19/#24/#25; reuses their installed packages and rendering setup.
-- **Report-only completion #16 / PR #26 is required before building the final APK.** The build command rejects the missing dependency, then regenerates Assessment using the current AssessmentSceneBuilder. This branch does not merge #26 or check in a competing regeneration of its scene/prefabs.
+- Based on `dev` `efaa61a`, including #16/#26/#27 and #19/#24/#25; reuses their packages, report-only implementation and rendering setup.
+- **Report-only completion #16 is already in the current base.** The build command still rejects older copies missing this dependency, then regenerates Assessment using the current AssessmentSceneBuilder. No competing Assessment scene/prefab regeneration is checked into this feature PR.
 - Android Player/OpenXR settings are published separately on `chore/issue-18-android-settings`, per CONTRIBUTING. Apply both code and settings before building. No package upgrades.
 - Integrator review is required for App.Core flow context handling, ProbeTaskRunner and composition. No capture/metrics/contract/forest implementation is replaced. #21 remains responsible for the real native eye adapter, consent/permission/calibration UI and device signal acceptance.
 
@@ -21,7 +21,7 @@ Only probes stay parented to the tracked head. Their target position is the same
 
 Install Unity **6000.6.7f1 ARM64** with **Android Build Support**, its OpenJDK **17.0.18+8**, **NDK r27c**, SDK build-tools **36.0.0**, command-line tools **16.0**, platform-tools **37.0.1** and Android platform **36**. Versions come from this editor's official release module metadata; do not substitute an older editor or package graph. Unity 6.6 supports Android target API 36 ([Unity requirements](https://docs.unity3d.com/6000.6/Documentation/Manual/android-requirements-and-compatibility.html)).
 
-1. Integrate the report-only dependency and this feature/settings through human-reviewed PRs into `dev`.
+1. Use current `dev` with the integrated report-only flow, then apply this feature/settings through human-reviewed PRs.
 2. Run **App > Quest Pro > Apply Android Assessment Settings** explicitly. It reuses the existing 90 Hz Meta setup, selects IL2CPP/ARM64, min API 32, target API 36, `com.vrfatigue.prototype`, Oculus Touch profile and Meta system keyboard. Publish settings changes only in their chore PR; no settings mutation occurs during import or build validation.
 3. Run **App > Quest Pro > Build Assessment Development APK**. It checks versions/settings/dependency, generates the owned UI through AssessmentSceneBuilder and builds enabled scenes. Default output: `builds/quest/VRFatigue-development.apk` outside the Unity project, git-ignored. Set `VR_QUEST_APK_PATH` to override it.
 
@@ -36,6 +36,8 @@ VR_QUEST_APK_PATH=/absolute/path/VRFatigue-development.apk \
 
 `UNITY_EDITOR` is the executable inside the target Unity.app. The development APK uses local development signing; do not commit signing keys, APKs, SDK binaries or machine-local paths/settings.
 
+Meta 207's build callback injects a local DevAgent access token/IP into its Resources asset even when its UI is disabled. The late QuestBuildPrivacy callback disables that service/voice input and clears its address/tokens/config reference before packing; its original local values are restored after the build, including failures through the prescribed builder. This code uses Unity serialization APIs and never logs credential values. No SDK files are modified.
+
 ## Verification and remaining device acceptance
 
 Automated checks use synthetic/replay data and tracked-pointer models, not screenshots or a simulated claim of physical tracking. They cover real XRI raycasts/Consent/Pause/Exit dispatch, scrolling, head-relative probe geometry, interruption between phases, report completion during pause, single rig/camera/listener, controller action bindings and no startup permission requests. Six invalid Android setting cases are rejected. The dependency integration test uses the actual report-only button and preserves the report without loading ForestDemo.
@@ -43,3 +45,14 @@ Automated checks use synthetic/replay data and tracked-pointer models, not scree
 Exact final test/build evidence is recorded in the PR and the acceptance record below. Local backend smoke checks keep Gemini disabled; no real eye recordings or paid APIs are involved.
 
 The user confirmed no Quest Pro is available. Keep #18 open until a consenting operator installs the APK and records: headset OS/OpenXR runtime; head tracking and both controller rays; readable source/report/preview/Done controls; trigger, slider dragging, scrolling and optional keyboard; Y/B, pause, resume, exit, headset removal/focus loss and recenter during/between phases; successful report-only run; permission deny/revoke and operator-confirmed calibration via #21; and measured sustained CPU/GPU/frame times at the actual refresh rate. Requesting 90 Hz is not evidence of 90 FPS. No device installation, physical comfort, native eye access or performance acceptance is claimed here.
+
+## Recorded local acceptance — October 25, 2026
+
+- Latest integrated base: `dev` `efaa61a` (report-only #26/#27 retained). Unity 6000.6.7f1, complete pinned package graph including Meta 207.0.1, OpenXR 1.18.0 and XRI 3.6.1.
+- **338 EditMode tests passed**, zero skipped. Includes six invalid Android settings, one-rig structure, DevAgent sanitization and two optional-eye manifest cases. **26 PlayMode tests passed**, zero skipped, with local authenticated FastAPI/Gemini disabled. Runtime code last passed the complete suite; the final changes added only Editor manifest processing and its EditMode checks.
+- Real XRI ray interactor + explicitly synthetic OpenXR controller/trigger bindings reach Consent; synthetic tracked-ray checks exercise Pause/Exit, scrolling and the complete report-only route. These checks do not emulate a real headset or native eyes.
+- **Android development APK built successfully** with ARM64 IL2CPP/Vulkan, min API 32, target/compile API 36, JDK 17.0.18+8, NDK 27.2.12479018, Gradle 9.3.1 / Android Gradle Plugin 9.1.1. Local output `builds/quest/VRFatigue-development.apk`: **72,594,231 bytes**, SHA-256 `9e2bbd1151a80fef87b48fac9a6e85425de5b859da7e3fa15e48ee86e3609b8e`.
+- Inspected actual APK manifest with Android aapt: `com.vrfatigue.prototype`, development/debuggable, arm64-v8a, optional `oculus.software.eye_tracking`, eye permission declared, optional overlay keyboard. The OpenXR eye-foveation manifest initially required eye hardware; a generated-manifest override now preserves optional support without removing its permission. No vendor source or static manifest YAML was edited.
+- Independently parsed the packed APK's DevAgent resource using UnityPy: the complete serialized object has service/voice disabled and empty server/token fields. No secret values were printed. Existing scene/prefab metadata were not edited; no screenshot-based checks were run.
+- Local evidence: `/tmp/issue18-final-edit.xml`, `/tmp/issue18-final-play.xml`, `/tmp/issue18-build.log`, `/tmp/issue18-apk-inspection.txt`. These are machine-local reports, not portable proof of device acceptance.
+- **Not run:** installation, headset tracking/input/keyboard/readability, permission/calibration on Quest Pro, native eye capture, physical comfort and sustained frame-time/90 FPS measurements. No headset is available. Keep issue #18 open pending these checks; #21 owns native capture integration.

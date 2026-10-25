@@ -34,7 +34,7 @@ public class QuestRigStructureTests
             {
                 Assert.AreEqual(XRInputButtonReader.InputSourceMode.InputAction, ray.uiPressInput.inputSourceMode);
                 Assert.IsTrue(ray.enableUIInteraction);
-                Assert.AreEqual(0, ray.raycastMask.value);
+                Assert.AreEqual(1 << LayerMask.NameToLayer("UI"), ray.raycastMask.value);
                 Assert.NotNull(ray.GetComponent<LineRenderer>().sharedMaterial);
             }
             Assert.Throws<System.InvalidOperationException>(() => QuestAssessmentRig.Create(controller));

@@ -89,6 +89,8 @@ namespace App.Quest
             probe.CanvasRect.localScale = Vector3.one * MetresPerPixel;
             probe.CanvasRect.localPosition = Vector3.forward * PanelDistance;
             probe.CanvasRect.sizeDelta = new Vector2(4000, 3000);
+            foreach (var node in Canvas.GetComponentsInChildren<Transform>(true))
+                node.gameObject.layer = LayerMask.NameToLayer("UI");
             PlaceInFrontOfHead();
         }
 
