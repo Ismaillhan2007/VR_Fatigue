@@ -1,0 +1,14 @@
+{
+  "name": "VRFatigue.QuestPro",
+  "rootNamespace": "VRFatigue.QuestPro",
+  "references": ["VRFatigue.Signals", "Oculus.VR"],
+  "autoReferenced": true,
+  "versionDefines": [
+    {
+      "name": "com.meta.xr.sdk.core",
+      "expression": "[207.0.1,208.0.0)",
+      "define": "VR_FATIGUE_META_207"
+    }
+  ],
+  "noEngineReferences": false
+}

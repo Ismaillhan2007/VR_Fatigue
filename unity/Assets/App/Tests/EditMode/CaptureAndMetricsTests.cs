@@ -91,8 +91,9 @@ namespace App.Tests
         public void StubEngineProducesValidLabelledSummary()
         {
             var (task, baseline, ctx) = Record(120, 60, TestFixtures.Load<SelfReport>("self_report_baseline.json"));
-            var s = MetricsEngineFactory.Create().Compute(task, baseline, ctx);
+            var s = new StubMetricsEngine().Compute(task, baseline, ctx);
             CollectionAssert.IsEmpty(s.Validate());
+            Assert.AreEqual(s.DurationMs, s.Quality.ValidDurationMs + s.Quality.GapDurationMs, "backend requires valid + gap = duration");
             Assert.AreEqual(DataSource.Synthetic, s.DataSource);
             Assert.AreEqual(ctx.SessionId, s.SessionId);
             Assert.AreEqual(QualityStatus.Usable, s.Quality.Status);
@@ -101,6 +102,81 @@ namespace App.Tests
             Assert.IsFalse(s.Baseline.LowConfidence);
             Assert.AreEqual(StrainLevel.Moderate, s.StrainIndicator.Level);
             StringAssert.Contains("stub", s.MetricVersion);
+        }
+
+        [Test]
+        public void FactoryReturnsTheSignalsEngine() => Assert.IsInstanceOf<SignalsMetricsEngine>(MetricsEngineFactory.Create());
+
+        [Test]
+        public void SignalsEngineProducesValidLabelledSummary()
+        {
+            var (task, baseline, ctx) = Record(130, 60, TestFixtures.Load<SelfReport>("self_report_baseline.json"));
+            var s = new SignalsMetricsEngine().Compute(task, baseline, ctx);
+            CollectionAssert.IsEmpty(s.Validate());
+            Assert.AreEqual(DataSource.Synthetic, s.DataSource);
+            Assert.IsFalse(s.Capabilities.NativeEyeGaze);
+            Assert.AreEqual(ctx.SessionId, s.SessionId);
+            Assert.AreEqual(QualityStatus.Usable, s.Quality.Status);
+            Assert.AreEqual(s.DurationMs, s.Quality.ValidDurationMs + s.Quality.GapDurationMs);
+            Assert.That(s.Quality.RepeatedSampleFraction, Is.GreaterThan(0), "synthetic repeats must be counted and dropped");
+            Assert.That(s.Baseline.Windows, Is.GreaterThanOrEqualTo(6));
+            Assert.IsFalse(s.Baseline.LowConfidence);
+            Assert.IsNotNull(s.Metrics.GazeSpeedMedianDegS);
+            Assert.IsNotNull(s.Deviations.GazeSpeedP95DegS);
+            Assert.IsNull(s.Metrics.ProbeLatencyMs, "no probes were shown: probe metrics stay null, never 0");
+            Assert.IsTrue(s.Quality.Unavailable.Any(u => u.Signal == Signal.Probe && u.Reason == UnavailableReason.NotCollected));
+            Assert.AreEqual(StrainLevel.Unavailable, s.StrainIndicator.Level, "indicator needs probes");
+            Assert.AreEqual(s.StrainIndicator.Level == StrainLevel.Unavailable, s.StrainIndicator.Value == null);
+            StringAssert.Contains("gaze-metrics", s.MetricVersion);
+        }
+
+        [Test]
+        public void SignalsEngineIsDeterministic()
+        {
+            var a = Record(130, 30, TestFixtures.Load<SelfReport>("self_report_baseline.json"));
+            var b = Record(130, 30, TestFixtures.Load<SelfReport>("self_report_baseline.json"));
+            b.ctx.SessionId = a.ctx.SessionId;
+            Assert.AreEqual(ContractJson.Serialize(new SignalsMetricsEngine().Compute(a.task, a.baseline, a.ctx)),
+                ContractJson.Serialize(new SignalsMetricsEngine().Compute(b.task, b.baseline, b.ctx)));
+        }
+
+        [Test]
+        public void SignalsEngineFlagsShortAndTiredBaselines()
+        {
+            var (task, baseline, ctx) = Record(20, 20, TestFixtures.Load<SelfReport>("self_report_baseline.json"));
+            var s = new SignalsMetricsEngine().Compute(task, baseline, ctx);
+            CollectionAssert.IsEmpty(s.Validate());
+            Assert.AreEqual(LowConfidenceReason.TooShort, s.Baseline.LowConfidenceReason);
+            Assert.AreEqual(StrainLevel.Unavailable, s.StrainIndicator.Level);
+
+            var tired = Record(130, 20, new SelfReport { Phase = ReportPhase.Baseline, EyeStrain = 5, MentalFatigue = 2 });
+            var t = new SignalsMetricsEngine().Compute(tired.task, tired.baseline, tired.ctx);
+            Assert.AreEqual(LowConfidenceReason.SelfReportedTired, t.Baseline.LowConfidenceReason);
+        }
+
+        [Test]
+        public void SignalsEngineWithNoSamplesIsInsufficient()
+        {
+            var ctx = new MetricsContext
+            {
+                SessionId = SessionContext.NewSessionId(), DataSource = DataSource.Synthetic,
+                Capabilities = new Capabilities(), Unavailable = new List<UnavailableSignal>(),
+            };
+            var s = new SignalsMetricsEngine().Compute(new PhaseRecording(), new BaselineData(), ctx);
+            CollectionAssert.IsEmpty(s.Validate());
+            Assert.AreEqual(QualityStatus.InsufficientData, s.Quality.Status);
+            Assert.AreEqual(StrainLevel.Unavailable, s.StrainIndicator.Level);
+        }
+
+        [TestCase("replay/steady_gaze.json")]
+        [TestCase("metrics/steady_acquired.json")]
+        public void ReplayLoadsSignalFixturesAndStaysSynthetic(string fixture)
+        {
+            var p = ReplayEyeProvider.FromFile(System.IO.Path.Combine(TestFixtures.Root, fixture), ReplayOrigin.Recorded);
+            Assert.AreEqual(DataSource.Replay, p.DataSource);
+            Assert.AreEqual(ReplayOrigin.Synthetic, p.ReplayOrigin, "a synthetic file must never be relabelled as recorded");
+            Assert.IsFalse(p.Capabilities.NativeEyeGaze);
+            Assert.That(p.RowCount, Is.GreaterThan(0));
         }
 
         [Test]

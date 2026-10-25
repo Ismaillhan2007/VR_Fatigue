@@ -16,6 +16,12 @@ unity/Assets/App/
   Tests/EditMode/ App.Tests.EditMode
 ```
 
+The implemented signal module is separate: `Assets/Signals/` (`VRFatigue.Signals`) and
+`Assets/QuestPro/` (`VRFatigue.QuestPro`). It provides JSON replay, real metric calculations
+and the native eye adapter. `MetricsEngineFactory` returns `SignalsMetricsEngine`, which bridges the app seam to this module;
+`ReplayEyeProvider` loads its eye-session.v1 JSON. The Quest Pro provider is not wired into
+`EyeProviderFactory` yet. See [signal/Quest handoff](QUEST_PRO_INTEGRATION.md).
+
 ## Data flow
 
 ```text
@@ -52,7 +58,7 @@ unity/Assets/App/
 | Eye data | `App.Core.Capture.IEyeTrackingProvider`, `GazeSample`, `ProbeEvent` | replay: `feat/replay-metrics`; headset: `feat/quest-eye` | `Capture/` (new provider class; register in `EyeProviderFactory`) |
 | Metrics | `App.Core.Metrics.IMetricsEngine` (+ `BaselinePolicy`) | `feat/replay-metrics` | `Metrics/` (return your engine from `MetricsEngineFactory.Create`) |
 | AI explanation | HTTP contract `contracts/v1/analyze_request` -> `analysis_response` | `feat/gemini-backend` | `backend/`; Unity side needs no change |
-| Scene | `App.Core.Scene.ISceneApplier` | `feat/forest-scene` | `Relaxation/Forest/` + `Scenes/ForestDemo.unity` |
+| Scene | `App.Core.Scene.ISceneApplier` (implemented by `ForestSceneApplier` over the forest `SceneConfigApplier`) | `feat/forest-scene` | `Relaxation/`, `Squirrel/`, `Scenes/ForestDemo.unity` (placeholder until replaced) |
 | Flow, UI, integration | `SessionController`, panels, `Assessment.unity` | integrator (`feat/app-flow`) | `UI/`, `Core/Flow/` |
 
 Changes to `Core/Contracts` or `contracts/v1` go through a contract PR that updates the schema, fixtures, C# DTOs and Pydantic models together.

@@ -31,8 +31,9 @@ namespace App.Core.Flow
                 case AiSource.Live: return $"AI: live ({c.Analysis.ModelId})";
                 case AiSource.Cached: return $"AI: CACHED earlier output ({c.Analysis.ModelId ?? "unknown model"})";
                 default:
+                    // No local reason means the backend answered with its own deterministic rules.
                     return string.IsNullOrEmpty(c.AnalysisFallbackReason)
-                        ? "AI: LOCAL FALLBACK (no AI used)"
+                        ? "AI: FALLBACK from backend rules (no AI used)"
                         : $"AI: LOCAL FALLBACK (no AI used: {c.AnalysisFallbackReason})";
             }
         }

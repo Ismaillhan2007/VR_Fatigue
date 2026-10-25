@@ -31,7 +31,56 @@ namespace App.Capture
 
         public static ReplayEyeProvider FromCsv(string csvText, ReplayOrigin origin) => new ReplayEyeProvider(Parse(csvText), origin);
 
-        public static ReplayEyeProvider FromFile(string path, ReplayOrigin origin) => FromCsv(File.ReadAllText(path), origin);
+        /// <summary>
+        /// Loads a replay file: <c>.json</c> = eye-session.v1 (fixtures/replay, fixtures/metrics; parsed by VRFatigue.Signals),
+        /// anything else = the CSV format above.
+        /// </summary>
+        public static ReplayEyeProvider FromFile(string path, ReplayOrigin origin) =>
+            path.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
+                ? FromEyeSessionJson(File.ReadAllText(path), origin)
+                : FromCsv(File.ReadAllText(path), origin);
+
+        /// <summary>
+        /// eye-session.v1 document. A file that declares synthetic data stays labelled synthetic, whatever the caller asked.
+        /// </summary>
+        public static ReplayEyeProvider FromEyeSessionJson(string json, ReplayOrigin origin)
+        {
+            var session = VRFatigue.Signals.SignalJson.ParseSession(json);
+            var replayInfo = session.Info.AsReplay();
+            var actualOrigin = replayInfo.ReplayOrigin == "synthetic" ? Core.Contracts.ReplayOrigin.Synthetic : origin;
+            var rows = new List<GazeSample>();
+            foreach (var s in session.Samples)
+            {
+                var t = s.TimestampUs / 1e6;
+                bool lv = s.Left != null && s.Left.IsUsable, rv = s.Right != null && s.Right.IsUsable;
+                var left = lv ? V(s.Left.Direction.Value) : Vector3.UnitZ;
+                var right = rv ? V(s.Right.Direction.Value) : Vector3.UnitZ;
+                rows.Add(new GazeSample
+                {
+                    FrameTime = t,
+                    SensorTimestamp = t,
+                    Valid = lv || rv,
+                    LeftValid = lv,
+                    RightValid = rv,
+                    LeftDirection = left,
+                    RightDirection = right,
+                    CyclopeanDirection = lv && rv ? Vector3.Normalize(left + right) : lv ? left : right,
+                    HeadPosition = s.Head == null ? Vector3.Zero : V(s.Head.PositionMetres),
+                    HeadRotation = s.Head == null ? Quaternion.Identity
+                        : new Quaternion((float)s.Head.RotationX, (float)s.Head.RotationY, (float)s.Head.RotationZ, (float)s.Head.RotationW),
+                    Confidence = (float?)(s.Left?.Confidence ?? s.Right?.Confidence),
+                });
+            }
+            var gaze = session.Info.Capabilities.Gaze.Available;
+            return new ReplayEyeProvider(rows, actualOrigin, new Capabilities
+            {
+                GazePose = gaze,
+                NativeEyeGaze = false,
+                ConfidenceInformative = session.Info.Capabilities.ConfidenceInformative,
+            });
+        }
+
+        static Vector3 V(VRFatigue.Signals.Direction3 d) => new Vector3((float)d.X, (float)d.Y, (float)d.Z);
 
         public string Name => "replay file";
         public DataSource DataSource => DataSource.Replay;

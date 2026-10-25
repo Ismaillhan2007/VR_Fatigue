@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:vr-fatigue:eye-session:v1",
+  "title": "Local eye-signal session v1 (never a cloud request)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "session_id", "data_source", "replay_origin", "coordinate_frame", "start_timestamp_us", "end_timestamp_us", "capabilities", "samples", "probe_events"],
+  "properties": {
+    "schema_version": {"const": "eye-session.v1"},
+    "session_id": {"type": "string", "format": "uuid"},
+    "data_source": {"enum": ["live", "replay", "synthetic"]},
+    "replay_origin": {"enum": [null, "recorded", "synthetic"]},
+    "coordinate_frame": {"const": "head_local"},
+    "start_timestamp_us": {"$ref": "#/$defs/timestamp"},
+    "end_timestamp_us": {"$ref": "#/$defs/timestamp"},
+    "capabilities": {"$ref": "#/$defs/capabilities"},
+    "samples": {"type": "array", "items": {"$ref": "#/$defs/sample"}},
+    "probe_events": {"type": "array", "items": {"$ref": "#/$defs/probe_event"}}
+  },
+  "allOf": [{
+    "if": {"properties": {"data_source": {"const": "replay"}}},
+    "then": {"properties": {"replay_origin": {"enum": ["recorded", "synthetic"]}}},
+    "else": {"properties": {"replay_origin": {"type": "null"}}}
+  }],
+  "$defs": {
+    "timestamp": {"type": "integer", "minimum": 0, "maximum": 9223372036854775807},
+    "vector3": {
+      "type": "object", "additionalProperties": false, "required": ["x", "y", "z"],
+      "properties": {"x": {"type": "number"}, "y": {"type": "number"}, "z": {"type": "number"}}
+    },
+    "availability": {
+      "type": "object", "additionalProperties": false, "required": ["available", "reason"],
+      "properties": {"available": {"type": "boolean"}, "reason": {"type": ["string", "null"], "minLength": 1}},
+      "allOf": [{
+        "if": {"properties": {"available": {"const": true}}},
+        "then": {"properties": {"reason": {"type": "null"}}},
+        "else": {"properties": {"reason": {"type": "string", "pattern": "\\S"}}}
+      }]
+    },
+    "capabilities": {
+      "type": "object", "additionalProperties": false,
+      "required": ["gaze", "pupil_diameter", "eyelid_openness", "confidence_informative"],
+      "properties": {
+        "gaze": {"$ref": "#/$defs/availability"},
+        "pupil_diameter": {"$ref": "#/$defs/availability"},
+        "eyelid_openness": {"$ref": "#/$defs/availability"},
+        "confidence_informative": {"type": "boolean"}
+      }
+    },
+    "eye": {
+      "type": "object", "additionalProperties": false, "required": ["valid", "direction", "confidence"],
+      "properties": {
+        "valid": {"type": "boolean"},
+        "direction": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/vector3"}]},
+        "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1}
+      }
+    },
+    "head_pose": {
+      "type": "object", "additionalProperties": false, "required": ["position_m", "rotation_xyzw"],
+      "properties": {
+        "position_m": {"$ref": "#/$defs/vector3"},
+        "rotation_xyzw": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "number"}}
+      }
+    },
+    "sample": {
+      "type": "object", "additionalProperties": false, "required": ["timestamp_us", "left", "right", "head_pose"],
+      "properties": {
+        "timestamp_us": {"$ref": "#/$defs/timestamp"},
+        "left": {"$ref": "#/$defs/eye"},
+        "right": {"$ref": "#/$defs/eye"},
+        "head_pose": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/head_pose"}]}
+      }
+    },
+    "probe_event": {
+      "type": "object", "additionalProperties": false,
+      "required": ["timestamp_us", "probe_id", "kind", "target_direction"],
+      "properties": {
+        "timestamp_us": {"$ref": "#/$defs/timestamp"},
+        "probe_id": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "\\S"},
+        "kind": {"enum": ["target_onset", "hold_start", "target_end"]},
+        "target_direction": {"$ref": "#/$defs/vector3"}
+      }
+    }
+  }
+}

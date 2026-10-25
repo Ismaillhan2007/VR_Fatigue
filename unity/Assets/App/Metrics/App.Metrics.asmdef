@@ -2,7 +2,8 @@
     "name": "App.Metrics",
     "rootNamespace": "App.Metrics",
     "references": [
-        "App.Core"
+        "App.Core",
+        "VRFatigue.Signals"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

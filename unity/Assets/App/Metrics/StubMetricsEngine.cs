@@ -8,7 +8,7 @@ using App.Core.Metrics;
 namespace App.Metrics
 {
     /// <summary>
-    /// PLACEHOLDER until feat/replay-metrics lands. Real quality bookkeeping (coverage, repeated timestamps, gaps),
+    /// FALLBACK only (used if SignalsMetricsEngine throws). Real quality bookkeeping (coverage, repeated timestamps, gaps),
     /// but metrics/deviations are the fixed values of fixtures/session_synthetic_usable.json. Never use it for live data
     /// claims: the metric_version says "stub".
     /// </summary>
@@ -38,7 +38,7 @@ namespace App.Metrics
                 SessionId = context.SessionId,
                 DataSource = context.DataSource,
                 ReplayOrigin = context.ReplayOrigin,
-                DurationMs = (long)Math.Round(((task?.DurationSeconds ?? 0) + baselineSeconds) * 1000),
+                DurationMs = q.ValidDurationMs + q.GapDurationMs,
                 MetricVersion = Version,
                 Capabilities = context.Capabilities,
                 Quality = q,
@@ -94,7 +94,7 @@ namespace App.Metrics
                 Status = coverage >= MinValidCoverage ? QualityStatus.Usable : QualityStatus.InsufficientData,
                 ValidCoverage = Math.Round(coverage, 4),
                 ValidDurationMs = (long)Math.Round(valid * 1000),
-                GapDurationMs = (long)Math.Round(Math.Max(0, duration - valid) * 1000),
+                GapDurationMs = Math.Max(0, (long)Math.Round(duration * 1000) - (long)Math.Round(valid * 1000)),
                 MaxGapMs = (long)Math.Round(maxGap * 1000),
                 RepeatedSampleFraction = samples.Count > 0 ? Math.Round((double)repeated / samples.Count, 4) : 0,
                 MedianDtMs = dts.Count > 0 ? Math.Round(dts[dts.Count / 2] * 1000, 2) : (double?)null,

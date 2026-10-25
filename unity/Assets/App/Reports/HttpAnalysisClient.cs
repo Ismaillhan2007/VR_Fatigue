@@ -20,8 +20,14 @@ namespace App.Reports
         public const string DefaultBaseUrl = "http://127.0.0.1:8000";
 
         readonly string _baseUrl;
+        readonly string _accessToken;
 
-        public HttpAnalysisClient(string baseUrl) => _baseUrl = string.IsNullOrWhiteSpace(baseUrl) ? DefaultBaseUrl : baseUrl.TrimEnd('/');
+        /// <param name="accessToken">Optional VR_BACKEND_ACCESS_TOKEN of the backend (LAN demo). Never the Gemini key.</param>
+        public HttpAnalysisClient(string baseUrl, string accessToken = null)
+        {
+            _baseUrl = string.IsNullOrWhiteSpace(baseUrl) ? DefaultBaseUrl : baseUrl.TrimEnd('/');
+            _accessToken = string.IsNullOrWhiteSpace(accessToken) ? null : accessToken.Trim();
+        }
 
         public string Name => "backend " + _baseUrl;
 
@@ -36,6 +42,7 @@ namespace App.Reports
                     web.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body)) { contentType = "application/json" };
                     web.downloadHandler = new DownloadHandlerBuffer();
                     web.SetRequestHeader("Accept", "application/json");
+                    if (_accessToken != null) web.SetRequestHeader("Authorization", "Bearer " + _accessToken);
                     web.timeout = TimeoutSeconds;
                     await Send(web);
                     cancellationToken.ThrowIfCancellationRequested();

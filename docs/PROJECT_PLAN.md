@@ -15,31 +15,33 @@ The report is an **experimental wellness summary**, not a medical diagnosis or p
 | Layer | Choice | Responsibility |
 | --- | --- | --- |
 | VR | Unity LTS + C#, URP, OpenXR, XR Interaction Toolkit | Headset input, UI, prebuilt scenes, comfort controls |
-| Eye adapter | Meta XR Core SDK `OVREyeGaze` on Quest Pro (OpenXR eye gaze as alternative); `ReplayEyeProvider` elsewhere | Capability checks, calibration status, validity, timestamps |
+| Eye adapter | Meta XR Core SDK `OVRPlugin` on Quest Pro (head-local/timestamp adapter); `ReplayEyeProvider` elsewhere | Capability checks, calibration status, validity, timestamps |
 | Metrics | Pure C# functions with Unity EditMode tests | Local aggregation; no cloud eye processing |
 | Backend | Python 3.11+, FastAPI, Pydantic, `google-genai`, pytest | Contract validation, bounded Gemini call, cache, local fallback |
 | Transport | UnityWebRequest + versioned JSON over HTTP locally / HTTPS remotely | One summary request after a session, not frame streaming |
 | Storage | Memory by default; synthetic JSON fixtures | No database needed for the hackathon |
 
-Use the Unity editor that the installed Meta XR SDK supports (verify its release notes); record exact editor, XR package, and SDK versions in the first setup PR. Keep `GEMINI_MODEL` configurable; choose an available stable Flash/Flash-Lite model after checking its structured-output support and project quota. Do not depend on a preview model or assume free quota.
+The team-selected Unity editor is **6000.6.7f1**. Verify the chosen Meta XR SDK supports it and record exact XR package/SDK versions in the setup PR. Meta XR Core SDK **207.0.1** and OpenXR **1.18.0** are pinned; the adapter and device acceptance steps are in [QUEST_PRO_INTEGRATION.md](QUEST_PRO_INTEGRATION.md). Keep `GEMINI_MODEL` configurable; choose an available stable Flash/Flash-Lite model after checking its structured-output support and project quota. Do not depend on a preview model or assume free quota.
 
-Layout (Unity part scaffolded; backend still planned; seams in [ARCHITECTURE.md](ARCHITECTURE.md)):
+Layout (application scaffold and signals module implemented; backend still planned; application seams in [ARCHITECTURE.md](ARCHITECTURE.md)):
 
 ```text
 unity/                  # Assets/, Packages/, ProjectSettings/
   Assets/App/
     Core/               # pure C#: contract DTOs, seams, session flow, local rules
-    Capture/            # IEyeTrackingProvider, hardware and replay adapters
-    Metrics/            # filtering, window aggregation, deterministic observations
+    Capture/            # application providers and factory; hardware placeholder
+    Metrics/            # application metrics seam and stub
     Reports/            # measured data, AI narrative, fallback, source labels
     Relaxation/         # allowlisted config -> local prefabs/audio/lighting
     UI/                 # setup, consent, preferences, summary, exit
     Scenes/             # Assessment, ForestDemo
     Tests/              # EditMode and PlayMode
+  Assets/Signals/       # pure C# replay, hardware provider, quality, metrics, baseline, indicator
+  Assets/QuestPro/      # Unity/Meta bridge, separate from pure C# signals
 backend/app/            # routes, contracts, gemini_service, fallback, budget
 backend/tests/
-contracts/v1/           # JSON schemas (present) + validate_examples.py; C# DTOs and Pydantic models to follow
-fixtures/               # synthetic sessions, valid/invalid examples (present); replay streams to follow
+contracts/v1/           # application and local signal/metric/baseline/indicator schemas
+fixtures/               # synthetic replay streams, metric cases, plans and temporal test sequences
 docs/                   # plan, setup, demo script, asset credits as implemented
 ```
 
@@ -59,7 +61,7 @@ Capture actual sample timestamps; do not assume render rate equals sensor rate o
 
 Start with valid sample coverage, session duration, descriptive gaze angular velocity/distribution, and gaze probes with known targets (latency, RMS error, miss fraction; targets at least 6 degrees apart). Drop repeated sensor timestamps before any metric. Add fixation/saccade estimates only with documented algorithms and configurable experimental thresholds. Add blink rate/closure duration only if a validated openness signal exists; tracking loss alone is not a blink. Pupil metrics are optional and lighting-dependent.
 
-Use a comfortable 90-120 second baseline (same scene, lighting and probe layout as the loaded task), anchored by a self-report taken at baseline; a baseline taken while the participant reports being tired is flagged `low_confidence` (see CONCEPT section 4). Store the metric algorithm version and parameters. Show differences as observations, not validated fatigue thresholds. Self-report is not a sensor measurement. When quality is insufficient, report `insufficient_data`; never present a validated fatigue score or a model confidence percentage. An *experimental baseline-deviation indicator* (CONCEPT section 5.2: robust z-scores against the personal baseline, fixed a-priori weights, EWMA, hysteresis) may be shown only with the label "experimental", next to the per-metric deviations, never when quality is insufficient, and never called a fatigue score. Its constants are initial guesses in one versioned config.
+Use at least 120 seconds nominal baseline to obtain six complete usable 20-second windows (same scene, lighting and probe layout as the loaded task), extending capture when windows fail quality. Actual valid time is reported separately. Anchor with baseline self-report; a baseline taken while the participant reports being tired is flagged `low_confidence` (see CONCEPT section 4). The implemented window/reference policy and signed deviations are in [BASELINE.md](BASELINE.md). Store the metric algorithm version and parameters. Show differences as observations, not validated fatigue thresholds. Self-report is not a sensor measurement. When quality is insufficient, report `insufficient_data`; never present a validated fatigue score or a model confidence percentage. An *experimental baseline-deviation indicator* (CONCEPT section 5.2: robust z-scores against the personal baseline, fixed a-priori weights, EWMA, hysteresis) may be shown only with the label "experimental", next to the per-metric deviations, never when quality is insufficient, and never called a fatigue score. Its constants are initial guesses in one versioned config.
 
 Acceptance: synthetic fixtures cover steady gaze, known motion, tracking gaps, unsupported signals, and insufficient coverage. The same inputs produce the same observations without Gemini. Neither gaze changes alone nor a short baseline establishes fatigue accuracy.
 
@@ -93,7 +95,7 @@ Acceptance: complete it on the target headset, then repeat with network disabled
 
 ## Contract to agree before splitting work
 
-JSON Schema v1 lives in [contracts/v1](../contracts/README.md) with synthetic fixtures in `fixtures/`; create matching C# DTOs and Pydantic models from it before implementing independent clients. Summary of the required shape:
+Local signal schemas and matching C# models are implemented in [contracts/v1](../contracts/README.md), with synthetic replay fixtures in `fixtures/`. Application schemas and Unity DTOs were added by the application scaffold; connect the signal outputs to these application contracts and align backend Pydantic models. Summary of the required shape:
 
 | Object | Required fields / semantics |
 | --- | --- |
@@ -105,7 +107,7 @@ JSON Schema v1 lives in [contracts/v1](../contracts/README.md) with synthetic fi
 | AnalysisResponse | `schema_version`, `session_id`, unchanged data provenance/quality, deterministic `reconciliation`, approved-vocabulary `observations`, `narrative`, `limitations`, `safety_notice`, `scene_rationale`, `scene_config`, `ai_source`, `model_id` (null when `fallback`), `prompt_version` |
 | SceneConfig | `scene_id` (`forest_v1`), `animals_enabled`, `time_of_day`, `light_warmth`, `brightness` (0.4..1), `fog_density` (0..0.6), `sound`, `master_volume`, `sound_layers`, `motion`, `motion_speed` (0..0.5), `particles`, `orb`; strict enums and ranges. No URLs/code/paths |
 
-Reject unknown schema versions, nonfinite numbers, extra executable fields, and incompatible signals. Keep all fields required with explicit nullability where supported by Gemini's schema subset. Unity validates configuration again before applying it. Cache by schema/metric/prompt/model versions plus canonical metrics/preferences; never reuse another session's identifiers or provenance. Fixtures ship synthetic, insufficient-data, and fallback examples plus invalid inputs that must be rejected (`python contracts/validate_examples.py`). Live and recorded-replay examples would have to come from a consenting teammate's real session; they stay local and are not committed.
+Reject unknown schema versions, nonfinite numbers, extra executable fields, and incompatible signals. Keep all fields required with explicit nullability where supported by Gemini's schema subset. Unity validates configuration again before applying it. Cache by schema/metric/prompt/model versions plus canonical metrics/preferences; never reuse another session's identifiers or provenance. Current fixtures cover synthetic replay and insufficient signal quality; `python contracts/validate_examples.py` validates them and checks invalid inputs are rejected. Application/fallback examples from the scaffold are also checked by the same entry point. Live and recorded-replay examples would have to come from a consenting teammate's real session; they stay local and are not committed.
 
 ## Cost, privacy, and reliability
 

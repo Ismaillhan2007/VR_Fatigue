@@ -1,0 +1,26 @@
+{
+  "schema_version": "eye-session.v1",
+  "session_id": "066ba6e8-472c-5f31-bf49-542536fa6148",
+  "data_source": "synthetic",
+  "replay_origin": null,
+  "coordinate_frame": "head_local",
+  "start_timestamp_us": 0,
+  "end_timestamp_us": 1000000,
+  "capabilities": {
+    "gaze": {
+      "available": false,
+      "reason": "not_supported"
+    },
+    "pupil_diameter": {
+      "available": false,
+      "reason": "not_exposed_by_runtime"
+    },
+    "eyelid_openness": {
+      "available": false,
+      "reason": "not_exposed_by_runtime"
+    },
+    "confidence_informative": false
+  },
+  "samples": [],
+  "probe_events": []
+}

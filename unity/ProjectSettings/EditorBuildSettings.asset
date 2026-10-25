@@ -9,8 +9,8 @@ EditorBuildSettings:
     path: Assets/App/Scenes/Assessment.unity
     guid: 4c536ff34f4e84c0f80f719ea1d639e9
   - enabled: 1
-    path: Assets/Scenes/SampleScene.unity
-    guid: 99c9720ab356a0642a771bea13969a05
+    path: Assets/App/Scenes/ForestDemo.unity
+    guid: 7b2e561a0e0824be8b33f999aac998f9
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
     com.unity.xr.openxr.settings4: {fileID: 11400000, guid: 8d04515b2e4a44fddb030b6eb09138f1, type: 2}

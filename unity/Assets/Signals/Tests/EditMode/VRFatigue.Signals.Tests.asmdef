@@ -1,0 +1,11 @@
+{
+  "name": "VRFatigue.Signals.Tests",
+  "rootNamespace": "VRFatigue.Signals.Tests",
+  "references": ["VRFatigue.Signals"],
+  "overrideReferences": true,
+  "precompiledReferences": ["Newtonsoft.Json.dll", "nunit.framework.dll"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": false,
+  "noEngineReferences": true
+}

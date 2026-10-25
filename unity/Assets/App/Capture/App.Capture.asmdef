@@ -2,7 +2,8 @@
     "name": "App.Capture",
     "rootNamespace": "App.Capture",
     "references": [
-        "App.Core"
+        "App.Core",
+        "VRFatigue.Signals"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

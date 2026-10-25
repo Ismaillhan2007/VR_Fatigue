@@ -33,8 +33,8 @@ namespace App.UI
     {
         [Header("Eye data")]
         public EyeSourceMode EyeSource = EyeSourceMode.Synthetic;
-        [Tooltip("Replay CSV path (local, git-ignored). Format: docs/ARCHITECTURE.md")]
-        public string ReplayCsvPath = "";
+        [Tooltip("Replay file: eye-session.v1 .json (fixtures/replay, fixtures/metrics) or the CSV in docs/ARCHITECTURE.md. Relative paths start at the unity/ folder.")]
+        public string ReplayCsvPath = "../fixtures/replay/steady_gaze.json";
         public ReplayOrigin ReplayOrigin = ReplayOrigin.Synthetic;
         public int SyntheticSeed = 1;
 
@@ -42,6 +42,8 @@ namespace App.UI
         public AnalysisMode Analysis = AnalysisMode.Http;
         [Tooltip("Override at runtime with the command-line argument -backendUrl http://<laptop-ip>:8000")]
         public string BackendBaseUrl = HttpAnalysisClient.DefaultBaseUrl;
+        [Tooltip("Only if the backend sets VR_BACKEND_ACCESS_TOKEN. Prefer the -backendToken command-line argument; never the Gemini key.")]
+        public string BackendAccessToken = "";
 
         [Header("Durations (desktop defaults; pilot uses 120 s / 300 s)")]
         public float BaselineSeconds = 20;
@@ -79,6 +81,7 @@ namespace App.UI
         void Awake()
         {
             BackendBaseUrl = CommandLineValue("-backendUrl") ?? BackendBaseUrl;
+            BackendAccessToken = CommandLineValue("-backendToken") ?? BackendAccessToken;
             Flow = new SessionFlow();
             Flow.StateChanged += (_, __) => ShowCurrent();
             Flow.PauseChanged += _ => ShowCurrent();
@@ -116,7 +119,7 @@ namespace App.UI
         public void AcceptConsent()
         {
             _provider?.Stop();
-            _provider = EyeProviderFactory.CreateAndStart(EyeSource, Now, SyntheticSeed, ReplayCsvPath, ReplayOrigin, out var note);
+            _provider = EyeProviderFactory.CreateAndStart(EyeSource, Now, SyntheticSeed, ResolveProjectPath(ReplayCsvPath), ReplayOrigin, out var note);
             ProviderNote = note;
             Flow.AcceptConsent(_provider.DataSource, _provider.ReplayOrigin, _provider.Capabilities, _provider.Name);
             _baseline.Recording.Clear();
@@ -174,6 +177,7 @@ namespace App.UI
 
         public void EnterScene()
         {
+            if (Flow.Context.Analysis?.SafetyNotice == SafetyNotice.StopSession) return;
             Flow.EnterScene();
             var config = Flow.Context.Analysis.SceneConfig;
             SceneStatus = "Loading scene...";
@@ -282,7 +286,7 @@ namespace App.UI
             switch (Analysis)
             {
                 case AnalysisMode.Mock: return new MockAnalysisClient();
-                case AnalysisMode.Http: return new HttpAnalysisClient(BackendBaseUrl);
+                case AnalysisMode.Http: return new HttpAnalysisClient(BackendBaseUrl, BackendAccessToken);
                 default: return new LocalAnalysisClient();
             }
         }
@@ -306,6 +310,11 @@ namespace App.UI
             foreach (var p in Panels) if (p.gameObject.activeSelf) p.Refresh();
             ProvenanceBar.Show(this);
         }
+
+        static string ResolveProjectPath(string path) =>
+            string.IsNullOrWhiteSpace(path) || System.IO.Path.IsPathRooted(path)
+                ? path
+                : System.IO.Path.GetFullPath(System.IO.Path.Combine(Application.dataPath, "..", path));
 
         static string CommandLineValue(string name)
         {

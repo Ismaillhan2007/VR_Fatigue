@@ -5,6 +5,7 @@
         "App.Core",
         "App.UI",
         "App.Relaxation",
+        "App.Reports",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

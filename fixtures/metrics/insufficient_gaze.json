@@ -1,0 +1,57 @@
+{
+  "schema_version": "eye-session.v1",
+  "session_id": "9c3afbfa-da0b-5942-9e30-d6bbb289f149",
+  "data_source": "synthetic",
+  "replay_origin": null,
+  "coordinate_frame": "head_local",
+  "start_timestamp_us": 0,
+  "end_timestamp_us": 2000000,
+  "capabilities": {
+    "gaze": {
+      "available": true,
+      "reason": null
+    },
+    "pupil_diameter": {
+      "available": false,
+      "reason": "not_exposed_by_runtime"
+    },
+    "eyelid_openness": {
+      "available": false,
+      "reason": "not_exposed_by_runtime"
+    },
+    "confidence_informative": false
+  },
+  "samples": [],
+  "probe_events": [
+    {
+      "timestamp_us": 0,
+      "probe_id": "probe-1",
+      "kind": "target_onset",
+      "target_direction": {
+        "x": 0.0,
+        "y": 0,
+        "z": 1.0
+      }
+    },
+    {
+      "timestamp_us": 1000000,
+      "probe_id": "probe-1",
+      "kind": "hold_start",
+      "target_direction": {
+        "x": 0.0,
+        "y": 0,
+        "z": 1.0
+      }
+    },
+    {
+      "timestamp_us": 2000000,
+      "probe_id": "probe-1",
+      "kind": "target_end",
+      "target_direction": {
+        "x": 0.0,
+        "y": 0,
+        "z": 1.0
+      }
+    }
+  ]
+}
