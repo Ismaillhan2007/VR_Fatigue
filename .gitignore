@@ -51,3 +51,8 @@ unity/*.pidb
 # Meta XR SDK writes a machine-local dev-agent token and LAN address here
 unity/Assets/Resources/DevAgentSettings.asset
 unity/Assets/Resources/DevAgentSettings.asset.meta
+
+# Meta XR SDK writes these input-action dumps on Play/build; generated per machine
+unity/RuntimeActionBindings.json
+unity/Assets/StreamingAssets/RuntimeActionBindings.json
+unity/Assets/StreamingAssets/RuntimeActionBindings.json.meta
