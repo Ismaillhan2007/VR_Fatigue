@@ -38,7 +38,7 @@ The desktop state machine and generated UI now implement this flow.
 | Area | Desktop implementation / remaining acceptance |
 | --- | --- |
 | Successful completion | `SessionFlow.FinishWithReport` moves Summary -> Done without a forest or feedback. Done retains the report until explicit Exit/reset. |
-| Explicit optional relaxation | Summary offers a separate choice, then `RelaxationOptionsPanel` collects optional preferences and previews the result before deliberate entry. Back returns to the report. |
+| Explicit optional relaxation | Summary offers a separate choice, then `RelaxationSetupPanel` collects optional preferences and previews the result before deliberate entry. Back returns to the report. |
 | Report/config separation | SummaryFormatter shows measurements, quality, safety, explanation, limitations and provenance. Scene preview/rationale appears only after opting in; the v1 wire contract remains unchanged. |
 | Feedback | Scene participants may submit or skip post-scene feedback. Done describes actual participation without inventing ratings. |
 | Verification | See [desktop state/UI/HTTP checks](REPORT_ONLY_FLOW.md), including offline, insufficient-data, safety, reset and both participation branches. |

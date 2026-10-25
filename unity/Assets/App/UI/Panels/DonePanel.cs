@@ -22,7 +22,7 @@ namespace App.UI.Panels
                 return;
             }
             var c = flow.Context;
-            var participation = !c.SceneEntered ? "Report complete. No relaxation scene was entered."
+            var participation = !c.SceneParticipated ? "Report complete. No relaxation scene was entered."
                 : c.PostSceneReport == null ? "Report complete. Optional relaxation ended; feedback was skipped."
                 : $"Report complete. After optional relaxation you reported (1-7): eye strain {c.PostSceneReport.EyeStrain}, "
                     + $"mental fatigue {c.PostSceneReport.MentalFatigue}. A single rating is not evidence that the scene helps.";

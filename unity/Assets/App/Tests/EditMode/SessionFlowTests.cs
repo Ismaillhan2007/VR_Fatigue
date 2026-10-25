@@ -27,7 +27,7 @@ namespace App.Tests
             f.AcceptConsent(DataSource.Synthetic, null, Synthetic, "synthetic");
             f.CompleteBaseline(baseline ?? Report(ReportPhase.Baseline));
             f.CompleteLoadTask();
-            f.SubmitCheckIn(Report(ReportPhase.PostTask, 5, 5, Chip.TiredEyes));
+            f.SubmitCheckIn(Report(ReportPhase.PostTask, 5, 5, Chip.TiredEyes), null);
             return f;
         }
 
@@ -41,20 +41,21 @@ namespace App.Tests
             f.AcceptConsent(DataSource.Synthetic, null, Synthetic, "synthetic");
             f.CompleteBaseline(Report(ReportPhase.Baseline));
             f.CompleteLoadTask();
-            f.SubmitCheckIn(Report(ReportPhase.PostTask, 5, 5, Chip.TiredEyes));
+            f.SubmitCheckIn(Report(ReportPhase.PostTask, 5, 5, Chip.TiredEyes), null);
             var summary = SummaryFor(f);
             f.SetSummary(summary);
             var request = AnalyzeRequest.Create(summary, f.Context.BaselineReport, null);
             f.SetAnalysis(LocalFallbackAnalysis.Analyze(request), "test");
             f.ChooseRelaxation();
             f.EnterScene();
+            f.MarkSceneParticipated();
             f.FinishScene();
             f.SubmitReRating(Report(ReportPhase.PostScene));
 
             CollectionAssert.AreEqual(new[]
             {
                 FlowState.Consent, FlowState.Baseline, FlowState.LoadTask, FlowState.CheckIn, FlowState.Summary,
-                FlowState.RelaxationOptions, FlowState.Scene, FlowState.ReRating, FlowState.Done,
+                FlowState.RelaxationSetup, FlowState.Scene, FlowState.ReRating, FlowState.Done,
             }, visited);
             Assert.AreEqual(DataSource.Synthetic, f.Context.DataSource);
             Assert.AreEqual(AiSource.Fallback, f.Context.AiSource);
@@ -204,7 +205,7 @@ namespace App.Tests
             Assert.NotNull(context.Analysis);
             Assert.IsNull(context.Preferences);
             Assert.IsNull(context.PostSceneReport);
-            Assert.IsFalse(context.SceneEntered);
+            Assert.IsFalse(context.SceneParticipated);
             flow.Restart();
             Assert.IsNull(flow.Context.Summary);
             Assert.IsNull(flow.Context.Analysis);
@@ -228,14 +229,15 @@ namespace App.Tests
         {
             var flow = WithAnalysis();
             Assert.Throws<InvalidOperationException>(() => flow.EnterScene());
+            Assert.Throws<InvalidOperationException>(() => flow.SetScenePreferences(new Preferences()));
             flow.ChooseRelaxation();
-            Assert.AreEqual(FlowState.RelaxationOptions, flow.State);
-            Assert.IsFalse(flow.Context.SceneEntered);
+            Assert.AreEqual(FlowState.RelaxationSetup, flow.State);
+            Assert.IsFalse(flow.Context.SceneParticipated);
             flow.CancelRelaxation();
             Assert.AreEqual(FlowState.Summary, flow.State);
             Assert.IsNull(flow.Context.Preferences);
             flow.FinishWithReport();
-            Assert.IsFalse(flow.Context.SceneEntered);
+            Assert.IsFalse(flow.Context.SceneParticipated);
         }
 
         [Test]
@@ -245,15 +247,30 @@ namespace App.Tests
             Assert.Throws<InvalidOperationException>(() => flow.SkipReRating());
             flow.ChooseRelaxation();
             var preferences = new Preferences { Sound = SoundMode.Silent, AnimalsEnabled = false };
-            flow.EnterScene(preferences);
+            flow.SetScenePreferences(preferences);
+            flow.EnterScene();
             preferences.Sound = SoundMode.Forest;
-            Assert.IsTrue(flow.Context.SceneEntered);
+            Assert.IsFalse(flow.Context.SceneParticipated, "entry is not participation until the forest actually loads");
             Assert.AreEqual(SoundMode.Silent, flow.Context.Preferences.Sound);
+            flow.MarkSceneParticipated();
+            Assert.IsTrue(flow.Context.SceneParticipated);
             flow.FinishScene();
             flow.SkipReRating();
             Assert.AreEqual(FlowState.Done, flow.State);
             Assert.IsNull(flow.Context.PostSceneReport);
             Assert.NotNull(flow.Context.Analysis);
+        }
+
+        [Test]
+        public void UnavailableForestCompletesWithoutPostSceneFeedback()
+        {
+            var flow = WithAnalysis();
+            flow.ChooseRelaxation();
+            flow.EnterScene();
+            flow.FinishScene();
+            Assert.AreEqual(FlowState.Done, flow.State);
+            Assert.IsFalse(flow.Context.SceneParticipated);
+            Assert.IsNull(flow.Context.PostSceneReport);
         }
 
         [Test]

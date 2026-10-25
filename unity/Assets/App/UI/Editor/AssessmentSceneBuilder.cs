@@ -46,7 +46,7 @@ namespace App.UI.Editor
             var prefabs = new GameObject[]
             {
                 Save(Consent()), Save(Baseline()), Save(LoadTask()), Save(CheckIn()), Save(Summary()),
-                Save(RelaxationOptions()), Save(SceneView()), Save(ReRating()), Save(Done()),
+                Save(RelaxationSetup()), Save(SceneView()), Save(ReRating()), Save(Done()),
             };
             var bar = Save(Bar());
             var pause = Save(Pause());
@@ -133,14 +133,14 @@ namespace App.UI.Editor
             return root;
         }
 
-        static GameObject RelaxationOptions()
+        static GameObject RelaxationSetup()
         {
-            var root = PanelRoot("RelaxationOptionsPanel");
-            var p = root.AddComponent<RelaxationOptionsPanel>();
-            Label(root.transform, "Optional relaxation", 30, 44);
-            p.Preview = Label(root.transform, "", 20, flexible: true);
-            p.ChooseSettings = MakeToggle(root.transform, "Choose my forest settings");
-            p.PreferenceGroup = Group(root.transform, "Preferences", horizontal: true);
+            var root = PanelRoot("RelaxationSetupPanel");
+            var p = root.AddComponent<RelaxationSetupPanel>();
+            Label(root.transform, "Optional relaxation: preferences and preview", 26, 40);
+            p.Body = Label(root.transform, "", 20, flexible: true);
+            p.ChooseSettings = MakeToggle(root.transform, "Choose settings myself");
+            p.PreferenceGroup = Group(root.transform, "Preferences");
             p.Animals = MakeToggle(p.PreferenceGroup.transform, "Animals");
             p.Silent = MakeToggle(p.PreferenceGroup.transform, "Silent");
             p.Sunset = MakeToggle(p.PreferenceGroup.transform, "Sunset (off = day)");
@@ -168,13 +168,14 @@ namespace App.UI.Editor
         {
             var root = PanelRoot("ReRatingPanel");
             var p = root.AddComponent<ReRatingPanel>();
-            Label(root.transform, "Optional: how do you feel now?", 30, 44);
+            Label(root.transform, "How do you feel now?", 30, 44);
             p.EyeStrain = Rating(root.transform, "Eye strain");
             p.MentalFatigue = Rating(root.transform, "Mental fatigue");
             Spacer(root.transform);
+            Label(root.transform, "Feedback is optional.", 20, 32);
             var row = ButtonRow(root.transform);
-            p.SkipButton = MakeButton(row, "Skip feedback");
-            p.SubmitButton = MakeButton(row, "Submit feedback");
+            p.SkipButton = MakeButton(row, "Finish without feedback");
+            p.SubmitButton = MakeButton(row, "Submit feedback and finish");
             return root;
         }
 

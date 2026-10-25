@@ -8,21 +8,25 @@ The assessment now completes normally with its report. A forest is a separate op
 - Done retains the same measurements, limitations, safety information, data/AI provenance and calculation-failure notice. **Exit** or **New session** clears the report and recordings. Reports are never saved to disk by the app.
 - **Try optional relaxation** opens a separate preferences/preview screen. **Back to report** declines it without loading a forest. **Enter optional forest** confirms entry and applies validated preferences locally.
 - A stop-session notice blocks relaxation while preserving report completion and immediate Exit.
-- Scene participants may submit feedback or choose **Skip feedback**; no after-scene rating is invented.
+- Scene participants may submit feedback or choose **Finish without feedback**; no after-scene rating is invented.
 - Pending analysis disables report completion. Exit cancels it; a late result cannot revive a reset session or overwrite its progress state. Analysis errors expose an exception type only.
 
 The required v1 scene configuration/rationale remains on the wire; the report formatter ignores it. Scene preferences are no longer collected during check-in or needed for report generation. No JSON schemas, DTO fields or backend request models change.
 
 ## Implementation
 
-`SessionFlow` provides the report-only transition, explicit RelaxationOptions state, scene-entry guard and optional feedback. `SessionController` retains/clears data at the appropriate actions and rejects stale async completions. `AssessmentSceneBuilder.BuildAll` generated Assessment, all panel prefabs and the new RelaxationOptionsPanel assets in Unity 6000.6.7f1. Existing asset GUIDs are preserved; no serialized YAML/GUIDs were hand-edited.
+`SessionFlow` provides the report-only transition, explicit RelaxationSetup state, scene-entry guard and optional feedback. `SessionController` retains/clears data at the appropriate actions and rejects stale async completions. `AssessmentSceneBuilder.BuildAll` generated Assessment, all panel prefabs and the new RelaxationSetupPanel assets in Unity 6000.6.7f1. Existing asset GUIDs are preserved; no serialized YAML/GUIDs were hand-edited.
 
 Shared status docs were updated during integration so the former scene-required flow is no longer described as current behavior.
+
+## Consolidation with teammate PR #26
+
+PR #26 appeared while #27 was being implemented. The integration retains the teammate's RelaxationSetup API, numeric self-report, scene-load/session guard and participation tracking: a missing forest does not count as participation or request post-scene feedback. It keeps the integration's preference-copy protection, exception-type-only logging, report-retention wording, desktop UI evidence and additional reset/HTTP regressions. The scene/prefabs were regenerated from the combined builder; duplicate RelaxationOptions assets were removed. No teammate implementation was discarded wholesale.
 
 ## Desktop verification
 
 - Combined PRs #19, #24 and #25: **321 EditMode tests**, **150 backend tests**, Ruff and contracts passed before this follow-up.
-- Report-only state regressions: **327 EditMode tests passed**, no skips, on Unity **6000.6.7f1** and the full pinned package graph.
+- Report-only state regressions: **328 EditMode tests passed**, no skips, on Unity **6000.6.7f1** and the full pinned package graph.
 - Final PlayMode results: **19 passed, no skips**, on the same pinned Unity editor..
 - Backend tests: **150 passed**; Ruff passed for app/tests/scripts. Contracts: **14 schemas, 35 fixtures, 7 deliberately invalid examples rejected**; no C# reports regenerated during this integration.
 - The native HTTP tests used a loopback-only backend in hosted mode, a synthetic test token, Gemini disabled and invented requests. They exercise successful backend rules, auth/422 handling, invalid responses, network fallback, replay, unavailable calculations and report/forest paths.

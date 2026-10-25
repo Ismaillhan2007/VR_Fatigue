@@ -111,6 +111,8 @@ namespace App.Tests
                     yield return WaitUntil(() => received.Task.IsCompleted);
                     Assert.IsTrue(c.AnalysisInProgress);
                     Assert.IsFalse(c.Panels.OfType<SummaryPanel>().Single().FinishReportButton.interactable);
+                    Assert.IsFalse(c.Panels.OfType<SummaryPanel>().Single().EnterSceneButton.interactable);
+                    Assert.Throws<InvalidOperationException>(() => c.FinishWithReport());
                     var previousId = c.Flow.Context.SessionId;
                     c.Exit();
                     c.Restart();
@@ -165,9 +167,9 @@ namespace App.Tests
             yield return ShortSession(c);
             var summary = c.Panels.OfType<SummaryPanel>().Single();
             summary.EnterSceneButton.onClick.Invoke();
-            Assert.AreEqual(FlowState.RelaxationOptions, c.Flow.State);
+            Assert.AreEqual(FlowState.RelaxationSetup, c.Flow.State);
             Assert.IsFalse(SceneManager.GetSceneByName("ForestDemo").isLoaded);
-            var options = c.Panels.OfType<RelaxationOptionsPanel>().Single();
+            var options = c.Panels.OfType<RelaxationSetupPanel>().Single();
             options.BackButton.onClick.Invoke();
             Assert.AreEqual(FlowState.Summary, c.Flow.State);
             summary.EnterSceneButton.onClick.Invoke();
@@ -223,7 +225,7 @@ namespace App.Tests
                 .GetField("_task", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
                 .GetValue(c);
             var row = task.Samples[0]; row.SensorTimestamp = double.NaN; task.Samples[0] = row;
-            c.SubmitCheckIn(new SelfReport { Phase = ReportPhase.PostTask, EyeStrain = 3, MentalFatigue = 3 });
+            c.SubmitCheckIn(new SelfReport { Phase = ReportPhase.PostTask, EyeStrain = 3, MentalFatigue = 3 }, null);
             yield return WaitUntil(() => c.Flow.Context.Analysis != null);
 
             var summary = c.Flow.Context.Summary;
@@ -308,7 +310,7 @@ namespace App.Tests
             {
                 Phase = ReportPhase.PostTask, EyeStrain = 3, MentalFatigue = 3,
                 Chips = new List<Chip> { Chip.WantQuiet }, FreeText = "private check-in stays here",
-            });
+            }, null);
             yield return WaitUntil(() => c.Flow.Context.Analysis != null, 20);
             var ctx = c.Flow.Context;
             Assert.AreEqual(AiSource.Fallback, ctx.Analysis.AiSource);
@@ -324,7 +326,8 @@ namespace App.Tests
             StringAssert.Contains("FALLBACK from backend rules", bar.AiLabel.text);
             Assert.IsNull(ctx.Preferences, "preferences are not collected before relaxation is chosen");
             c.ChooseRelaxation();
-            c.EnterScene(new Preferences { AnimalsEnabled = false, Sound = SoundMode.Silent, Motion = MotionMode.None });
+            c.Flow.SetScenePreferences(new Preferences { AnimalsEnabled = false, Sound = SoundMode.Silent, Motion = MotionMode.None });
+            c.EnterScene();
             Assert.IsFalse(App.Relaxation.SceneConfigHandoff.Current.AnimalsEnabled);
             Assert.AreEqual(SoundMode.Silent, App.Relaxation.SceneConfigHandoff.Current.Sound);
             yield return WaitUntil(() => c.SceneStatus.Contains("brightness"));
@@ -422,7 +425,7 @@ namespace App.Tests
             {
                 Phase = ReportPhase.PostTask, EyeStrain = 5, MentalFatigue = 4,
                 Chips = new List<Chip> { Chip.TiredEyes, Chip.WantQuiet }, FreeText = "a bit dizzy",
-            });
+            }, null);
             yield return WaitUntil(() => c.Flow.Context.Analysis != null, 20);
 
             var ctx = c.Flow.Context;
@@ -469,7 +472,7 @@ namespace App.Tests
             {
                 Phase = ReportPhase.PostTask, EyeStrain = 5, MentalFatigue = 5,
                 Chips = new List<Chip> { Chip.TiredEyes, Chip.WantQuiet }, FreeText = "private text stays local",
-            });
+            }, null);
             yield return WaitUntil(() => c.Flow.Context.Analysis != null, 20);
 
             var a = c.Flow.Context.Analysis;
@@ -489,7 +492,7 @@ namespace App.Tests
 
         /// <summary>Desktop demo default: the synthetic 130 s replay with probes, played fast, offline, to the forest.</summary>
         [UnityTest]
-        public IEnumerator DemoReplayShowsDeviationsAndReachesForest()
+        public IEnumerator DemoReplayShowsDeviationsAndCompletesWithReport()
         {
             yield return SceneManager.LoadSceneAsync("Assessment");
             var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
@@ -503,7 +506,7 @@ namespace App.Tests
             yield return WaitUntil(() => !c.IsCapturing, 20);
             c.SubmitBaseline(2, 2);
             yield return WaitUntil(() => c.Flow.State == FlowState.CheckIn, 20);
-            c.SubmitCheckIn(new SelfReport { Phase = ReportPhase.PostTask, EyeStrain = 5, MentalFatigue = 4, Chips = new List<Chip> { Chip.TiredEyes } });
+            c.SubmitCheckIn(new SelfReport { Phase = ReportPhase.PostTask, EyeStrain = 5, MentalFatigue = 4, Chips = new List<Chip> { Chip.TiredEyes } }, null);
             yield return WaitUntil(() => c.Flow.Context.Analysis != null, 20);
 
             var s = c.Flow.Context.Summary;
@@ -516,12 +519,9 @@ namespace App.Tests
             Assert.AreNotEqual(StrainLevel.Unavailable, s.StrainIndicator.Level, "the demo must show the experimental indicator");
             StringAssert.Contains("Probe trials", c.ProbeStatsText);
 
-            c.ChooseRelaxation();
-            c.EnterScene();
-            yield return WaitUntil(() => c.SceneStatus.Contains("brightness"));
-            StringAssert.Contains("Forest scene loaded", c.SceneStatus);
-            c.FinishScene();
-            c.SubmitReRating(3, 3);
+            c.FinishWithReport();
+            Assert.IsFalse(SceneManager.GetSceneByName("ForestDemo").isLoaded);
+            Assert.IsNull(c.Flow.Context.PostSceneReport);
             Assert.AreEqual(FlowState.Done, c.Flow.State);
         }
     }

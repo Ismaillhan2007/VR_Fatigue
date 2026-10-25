@@ -53,7 +53,7 @@ namespace App.UI.Panels
                 Chips = chips,
                 FreeText = string.IsNullOrWhiteSpace(FreeText.text) ? null : FreeText.text.Trim(),
             };
-            Controller.SubmitCheckIn(report);
+            Controller.SubmitCheckIn(report, null);
         }
     }
 }

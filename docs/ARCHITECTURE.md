@@ -51,9 +51,9 @@ and the native eye adapter. `MetricsEngineFactory` returns `SignalsMetricsEngine
                          SceneConfigHandoff ──▶ ISceneApplier.Apply (ForestDemo or logging stub)
 ```
 
-`SessionFlow` (Core/Flow) owns Consent -> Baseline -> LoadTask -> CheckIn -> Summary, then either FinishWithReport -> Done or ChooseRelaxation -> RelaxationOptions -> Scene -> ReRating -> Done. ReRating can be skipped. Pause blocks transitions; Exit clears data from anywhere. It rejects summaries/analyses whose session id or data provenance differ from the provider chosen at consent, so nothing can be relabelled as live later.
+`SessionFlow` (Core/Flow) owns Consent -> Baseline -> LoadTask -> CheckIn -> Summary, then either FinishWithReport -> Done or ChooseRelaxation -> RelaxationSetup -> Scene -> ReRating -> Done. ReRating can be skipped. Pause blocks transitions; Exit clears data from anywhere. It rejects summaries/analyses whose session id or data provenance differ from the provider chosen at consent, so nothing can be relabelled as live later.
 
-Report-only completion retains the same report, safety, provenance and limitations on Done until Exit or New session. Scene preferences and preview appear only in RelaxationOptions; entering still requires a second deliberate action. SummaryFormatter omits scene content from the report. The required v1 scene config/rationale stays on the wire and is unused for report-only sessions; no contract change is needed.
+Report-only completion retains the same report, safety, provenance and limitations on Done until Exit or New session. Scene preferences and preview appear only in RelaxationSetup; entering still requires a second deliberate action. SummaryFormatter omits scene content from the report. The required v1 scene config/rationale stays on the wire and is unused for report-only sessions; no contract change is needed.
 
 ## Seams and owners
 

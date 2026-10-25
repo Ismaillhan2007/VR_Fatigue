@@ -15,7 +15,7 @@ namespace App.Core.Flow
         ReRating,
         Done,
         Exited,
-        RelaxationOptions,
+        RelaxationSetup, // appended to preserve serialized values of the existing states
     }
 
     /// <summary>Everything one session knows. Lives in memory only and is cleared on exit/restart.</summary>
@@ -36,7 +36,7 @@ namespace App.Core.Flow
         public AnalysisResponse Analysis;
         public string AnalysisFallbackReason;
         public SelfReport PostSceneReport;
-        public bool SceneEntered;
+        public bool SceneParticipated;
 
         public AiSource? AiSource => Analysis?.AiSource;
 
@@ -45,7 +45,7 @@ namespace App.Core.Flow
     }
 
     /// <summary>
-    /// Report-first flow: Summary -> Done, or explicit RelaxationOptions -> Scene -> optional ReRating -> Done,
+    /// Pure session flow: assessment -> report -> Done, or explicitly chosen relaxation -> optional feedback -> Done,
     /// with pause (blocks transitions) and exit (from anywhere; clears session data). Invalid transitions throw.
     /// Provenance set at consent cannot be relabelled later.
     /// </summary>
@@ -93,11 +93,13 @@ namespace App.Core.Flow
             MoveTo(FlowState.CheckIn);
         }
 
-        public void SubmitCheckIn(SelfReport postTaskReport)
+        public void SubmitCheckIn(SelfReport postTaskReport, Preferences preferences)
         {
             Require(FlowState.CheckIn);
             RequireReport(postTaskReport, ReportPhase.PostTask);
+            if (preferences != null) throw new InvalidOperationException("choose scene preferences only after opting into relaxation");
             Context.PostTaskReport = postTaskReport.Copy();
+            Context.Preferences = preferences;
             MoveTo(FlowState.Summary);
         }
 
@@ -130,7 +132,7 @@ namespace App.Core.Flow
         public void FinishWithReport()
         {
             Require(FlowState.Summary);
-            if (Context.Analysis == null) throw new InvalidOperationException("no analysis yet");
+            RequireAnalysis();
             MoveTo(FlowState.Done);
         }
 
@@ -138,25 +140,36 @@ namespace App.Core.Flow
         {
             Require(FlowState.Summary);
             RequireSceneAllowed();
-            MoveTo(FlowState.RelaxationOptions);
+            MoveTo(FlowState.RelaxationSetup);
         }
 
         public void CancelRelaxation()
         {
-            Require(FlowState.RelaxationOptions);
+            Require(FlowState.RelaxationSetup);
             Context.Preferences = null;
             MoveTo(FlowState.Summary);
         }
 
-        public void EnterScene(Preferences preferences = null)
+        public void SetScenePreferences(Preferences preferences)
         {
-            Require(FlowState.RelaxationOptions);
-            RequireSceneAllowed();
+            Require(FlowState.RelaxationSetup);
             if (preferences != null) ThrowIfInvalid(preferences);
             Context.Preferences = preferences == null ? null :
                 ContractJson.Parse<Preferences>(ContractJson.Serialize(preferences));
-            Context.SceneEntered = true;
+            ContextChanged?.Invoke();
+        }
+
+        public void EnterScene()
+        {
+            Require(FlowState.RelaxationSetup);
+            RequireSceneAllowed();
             MoveTo(FlowState.Scene);
+        }
+
+        void RequireAnalysis()
+        {
+            if (Context.Summary == null || Context.Analysis == null)
+                throw new InvalidOperationException("wait for the report before completing");
         }
 
         void RequireSceneAllowed()
@@ -166,10 +179,22 @@ namespace App.Core.Flow
                 throw new InvalidOperationException("stop-session notice requires exiting and resting");
         }
 
+        public void MarkSceneParticipated()
+        {
+            if (State != FlowState.Scene) throw new InvalidOperationException("no scene is being entered");
+            Context.SceneParticipated = true;
+        }
+
         public void FinishScene()
         {
             Require(FlowState.Scene);
-            MoveTo(FlowState.ReRating);
+            MoveTo(Context.SceneParticipated ? FlowState.ReRating : FlowState.Done);
+        }
+
+        public void SkipReRating()
+        {
+            Require(FlowState.ReRating);
+            MoveTo(FlowState.Done);
         }
 
         public void SubmitReRating(SelfReport postSceneReport)
@@ -177,12 +202,6 @@ namespace App.Core.Flow
             Require(FlowState.ReRating);
             RequireReport(postSceneReport, ReportPhase.PostScene);
             Context.PostSceneReport = postSceneReport.Copy();
-            MoveTo(FlowState.Done);
-        }
-
-        public void SkipReRating()
-        {
-            Require(FlowState.ReRating);
             MoveTo(FlowState.Done);
         }
 

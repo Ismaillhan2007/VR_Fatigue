@@ -170,15 +170,15 @@ namespace App.UI
             BeginCapture(_task, TaskSeconds, "l", loaded: true);
         }
 
-        public async void SubmitCheckIn(SelfReport report)
+        public async void SubmitCheckIn(SelfReport report, Preferences preferences)
         {
-            Flow.SubmitCheckIn(report);
+            Flow.SubmitCheckIn(report, preferences);
             var sessionId = Flow.Context.SessionId;
             var succeeded = MetricsEngineFactory.TryCompute(_metrics, _task, _baseline, ContextForMetrics(report), out var summary);
             MetricsFailureMessage = succeeded ? null : "Measurements could not be calculated. Please repeat the session or continue using your check-in.";
             Flow.SetSummary(summary);
 
-            var request = AnalyzeRequest.Create(summary, Flow.Context.BaselineReport, null);
+            var request = AnalyzeRequest.Create(summary, Flow.Context.BaselineReport, preferences);
             AnalysisInProgress = true;
             RefreshVisible();
             AnalysisResult result;
@@ -199,19 +199,30 @@ namespace App.UI
         public void FinishWithReport() => Flow.FinishWithReport();
         public void ChooseRelaxation() => Flow.ChooseRelaxation();
         public void CancelRelaxation() => Flow.CancelRelaxation();
+        public void SkipReRating() => Flow.SkipReRating();
 
-        public void EnterScene(Preferences preferences = null)
+        public SceneConfig ScenePreview => Flow.Context.Analysis == null ? null
+            : SceneConfigSanitizer.Sanitize(Flow.Context.Analysis.SceneConfig, Flow.Context.Preferences);
+
+        public void EnterScene()
         {
             if (Flow.Context.Analysis?.SafetyNotice == SafetyNotice.StopSession) return;
-            Flow.EnterScene(preferences);
+            Flow.EnterScene();
             var config = Flow.Context.Analysis.SceneConfig;
             SceneStatus = "Loading scene...";
-            StartCoroutine(EnterSceneRoutine(config));
+            StartCoroutine(EnterSceneRoutine(config, Flow.Context.SessionId));
         }
 
-        System.Collections.IEnumerator EnterSceneRoutine(SceneConfig config)
+        System.Collections.IEnumerator EnterSceneRoutine(SceneConfig config, string sessionId)
         {
             yield return _scene.Enter(config, Flow.Context.Preferences);
+            if (Flow.Context.SessionId != sessionId || Flow.State != FlowState.Scene)
+            {
+                yield return _scene.Exit();
+                SceneConfigHandoff.Clear();
+                yield break;
+            }
+            if (_scene.ForestLoaded) Flow.MarkSceneParticipated();
             SceneStatus = (_scene.ForestLoaded ? "Forest scene loaded." : "Forest scene not available yet (stub applier): showing the config only.")
                 + "\n\n" + SummaryFormatter.SceneLine(SceneConfigHandoff.Current)
                 + "\n\nYou can mute, pause or exit at any time.";
@@ -237,8 +248,6 @@ namespace App.UI
         public void SubmitReRating(int eyeStrain, int mentalFatigue) =>
             Flow.SubmitReRating(new SelfReport { Phase = ReportPhase.PostScene, EyeStrain = eyeStrain, MentalFatigue = mentalFatigue });
 
-        public void SkipReRating() => Flow.SkipReRating();
-
         public void TogglePause()
         {
             if (Flow.IsPaused) Flow.Resume();
@@ -249,6 +258,7 @@ namespace App.UI
         {
             MetricsFailureMessage = null;
             _cts.Cancel();
+            _cts.Dispose();
             _cts = new CancellationTokenSource();
             StopCapture();
             StartCoroutine(_scene.Exit());
@@ -257,15 +267,18 @@ namespace App.UI
             _baseline.SelfReport = null;
             _task.Clear();
             AnalysisInProgress = false;
+            SceneStatus = "";
             Flow.Exit();
         }
 
         public void Restart()
         {
-            MetricsFailureMessage = null;
+            if (Flow.State != FlowState.Done && Flow.State != FlowState.Exited)
+                throw new InvalidOperationException("finish or exit before restarting");
             _cts.Cancel();
             _cts.Dispose();
             _cts = new CancellationTokenSource();
+            MetricsFailureMessage = null;
             StopCapture();
             _baseline.Recording.Clear();
             _baseline.SelfReport = null;
