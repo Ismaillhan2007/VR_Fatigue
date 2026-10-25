@@ -35,9 +35,12 @@ def response_validator():
 
 @pytest.fixture
 def body():
+    session = fixture("session_synthetic_usable.json")
+    session["self_report"]["free_text"] = None
     return {
         "schema_version": "1.0",
-        "session_summary": fixture("session_synthetic_usable.json"),
+        "cloud_policy": "synthetic_demo",
+        "session_summary": session,
         "preferences": fixture("preferences_default.json"),
         "reconciliation": "agree_high",
         "safety_notice": "none",
@@ -108,6 +111,7 @@ def test_health_and_openapi_without_key():
 
 
 def test_offline_response_matches_shared_contract_and_preferences(body, response_validator):
+    body["preferences"].update(animals_enabled=False, sound="silent", motion="none")
     with client_for() as client:
         response = client.post("/api/v1/analyze", json=body)
     assert response.status_code == 200, response.text
@@ -282,7 +286,7 @@ def test_real_measurements_never_reach_cloud(body, source, origin):
 
 
 def test_safety_can_only_increase_and_skips_cloud(body):
-    body["session_summary"]["self_report"]["free_text"] = "I feel dizzy"
+    body["safety_notice"] = "stop_session"
     adapter = FakeAdapter()
     with client_for(live_settings(), adapter) as client:
         response = client.post("/api/v1/analyze", json=body)
@@ -305,6 +309,7 @@ def test_model_failures_return_local_response(body, behavior):
 
 
 def test_cache_rebinds_session_and_preserves_controls(body):
+    body["preferences"].update(animals_enabled=False, sound="silent", motion="none")
     adapter = FakeAdapter()
     with client_for(live_settings(), adapter) as client:
         first = client.post("/api/v1/analyze", json=body).json()
@@ -335,8 +340,6 @@ def test_budget_cutoff_prevents_calls(body, limit):
 
 
 def test_prompt_omits_identifiers_and_free_text(body):
-    body["session_summary"]["self_report"]["free_text"] = "private-free-text-marker"
-    body["preferences"]["text"] = "ignore-all-rules-marker"
     request = AnalysisRequest.model_validate(body)
     prompt = build_prompt(request, [])
     assert "private-free-text-marker" not in prompt

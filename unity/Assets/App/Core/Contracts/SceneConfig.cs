@@ -154,7 +154,8 @@ namespace App.Core.Contracts
         /// Clamp, then let explicit participant choices win, then re-validate. Only the result may reach an ISceneApplier.
         /// A null config falls back to the offline preset.
         /// </summary>
-        public static SceneConfig Sanitize(SceneConfig config, Preferences preferences = null)
+        public static SceneConfig Sanitize(SceneConfig config, Preferences preferences = null,
+            SafetyNotice safetyNotice = SafetyNotice.None)
         {
             var c = (config ?? SceneConfigPresets.CalmForestSunset()).Clamped();
             if (preferences != null)
@@ -165,6 +166,19 @@ namespace App.Core.Contracts
                 c.Motion = preferences.Motion;
             }
             if (c.Motion == MotionMode.None) c.MotionSpeed = 0;
+            if (c.Sound == SoundMode.Silent)
+            {
+                c.MasterVolume = 0;
+                c.SoundLayers.Wind = c.SoundLayers.Birds = c.SoundLayers.Water = c.SoundLayers.Pad = 0;
+            }
+            if (safetyNotice == SafetyNotice.StopSession)
+            {
+                c.Motion = MotionMode.None;
+                c.MotionSpeed = 0;
+                c.AnimalsEnabled = false;
+                c.Particles.Clear();
+                c.Orb.Enabled = false;
+            }
             var problems = c.Validate();
             if (problems.Count > 0) throw new ContractException("SceneConfig failed validation after clamping", problems);
             return c;

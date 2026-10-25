@@ -11,6 +11,8 @@ namespace App.Core.Analysis
     public sealed class AnalyzeRequest : IContract
     {
         [JsonProperty("schema_version", Required = Required.Always)] public string SchemaVersion = Problems.SchemaVersion;
+        /// <summary>Interactive check-ins always stay local. SyntheticDemo is only for invented test scenarios.</summary>
+        [JsonProperty("cloud_policy", Required = Required.DisallowNull)] public CloudPolicy CloudPolicy = CloudPolicy.LocalOnly;
         [JsonProperty("session_summary", Required = Required.Always)] public SessionSummary SessionSummary;
         /// <summary>Null when the participant let the app choose.</summary>
         [JsonProperty("preferences", Required = Required.AllowNull)] public Preferences Preferences;
@@ -20,6 +22,7 @@ namespace App.Core.Analysis
         public void Validate(Problems p, string path)
         {
             p.Version(path, SchemaVersion);
+            p.Defined(path + ".cloud_policy", CloudPolicy);
             p.Nested(path + ".session_summary", SessionSummary);
             if (Preferences != null) Preferences.Validate(p, path + ".preferences");
             p.Defined(path + ".reconciliation", Reconciliation);
@@ -46,6 +49,7 @@ namespace App.Core.Analysis
             }
             return new AnalyzeRequest
             {
+                CloudPolicy = CloudPolicy.LocalOnly,
                 SessionSummary = wireSummary,
                 Preferences = wirePreferences,
                 Reconciliation = ReconciliationRules.Compute(post, baselineReport, summary.StrainIndicator.Level),

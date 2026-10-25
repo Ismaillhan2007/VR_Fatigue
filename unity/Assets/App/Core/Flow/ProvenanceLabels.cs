@@ -31,10 +31,12 @@ namespace App.Core.Flow
                 case AiSource.Live: return $"AI: live ({c.Analysis.ModelId})";
                 case AiSource.Cached: return $"AI: CACHED earlier output ({c.Analysis.ModelId ?? "unknown model"})";
                 default:
-                    // No local reason means the backend answered with its own deterministic rules.
+                    // Unity's own rules stamp prompt_version "none"; anything else came from the backend's rules.
+                    var fromBackend = c.Analysis.PromptVersion != App.Core.Analysis.LocalFallbackAnalysis.PromptVersion;
+                    var label = fromBackend ? "AI: FALLBACK from backend rules" : "AI: LOCAL FALLBACK";
                     return string.IsNullOrEmpty(c.AnalysisFallbackReason)
-                        ? "AI: FALLBACK from backend rules (no AI used)"
-                        : $"AI: LOCAL FALLBACK (no AI used: {c.AnalysisFallbackReason})";
+                        ? label + " (no AI used)"
+                        : $"{label} (no AI used: {c.AnalysisFallbackReason})";
             }
         }
     }

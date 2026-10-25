@@ -17,7 +17,7 @@ The report is an **experimental wellness summary**, not a medical diagnosis or p
 | VR | Unity LTS + C#, URP, OpenXR, XR Interaction Toolkit | Headset input, UI, prebuilt scenes, comfort controls |
 | Eye adapter | Meta XR Core SDK `OVRPlugin` on Quest Pro (head-local/timestamp adapter); `ReplayEyeProvider` elsewhere | Capability checks, calibration status, validity, timestamps |
 | Metrics | Pure C# functions with Unity EditMode tests | Local aggregation; no cloud eye processing |
-| Backend | Python 3.11+, FastAPI, Pydantic, `google-genai`, pytest | Contract validation, bounded Gemini call, cache, local fallback |
+| Backend | Python 3.12 (pinned), FastAPI, Pydantic, `google-genai`, pytest | Contract validation, bounded Gemini call, cache, local fallback |
 | Transport | UnityWebRequest + versioned JSON over HTTP locally / HTTPS remotely | One summary request after a session, not frame streaming |
 | Storage | Memory by default; synthetic JSON fixtures | No database needed for the hackathon |
 

@@ -56,13 +56,16 @@ Never commit without the `.meta` files Unity creates, never edit GUIDs by hand, 
 - **Eye Source** (desktop demo default: `Replay` of `../fixtures/replay/demo_session.json`): a **synthetic** 190 s session (130 s baseline + 60 s loaded task, 95 probe trials, realistic artifacts). The top bar says "REPLAY of synthetic data (not live)". `Replay Speed` (default 4) only shortens the wait: metrics use the file's sensor timestamps. `Synthetic` runs the live generator with the same probe task; `Hardware` is the placeholder (falls back to synthetic with a visible note). A missing replay path falls back to `StreamingAssets/fixtures/replay/`. Regenerate the fixture with `python3 tools/generate_demo_session.py` and copy it to StreamingAssets (a test checks the copy).
 - **Probe task**: in Baseline and Task a yellow head-locked target (2 m) jumps every 2 s through the fixed layout `probe_cycle_10_v1` (10 positions, jumps 10-30 degrees); both phases use the same layout, so their `conditions_id` honestly match. Probe policy: within 2 degrees by 500 ms. The summary shows per-trial counts.
 - **Analysis**: `Http` (default; falls back to local rules on any failure, 15 s timeout), `Mock` (canned fixture), `Local` (offline only).
-- **Backend Base Url** / **Backend Access Token**: default `http://127.0.0.1:8000`. In a build use `-backendUrl http://<laptop-LAN-IP>:8000` and, only if the backend sets `VR_BACKEND_ACCESS_TOKEN`, `-backendToken <token>`. Never put the Gemini key in Unity.
+- **Backend Base Url**: default `http://127.0.0.1:8000`. In a build use `-backendUrl http://<laptop-LAN-IP>:8000`. Never put the Gemini key in Unity.
 - **Baseline/Task Seconds**: 130 / 60 in eye-data seconds (matches the demo file). Deviations need at least 6 usable 20 s baseline windows; the experimental indicator also needs probes in both phases. With the demo replay it shows real deviations (still synthetic data, still experimental, not a fatigue score).
 
 ## Backend and network
 
 - Same machine: keep `http://127.0.0.1:8000` (`localhost` works only on the same machine).
 - Headset or another laptop: start the backend with `--host 0.0.0.0`, use the laptop's **LAN IP** in Unity (not `localhost`, not `0.0.0.0`), open the port in the firewall, and allow HTTP for development builds (Player settings -> Allow downloads over HTTP). Venue Wi-Fi may isolate clients; a phone hotspot is the fallback. See [HARDWARE_QUEST_PRO.md](HARDWARE_QUEST_PRO.md) section 3 and [backend/README.md](../backend/README.md).
+- `preferences: null` means the participant lets the app choose; the backend rejects non-null free text with 422 (decision D1). The optional request field `cloud_policy` defaults to `local_only`; `synthetic_demo` is only for invented test scenarios, never for participant check-ins.
+- If the backend sets `VR_BACKEND_ACCESS_TOKEN`, start Unity with the same environment variable; the client reads it at runtime. Never put it in scenes, prefabs, URLs or command-line arguments, and never use the Gemini key as the client token.
+- Backend generation deadline 12 s, Unity HTTP timeout 15 s; every network/auth failure uses the labelled local fallback.
 - Gemini stays off unless `backend/.env` enables it with a key, model, prices and budget (see `backend/.env.example`). Only synthetic data is ever sent to it. The request body is `contracts/v1/analyze_request.schema.json` and never contains free text.
 
 When you change a file in `fixtures/` that has a copy in `unity/Assets/StreamingAssets/fixtures/`, copy it again; a test fails if the copies drift.

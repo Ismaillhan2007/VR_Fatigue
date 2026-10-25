@@ -105,6 +105,17 @@ namespace App.Tests
         [Test] public void RejectsNonObjectRoot() => Rejects<SessionSummary>("[1,2]");
 
         [Test]
+        public void LegacyRequestDefaultsToLocalOnly()
+        {
+            var json = JObject.Parse(TestFixtures.Read("analyze_request_synthetic.json"));
+            json.Remove("cloud_policy");
+            var request = ContractJson.Parse<App.Core.Analysis.AnalyzeRequest>(json.ToString());
+            Assert.AreEqual(CloudPolicy.LocalOnly, request.CloudPolicy);
+            json["cloud_policy"] = "unknown_policy";
+            Rejects<App.Core.Analysis.AnalyzeRequest>(json.ToString());
+        }
+
+        [Test]
         public void AcceptsReplayWithOrigin()
         {
             var s = ContractJson.Parse<SessionSummary>(Mutate(Usable, o => { o["data_source"] = "replay"; o["replay_origin"] = "synthetic"; }));

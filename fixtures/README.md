@@ -4,6 +4,7 @@ Everything here is **synthetic**: hand-written values that match the v1 contract
 
 - Valid examples: `session_synthetic_*.json`, `self_report_*.json`, `preferences_default.json`, `scene_config_calm_forest_sunset.json` (the saved offline demo preset), `analysis_fallback.json`.
 - `invalid/` holds inputs that must be rejected. `contracts/validate_examples.py` checks both groups.
+- `integration/scene_rules.json` holds synthetic scene-rule expectations shared by Python and C# tests. It covers null preferences, chip order, explicit overrides, full silence and stop-session behavior; it is a test-case list rather than a top-level v1 contract object.
 - There is deliberately no committed `live` example: that would be invented data presented as a measurement. Live and recorded-replay sessions come from consenting teammates, stay in the git-ignored `session-data/` folder, and are never committed.
 
 The signal module now supplies JSON replay fixtures in `fixtures/replay/`; the application CSV replay stub uses a separate format. Generate them synthetically and include the artefacts real headset streams show, so the metrics code is tested against them:

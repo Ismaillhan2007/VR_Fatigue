@@ -45,8 +45,8 @@ Works: offline by default (`VR_GEMINI_ENABLED=false`); the key is read only from
 
 Defects / mismatches:
 - `preferences` was required; the shared contract allows `null`, so every "let the app choose" request from Unity got 422 (and silently fell back). **Fixed here** (+2 tests).
-- Unity could not send the optional bearer token. **Fixed here** (`-backendToken` / inspector field).
-- The backend accepts non-null `free_text`, but `analyze_request.schema.json` requires `null`. Unity never sends it; owner should reject or strip it server-side.
+- Unity could not send the optional bearer token. Fixed in `dev`: `HttpAnalysisClient` reads `VR_BACKEND_ACCESS_TOKEN` at runtime (never a scene field or command-line argument).
+- The backend accepted non-null `free_text`. Fixed in `dev`: non-null `self_report.free_text` / `preferences.text` get 422 without echoing the text.
 - Stricter semantic rules than the schemas (indicator rules, `valid + gap = duration`). Fine, but document them in `contracts/README.md` so producers know.
 - Branch is based on the old `feat/contracts-v1` commit and merged into `dev`; base future work on `main`.
 

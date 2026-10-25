@@ -54,6 +54,7 @@ async def check(args):
     root = Path(__file__).resolve().parents[2]
     body = {
         "schema_version": "1.0",
+        "cloud_policy": "synthetic_demo",
         "session_summary": json.loads(
             (root / "fixtures/session_synthetic_usable.json").read_text()
         ),
@@ -61,6 +62,8 @@ async def check(args):
         "reconciliation": "agree_high",
         "safety_notice": "none",
     }
+    body["session_summary"]["self_report"]["free_text"] = None
+    body["preferences"].update(animals_enabled=False, sound="silent", motion="none")
     adapter = ProbeAdapter(settings)
     service = AnalysisService(settings, adapter)
     first = await service.analyze(AnalysisRequest.model_validate(body))
@@ -71,6 +74,9 @@ async def check(args):
     real_body["session_summary"].update(data_source="live", replay_origin=None)
     real_body["session_summary"]["capabilities"]["native_eye_gaze"] = True
     real = await service.analyze(AnalysisRequest.model_validate(real_body))
+    participant_body = copy.deepcopy(body)
+    participant_body["cloud_policy"] = "local_only"
+    participant = await service.analyze(AnalysisRequest.model_validate(participant_body))
     registry = Registry()
     for path in (root / "contracts/v1").glob("*.schema.json"):
         schema = json.loads(path.read_text())
@@ -82,7 +88,12 @@ async def check(args):
         "cache_hit": cached.ai_source == "cached" and adapter.calls == 1,
         "cache_session_rebound": cached.session_id == cached_body["session_summary"]["session_id"],
         "real_data_stays_local": real.ai_source == "fallback",
-        "shared_contracts": all(validator.is_valid(r.model_dump()) for r in (first, cached, real)),
+        "participant_checkin_stays_local": (
+            participant.ai_source == "fallback" and adapter.calls == 1
+        ),
+        "shared_contracts": all(
+            validator.is_valid(r.model_dump()) for r in (first, cached, real, participant)
+        ),
         "preference_overrides": (
             first.scene_config.sound == "silent"
             and not first.scene_config.animals_enabled

@@ -44,8 +44,6 @@ namespace App.UI
         public AnalysisMode Analysis = AnalysisMode.Http;
         [Tooltip("Override at runtime with the command-line argument -backendUrl http://<laptop-ip>:8000")]
         public string BackendBaseUrl = HttpAnalysisClient.DefaultBaseUrl;
-        [Tooltip("Only if the backend sets VR_BACKEND_ACCESS_TOKEN. Prefer the -backendToken command-line argument; never the Gemini key.")]
-        public string BackendAccessToken = "";
 
         [Header("Durations in replay/eye-data seconds (demo_session.json: 130 s baseline + 60 s task)")]
         public float BaselineSeconds = 130;
@@ -96,7 +94,6 @@ namespace App.UI
         void Awake()
         {
             BackendBaseUrl = CommandLineValue("-backendUrl") ?? BackendBaseUrl;
-            BackendAccessToken = CommandLineValue("-backendToken") ?? BackendAccessToken;
             Flow = new SessionFlow();
             Flow.StateChanged += (_, __) => ShowCurrent();
             Flow.PauseChanged += paused =>
@@ -342,7 +339,8 @@ namespace App.UI
             switch (Analysis)
             {
                 case AnalysisMode.Mock: return new MockAnalysisClient();
-                case AnalysisMode.Http: return new HttpAnalysisClient(BackendBaseUrl, BackendAccessToken);
+                // The optional backend token comes only from the VR_BACKEND_ACCESS_TOKEN environment variable.
+                case AnalysisMode.Http: return new HttpAnalysisClient(BackendBaseUrl);
                 default: return new LocalAnalysisClient();
             }
         }

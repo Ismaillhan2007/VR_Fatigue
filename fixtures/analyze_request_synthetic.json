@@ -92,5 +92,6 @@
     "text": null
   },
   "reconciliation": "agree_high",
-  "safety_notice": "none"
+  "safety_notice": "none",
+  "cloud_policy": "local_only"
 }
