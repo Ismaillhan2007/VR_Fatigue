@@ -114,6 +114,27 @@ namespace VRFatigue.QuestPro.Tests
         }
 
         [Test]
+        public void NativeHandednessConversionKeepsRightwardGazeAfterHeadCompensation()
+        {
+            var head = NativeYaw(45).ToOVRPose();
+            var eye = NativeYaw(60).ToOVRPose();
+            Assert.That(QuestGazeGeometry.TryHeadLocalDirection(eye.orientation, head.orientation,
+                out var direction), Is.True);
+            Assert.That(Vector3.Angle(direction, Quaternion.Euler(0, 15, 0) * Vector3.forward), Is.LessThan(0.01f));
+            Assert.That(eye.position.z, Is.EqualTo(1));
+        }
+
+        private static OVRPlugin.Posef NativeYaw(float unityDegrees)
+        {
+            float half = unityDegrees * Mathf.Deg2Rad / 2;
+            return new OVRPlugin.Posef
+            {
+                Position = new OVRPlugin.Vector3f { z = -1 },
+                Orientation = new OVRPlugin.Quatf { y = -Mathf.Sin(half), w = Mathf.Cos(half) }
+            };
+        }
+
+        [Test]
         public void DesktopDoesNotInstallOrPromptForQuestRendering()
         {
             Assert.That(QuestProRenderingController.EnsureInstalled(), Is.Null);
