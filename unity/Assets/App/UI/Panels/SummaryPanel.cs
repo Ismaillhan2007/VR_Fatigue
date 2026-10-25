@@ -21,9 +21,9 @@ namespace App.UI.Panels
         public override void Refresh()
         {
             var c = Controller.Flow.Context;
-            EnterSceneButton.interactable = c.Analysis != null
-                && c.Analysis.SafetyNotice != SafetyNotice.StopSession;
-            Body.text = SummaryFormatter.Format(c, Controller.AnalysisInProgress);
+            // stop_session: show the take-a-break message instead of offering the scene.
+            EnterSceneButton.interactable = c.Analysis != null && c.Analysis.SafetyNotice != SafetyNotice.StopSession;
+            Body.text = SummaryFormatter.Format(c, Controller.AnalysisInProgress, Controller.ProbeStatsText);
         }
     }
 }

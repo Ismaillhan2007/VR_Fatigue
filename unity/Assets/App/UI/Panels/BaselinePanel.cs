@@ -38,7 +38,7 @@ namespace App.UI.Panels
             SkipButton.gameObject.SetActive(capturing);
             ContinueButton.gameObject.SetActive(!capturing);
             Status.text = capturing
-                ? $"Baseline: relax and look around the screen.\n{Controller.PhaseRemainingSeconds:0} s left ({Controller.SampleCount} samples, {Controller.EyeSourceDescription})"
+                ? $"Baseline: follow the yellow target with your eyes.\n{Controller.PhaseRemainingSeconds:0} s left ({Controller.SampleCount} samples, {Controller.ProbeCount} targets, {Controller.EyeSourceDescription})"
                 : "Baseline done. How do you feel right now?";
         }
     }

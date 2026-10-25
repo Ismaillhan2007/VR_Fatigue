@@ -53,10 +53,11 @@ Never commit without the `.meta` files Unity creates, never edit GUIDs by hand, 
 
 ## SessionController settings (Inspector)
 
-- **Eye Source**: `Synthetic` (default), `Replay` (`Replay Csv Path`, default `../fixtures/replay/steady_gaze.json`; eye-session.v1 JSON or the CSV in [ARCHITECTURE.md](ARCHITECTURE.md); relative to `unity/`), `Hardware` (placeholder, falls back to synthetic with a visible note). The committed replay fixtures are 1-2 s unit cases, so replay currently ends in `insufficient_data`.
+- **Eye Source** (desktop demo default: `Replay` of `../fixtures/replay/demo_session.json`): a **synthetic** 190 s session (130 s baseline + 60 s loaded task, 95 probe trials, realistic artifacts). The top bar says "REPLAY of synthetic data (not live)". `Replay Speed` (default 4) only shortens the wait: metrics use the file's sensor timestamps. `Synthetic` runs the live generator with the same probe task; `Hardware` is the placeholder (falls back to synthetic with a visible note). A missing replay path falls back to `StreamingAssets/fixtures/replay/`. Regenerate the fixture with `python3 tools/generate_demo_session.py` and copy it to StreamingAssets (a test checks the copy).
+- **Probe task**: in Baseline and Task a yellow head-locked target (2 m) jumps every 2 s through the fixed layout `probe_cycle_10_v1` (10 positions, jumps 10-30 degrees); both phases use the same layout, so their `conditions_id` honestly match. Probe policy: within 2 degrees by 500 ms. The summary shows per-trial counts.
 - **Analysis**: `Http` (default; falls back to local rules on any failure, 15 s timeout), `Mock` (canned fixture), `Local` (offline only).
 - **Backend Base Url**: default `http://127.0.0.1:8000`. In a build use `-backendUrl http://<laptop-LAN-IP>:8000`. Never put the Gemini key in Unity.
-- **Baseline/Task Seconds**: 20 s on desktop. Deviations need at least 6 usable 20 s baseline windows, so use about **130 s** baseline to see them. The experimental indicator also needs probe targets, which the placeholder task does not show yet, so it stays `unavailable` (correct behaviour, not a bug).
+- **Baseline/Task Seconds**: 130 / 60 in eye-data seconds (matches the demo file). Deviations need at least 6 usable 20 s baseline windows; the experimental indicator also needs probes in both phases. With the demo replay it shows real deviations (still synthetic data, still experimental, not a fatigue score).
 
 ## Backend and network
 

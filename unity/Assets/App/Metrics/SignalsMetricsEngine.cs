@@ -16,10 +16,24 @@ namespace App.Metrics
     /// </summary>
     public sealed class SignalsMetricsEngine : IMetricsEngine
     {
-        /// <summary>Baseline and task share one placeholder canvas, so they share one conditions id.</summary>
-        public const string ConditionsId = "assessment_canvas_v1";
+        /// <summary>
+        /// Conditions id per phase: the probe layout id when the phase showed probes, otherwise the plain canvas.
+        /// Both phases run on the same canvas, so they match when both (or neither) showed the same layout; a phase
+        /// with probes and one without do not match, and the module then refuses to compare them.
+        /// </summary>
+        public const string ConditionsId = AppCapture.ProbeSchedule.LayoutId;
+        public const string NoProbeConditionsId = "assessment_canvas_no_probes";
+
+        /// <summary>
+        /// Stricter than the module default (3 degrees / 1 s): a rested recording had zero misses at the default, so it
+        /// could not show a change. 2 degrees within 500 ms; experimental, not a validated threshold.
+        /// </summary>
+        public static Sig.MetricPolicy ProbePolicy => new Sig.MetricPolicy(probeToleranceDeg: 2, acquisitionDeadlineUs: 500000);
 
         public string MetricVersion => Sig.MetricPolicy.AlgorithmVersion;
+
+        /// <summary>Per-trial counts of the last Compute, for the summary screen (not part of the v1 contract).</summary>
+        public ProbeTrialStats LastProbeStats { get; private set; }
 
         public SessionSummary Compute(PhaseRecording task, BaselineData baseline, MetricsContext context)
         {
@@ -36,23 +50,29 @@ namespace App.Metrics
             var baselineEndUs = taskSamples.Count > 0 ? Math.Max(0, Math.Min(endUs, Us(taskSamples[0].SensorTimestamp))) : endUs;
 
             var info = new Sig.SessionInfo(context.SessionId, Wire(context.DataSource), Wire(context.ReplayOrigin), 0, endUs, Capabilities(context));
-            var probes = Probes(baseline?.Recording, all, origin, endUs).Concat(Probes(task, all, origin, endUs)).OrderBy(p => p.TimestampUs).ToList();
+            var clock = new FrameToSensor(all, origin);
+            var baselineProbes = Probes(baseline?.Recording, clock, endUs).ToList();
+            var taskProbes = Probes(task, clock, endUs).ToList();
+            var probes = baselineProbes.Concat(taskProbes).OrderBy(p => p.TimestampUs).ToList();
             var session = new Sig.EyeSession(info, samples, probes);
 
             var report = baseline?.SelfReport;
             var plan = new Sig.BaselinePlan(context.SessionId,
-                new Sig.AssessmentPhase(0, baselineEndUs, ConditionsId),
-                new Sig.AssessmentPhase(baselineEndUs, endUs, ConditionsId),
+                new Sig.AssessmentPhase(0, baselineEndUs, baselineProbes.Count > 0 ? ConditionsId : NoProbeConditionsId),
+                new Sig.AssessmentPhase(baselineEndUs, endUs, taskProbes.Count > 0 ? ConditionsId : NoProbeConditionsId),
                 report == null ? null : new Sig.BaselineSelfReport(report.EyeStrain, report.MentalFatigue));
-            var comparison = Sig.BaselineEvaluator.Evaluate(session, plan);
+            var comparison = Sig.BaselineEvaluator.Evaluate(session, plan, metricPolicy: ProbePolicy);
             var indicator = Sig.IndicatorEvaluator.Evaluate(comparison);
 
             var clean = comparison.SessionQuality;
             var taskInfo = new Sig.SessionInfo(info.SessionId, info.DataSource, info.ReplayOrigin, baselineEndUs, endUs, info.Capabilities);
             var taskQuality = Sig.QualityEvaluator.Evaluate(taskInfo,
                 clean.AcceptedStream.Where(s => s.TimestampUs >= baselineEndUs), clean.Policy);
-            var taskProbes = probes.Where(p => p.TimestampUs >= baselineEndUs);
-            var taskMetrics = Sig.MetricsEvaluator.Evaluate(taskQuality, taskProbes, comparison.Baseline.MetricPolicy);
+            // Only trials that lie wholly inside the task phase count for the task-level probe metrics.
+            var inTask = probes.GroupBy(p => p.ProbeId).Where(g => g.All(p => p.TimestampUs >= baselineEndUs)).SelectMany(g => g)
+                .OrderBy(p => p.TimestampUs).ToList();
+            var taskMetrics = Sig.MetricsEvaluator.Evaluate(taskQuality, inTask, comparison.Baseline.MetricPolicy);
+            LastProbeStats = ProbeTrialStats.From(comparison.Baseline.Windows, taskMetrics.Probes);
 
             var usable = clean.Status == "usable" && taskQuality.Status == "usable";
             var summary = new SessionSummary
@@ -82,24 +102,60 @@ namespace App.Metrics
                 ? new Sig.EyeReading(true, new Sig.Direction3(d.X, d.Y, d.Z), confidence)
                 : new Sig.EyeReading(false, null, confidence);
             var q = s.HeadRotation;
-            var head = new Sig.HeadPose(new Sig.Direction3(s.HeadPosition.X, s.HeadPosition.Y, s.HeadPosition.Z), q.X, q.Y, q.Z, q.W);
+            var head = s.HeadTracked
+                ? new Sig.HeadPose(new Sig.Direction3(s.HeadPosition.X, s.HeadPosition.Y, s.HeadPosition.Z), q.X, q.Y, q.Z, q.W)
+                : null;
             return new Sig.EyeSample(timestampUs, Eye(s.LeftValid, s.LeftDirection), Eye(s.RightValid, s.RightDirection), head);
         }
 
-        /// <summary>App probes use the frame clock; shift them onto the sensor clock with the first sample's offset.</summary>
-        static IEnumerable<Sig.ProbeEvent> Probes(PhaseRecording r, List<AppCapture.GazeSample> all, double origin, long endUs)
+        /// <summary>App probes use the frame clock; map each time onto the sensor clock through the samples.</summary>
+        static IEnumerable<Sig.ProbeEvent> Probes(PhaseRecording r, FrameToSensor clock, long endUs)
         {
-            if (r == null || r.Probes.Count == 0) yield break;
-            var offset = all[0].FrameTime - all[0].SensorTimestamp;
-            var n = 0;
+            if (r == null) yield break;
             foreach (var p in r.Probes)
             {
                 var target = new Sig.Direction3(p.TargetDirection.X, p.TargetDirection.Y, p.TargetDirection.Z);
-                long At(double frameTime) => Math.Max(0, Math.Min(endUs, (long)Math.Round((frameTime - offset - origin) * 1e6)));
-                var id = $"probe_{r.StartTime:0}_{n++}";
-                yield return new Sig.ProbeEvent(At(p.OnsetTime), id, "target_onset", target);
-                yield return new Sig.ProbeEvent(At(p.OnsetTime + 1.0), id, "hold_start", target);
-                yield return new Sig.ProbeEvent(At(p.OnsetTime + 1.0 + p.HoldSeconds), id, "target_end", target);
+                long onset = clock.Us(p.OnsetTime, endUs), hold = clock.Us(p.HoldStartTime, endUs), end = clock.Us(p.EndTime, endUs);
+                if (!(onset < hold && hold < end)) continue; // clipped at the session edge: not an evaluable trial
+                var id = string.IsNullOrEmpty(p.TrialId) ? $"t{onset}" : p.TrialId;
+                yield return new Sig.ProbeEvent(onset, id, "target_onset", target);
+                yield return new Sig.ProbeEvent(hold, id, "hold_start", target);
+                yield return new Sig.ProbeEvent(end, id, "target_end", target);
+            }
+        }
+
+        /// <summary>Piecewise-linear frame-clock -> sensor-clock map built from the captured rows.</summary>
+        sealed class FrameToSensor
+        {
+            readonly double[] _frame, _sensor;
+            readonly double _origin;
+
+            public FrameToSensor(List<AppCapture.GazeSample> rows, double origin)
+            {
+                var ordered = rows.OrderBy(s => s.FrameTime).ToList();
+                _frame = ordered.Select(s => s.FrameTime).ToArray();
+                _sensor = ordered.Select(s => s.SensorTimestamp).ToArray();
+                _origin = origin;
+            }
+
+            public long Us(double frameTime, long endUs)
+            {
+                var n = _frame.Length;
+                double sensor;
+                var i = Array.BinarySearch(_frame, frameTime);
+                if (i >= 0) sensor = _sensor[i];
+                else
+                {
+                    i = ~i;
+                    if (i == 0) sensor = _sensor[0] - (_frame[0] - frameTime);
+                    else if (i >= n) sensor = _sensor[n - 1] + (frameTime - _frame[n - 1]);
+                    else
+                    {
+                        var f = (frameTime - _frame[i - 1]) / Math.Max(1e-9, _frame[i] - _frame[i - 1]);
+                        sensor = _sensor[i - 1] + f * (_sensor[i] - _sensor[i - 1]);
+                    }
+                }
+                return Math.Max(0, Math.Min(endUs, (long)Math.Round((sensor - _origin) * 1e6)));
             }
         }
 
@@ -140,16 +196,18 @@ namespace App.Metrics
 
         static Baseline BaselineOf(Sig.BaselineResult b, long baselineEndUs)
         {
-            var reasons = b.LowConfidenceReasons;
+            // conditions_unconfirmed (no probe layout in a phase) concerns comparability, not the reference itself;
+            // it already makes the indicator unavailable, so it is not reported as a low-confidence baseline.
+            var reasons = b.LowConfidenceReasons.Where(r => r != "conditions_unconfirmed").ToList();
             LowConfidenceReason? reason = reasons.Contains("self_reported_tired") ? LowConfidenceReason.SelfReportedTired
                 : reasons.Contains("too_short") ? LowConfidenceReason.TooShort
-                : b.LowConfidence ? LowConfidenceReason.PoorQuality : (LowConfidenceReason?)null;
+                : reasons.Count > 0 ? LowConfidenceReason.PoorQuality : (LowConfidenceReason?)null;
             return new Baseline
             {
                 State = baselineEndUs > 0 && b.Windows.Count > 0 ? BaselineState.Present : BaselineState.Absent,
                 DurationMs = (long)Math.Round(baselineEndUs / 1000.0),
                 Windows = b.Windows.Count(w => w.Eligible),
-                LowConfidence = b.LowConfidence,
+                LowConfidence = reasons.Count > 0,
                 LowConfidenceReason = reason,
             };
         }
@@ -166,7 +224,8 @@ namespace App.Metrics
 
         static StrainIndicator IndicatorOf(Sig.IndicatorResult r, SessionSummary s, bool usable)
         {
-            var last = r.Windows.LastOrDefault()?.State;
+            // The last window may be partial (unavailable); report the latest window that has a value.
+            var last = r.Windows.LastOrDefault(w => w.State.Value.HasValue)?.State;
             var probesMeasured = s.Metrics.ProbeLatencyMs.HasValue && s.Metrics.ProbeRmsErrorDeg.HasValue && s.Metrics.ProbeMissFraction.HasValue;
             var available = usable && last?.Value != null && s.Baseline.Windows >= BaselinePolicy.MinWindows && probesMeasured;
             return new StrainIndicator
@@ -221,5 +280,53 @@ namespace App.Metrics
 
         static string Wire(DataSource d) => d == DataSource.Live ? "live" : d == DataSource.Replay ? "replay" : "synthetic";
         static string Wire(ReplayOrigin? o) => o == null ? null : o == ReplayOrigin.Recorded ? "recorded" : "synthetic";
+        }
+
+    /// <summary>Per-trial probe outcome counts and medians for baseline and task (diagnostics, not the v1 contract).</summary>
+    public sealed class ProbeTrialStats
+    {
+        public PhaseStats Baseline = new PhaseStats();
+        public PhaseStats Task = new PhaseStats();
+
+        public sealed class PhaseStats
+        {
+            public int Acquired, Missed, Unavailable;
+            public double? MedianLatencyMs, MedianHoldRmsDeg;
+
+            public int Trials => Acquired + Missed + Unavailable;
+
+            public override string ToString() => Trials == 0
+                ? "no trials"
+                : $"{Trials} trials: {Acquired} acquired, {Missed} missed, {Unavailable} not evaluable; median latency "
+                  + (MedianLatencyMs.HasValue ? $"{MedianLatencyMs.Value:0} ms" : "n/a")
+                  + ", median hold error " + (MedianHoldRmsDeg.HasValue ? $"{MedianHoldRmsDeg.Value:0.00} deg" : "n/a");
+
+            internal static PhaseStats Of(IEnumerable<Sig.ProbeMeasurement> probes)
+            {
+                var list = probes.ToList();
+                return new PhaseStats
+                {
+                    Acquired = list.Count(p => p.Outcome == "acquired"),
+                    Missed = list.Count(p => p.Outcome == "missed"),
+                    Unavailable = list.Count(p => p.Outcome == "unavailable"),
+                    MedianLatencyMs = Median(list.Where(p => p.LatencyMs.HasValue).Select(p => p.LatencyMs.Value)),
+                    MedianHoldRmsDeg = Median(list.Where(p => p.HoldRmsErrorDeg.HasValue).Select(p => p.HoldRmsErrorDeg.Value)),
+                };
+            }
+
+            static double? Median(IEnumerable<double> values)
+            {
+                var v = values.OrderBy(x => x).ToList();
+                if (v.Count == 0) return null;
+                return v.Count % 2 == 1 ? v[v.Count / 2] : (v[v.Count / 2 - 1] + v[v.Count / 2]) / 2;
+            }
+        }
+
+        internal static ProbeTrialStats From(IEnumerable<Sig.MeasurementWindow> baselineWindows, IEnumerable<Sig.ProbeMeasurement> task) =>
+            new ProbeTrialStats
+            {
+                Baseline = PhaseStats.Of(baselineWindows.Where(w => w.Measurements != null).SelectMany(w => w.Measurements.Probes)),
+                Task = PhaseStats.Of(task),
+            };
     }
 }

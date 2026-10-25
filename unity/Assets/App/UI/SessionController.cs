@@ -31,10 +31,12 @@ namespace App.UI
     /// </summary>
     public sealed class SessionController : MonoBehaviour
     {
-        [Header("Eye data")]
-        public EyeSourceMode EyeSource = EyeSourceMode.Synthetic;
-        [Tooltip("Replay file: eye-session.v1 .json (fixtures/replay, fixtures/metrics) or the CSV in docs/ARCHITECTURE.md. Relative paths start at the unity/ folder.")]
-        public string ReplayCsvPath = "../fixtures/replay/steady_gaze.json";
+        [Header("Eye data (desktop demo default: synthetic 130 s replay with probes)")]
+        public EyeSourceMode EyeSource = EyeSourceMode.Replay;
+        [Tooltip("Replay file: eye-session.v1 .json (fixtures/replay, fixtures/metrics) or the CSV in docs/ARCHITECTURE.md. Relative paths start at the unity/ folder; a missing file falls back to StreamingAssets/fixtures/replay.")]
+        public string ReplayCsvPath = "../fixtures/replay/demo_session.json";
+        [Tooltip("Replay seconds per real second. Metrics use sensor timestamps, so speed does not change them.")]
+        public float ReplaySpeed = 4;
         public ReplayOrigin ReplayOrigin = ReplayOrigin.Synthetic;
         public int SyntheticSeed = 1;
 
@@ -43,19 +45,29 @@ namespace App.UI
         [Tooltip("Override at runtime with the command-line argument -backendUrl http://<laptop-ip>:8000")]
         public string BackendBaseUrl = HttpAnalysisClient.DefaultBaseUrl;
 
-        [Header("Durations (desktop defaults; pilot uses 120 s / 300 s)")]
-        public float BaselineSeconds = 20;
-        public float TaskSeconds = 20;
+        [Header("Durations in replay/eye-data seconds (demo_session.json: 130 s baseline + 60 s task)")]
+        public float BaselineSeconds = 130;
+        public float TaskSeconds = 60;
 
         [Header("UI (wired by App/Build Assessment Scene)")]
         public List<FlowPanel> Panels = new List<FlowPanel>();
         public ProvenanceBar ProvenanceBar;
         public PauseOverlay PauseOverlay;
+        public ProbeTaskRunner ProbeRunner;
 
         public SessionFlow Flow { get; private set; }
         public string ProviderNote { get; private set; }
         public bool IsCapturing => _recording != null;
-        public float PhaseRemainingSeconds => Mathf.Max(0, _phaseDuration - _phaseElapsed);
+        /// <summary>Remaining phase time in real seconds (replay may run faster than real time).</summary>
+        public float PhaseRemainingSeconds => Mathf.Max(0, (_phaseDuration - _phaseElapsed) / Mathf.Max(0.01f, PhaseSpeed));
+        public int ProbeCount => _recording?.Probes.Count ?? 0;
+
+        /// <summary>Per-trial probe outcomes of the last summary (diagnostics, not part of the contract).</summary>
+        public string ProbeStatsText => (_metrics as SignalsMetricsEngine)?.LastProbeStats is ProbeTrialStats s
+            ? $"Probe trials (2 deg within 500 ms): baseline {s.Baseline}; task {s.Task}"
+            : null;
+
+        float PhaseSpeed => _provider is ReplayEyeProvider r ? (float)r.Speed : 1f;
         public int SampleCount => _recording?.Samples.Count ?? 0;
         public bool AnalysisInProgress { get; private set; }
         public string SceneStatus { get; private set; } = "";
@@ -72,6 +84,9 @@ namespace App.UI
         IEyeTrackingProvider _provider;
         PhaseRecording _recording;
         float _phaseDuration, _phaseElapsed;
+        string _probePrefix;
+        int _lastTrial = -1;
+        double _phaseStartReplay;
         CancellationTokenSource _cts = new CancellationTokenSource();
 
         static double Now => Time.realtimeSinceStartupAsDouble;
@@ -81,7 +96,11 @@ namespace App.UI
             BackendBaseUrl = CommandLineValue("-backendUrl") ?? BackendBaseUrl;
             Flow = new SessionFlow();
             Flow.StateChanged += (_, __) => ShowCurrent();
-            Flow.PauseChanged += _ => ShowCurrent();
+            Flow.PauseChanged += paused =>
+            {
+                if (_recording != null && _provider is IHoldableProvider h) h.SetHold(paused, Now);
+                ShowCurrent();
+            };
             Flow.ContextChanged += RefreshVisible;
             foreach (var p in Panels) p.Bind(this);
             ProvenanceBar.Bind(this);
@@ -103,10 +122,14 @@ namespace App.UI
                 // Tracking during pause is not part of the session: drain and drop it.
                 _provider.ReadSamples(_discard, Now);
                 _discard.Clear();
+                ProbeRunner?.Hide();
                 return;
             }
             _provider.ReadSamples(_recording.Samples, Now);
-            _phaseElapsed += Time.unscaledDeltaTime;
+            // A replay's own clock is the phase clock (frame deltas can include scene-load time).
+            if (_provider is ReplayEyeProvider replay) _phaseElapsed = (float)(replay.ReplayedSeconds(Now) - _phaseStartReplay);
+            else _phaseElapsed += Time.unscaledDeltaTime;
+            UpdateProbes();
             if (_phaseElapsed >= _phaseDuration) EndCapture();
             RefreshVisible();
         }
@@ -116,13 +139,13 @@ namespace App.UI
         public void AcceptConsent()
         {
             _provider?.Stop();
-            _provider = EyeProviderFactory.CreateAndStart(EyeSource, Now, SyntheticSeed, ResolveProjectPath(ReplayCsvPath), ReplayOrigin, out var note);
+            _provider = EyeProviderFactory.CreateAndStart(EyeSource, Now, SyntheticSeed, ResolveReplayPath(ReplayCsvPath), ReplayOrigin, out var note, ReplaySpeed);
             ProviderNote = note;
             Flow.AcceptConsent(_provider.DataSource, _provider.ReplayOrigin, _provider.Capabilities, _provider.Name);
             _baseline.Recording.Clear();
             _baseline.SelfReport = null;
             _task.Clear();
-            BeginCapture(_baseline.Recording, BaselineSeconds);
+            BeginCapture(_baseline.Recording, BaselineSeconds, "b", loaded: false);
         }
 
         public void EndCaptureEarly()
@@ -135,7 +158,7 @@ namespace App.UI
             var report = new SelfReport { Phase = ReportPhase.Baseline, EyeStrain = eyeStrain, MentalFatigue = mentalFatigue };
             Flow.CompleteBaseline(report);
             _baseline.SelfReport = report;
-            BeginCapture(_task, TaskSeconds);
+            BeginCapture(_task, TaskSeconds, "l", loaded: true);
         }
 
         public async void SubmitCheckIn(SelfReport report, Preferences preferences)
@@ -238,21 +261,53 @@ namespace App.UI
 
         // ----- internals -----
 
-        void BeginCapture(PhaseRecording recording, float seconds)
+        void BeginCapture(PhaseRecording recording, float seconds, string probePrefix, bool loaded)
         {
             recording.Clear();
             recording.StartTime = Now;
+            if (_provider is IHoldableProvider holdable) holdable.SetHold(false, Now);
             _provider.ReadSamples(_discard, Now); // drop anything produced before this phase
             _discard.Clear();
+            if (_provider is IProbeFollower follower) follower.SetLoaded(loaded);
             _recording = recording;
+            _probePrefix = probePrefix;
+            _lastTrial = -1;
             _phaseDuration = Mathf.Max(1, seconds);
             _phaseElapsed = 0;
+            _phaseStartReplay = _provider is ReplayEyeProvider replay ? replay.ReplayedSeconds(Now) : 0;
+        }
+
+        /// <summary>
+        /// Same head-locked probe layout in both phases. A replay brings its own trials; otherwise the app runs
+        /// ProbeSchedule and tells a synthetic provider where the target is.
+        /// </summary>
+        void UpdateProbes()
+        {
+            if (_provider is IProbeSource source) source.ReadProbes(_recording.Probes, Now);
+            else
+            {
+                var index = ProbeSchedule.TrialIndex(_phaseElapsed);
+                var fits = (index + 1) * ProbeSchedule.TrialSeconds <= _phaseDuration;
+                if (index != _lastTrial && fits)
+                {
+                    _lastTrial = index;
+                    var trial = ProbeSchedule.Trial(_probePrefix, index, Now);
+                    _recording.Probes.Add(trial);
+                    (_provider as IProbeFollower)?.ShowTarget(trial.TargetDirection, Now);
+                }
+            }
+            var probes = _recording.Probes;
+            var active = probes.Count > 0 && probes[probes.Count - 1].EndTime > Now ? probes[probes.Count - 1] : (ProbeEvent?)null;
+            if (active.HasValue) ProbeRunner?.Show(active.Value.TargetDirection);
+            else ProbeRunner?.Hide();
         }
 
         void EndCapture()
         {
             _recording.EndTime = Now;
             _recording = null;
+            ProbeRunner?.Hide();
+            if (_provider is IHoldableProvider holdable) holdable.SetHold(true, Now);
             if (Flow.State == FlowState.LoadTask)
             {
                 _provider.Stop();
@@ -264,6 +319,7 @@ namespace App.UI
         void StopCapture()
         {
             _recording = null;
+            ProbeRunner?.Hide();
             _provider?.Stop();
             _provider = null;
         }
@@ -309,10 +365,17 @@ namespace App.UI
             ProvenanceBar.Show(this);
         }
 
-        static string ResolveProjectPath(string path) =>
-            string.IsNullOrWhiteSpace(path) || System.IO.Path.IsPathRooted(path)
+        /// <summary>Relative to the unity/ folder; falls back to the StreamingAssets copy (builds have no repo).</summary>
+        static string ResolveReplayPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return path;
+            var full = System.IO.Path.IsPathRooted(path)
                 ? path
                 : System.IO.Path.GetFullPath(System.IO.Path.Combine(Application.dataPath, "..", path));
+            if (System.IO.File.Exists(full)) return full;
+            var packaged = System.IO.Path.Combine(Application.streamingAssetsPath, "fixtures", "replay", System.IO.Path.GetFileName(path));
+            return System.IO.File.Exists(packaged) ? packaged : full;
+        }
 
         static string CommandLineValue(string name)
         {

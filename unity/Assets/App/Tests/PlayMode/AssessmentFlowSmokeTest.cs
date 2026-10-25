@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using App.Capture;
 using App.Core.Contracts;
 using App.Core.Analysis;
 using App.Core.Flow;
@@ -72,14 +73,15 @@ namespace App.Tests
             yield return SceneManager.LoadSceneAsync("Assessment");
             var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
             Assert.NotNull(c);
-            Assert.AreEqual(App.Capture.EyeSourceMode.Synthetic, c.EyeSource);
+            // The scene's desktop demo default: the synthetic 130 s replay with probes (labelled as replay).
+            Assert.AreEqual(App.Capture.EyeSourceMode.Replay, c.EyeSource);
             Assert.AreEqual(AnalysisMode.Http, c.Analysis);
-            // Keep the actual scene's durations. Default 20 + 20 seconds.
+            // Keep the actual scene's durations: 130 + 60 replay seconds at the scene's replay speed.
             c.BackendBaseUrl = ConfiguredUrl(c);
             c.AcceptConsent();
-            yield return WaitUntil(() => !c.IsCapturing, c.BaselineSeconds + 5);
+            yield return WaitUntil(() => !c.IsCapturing, c.BaselineSeconds / c.ReplaySpeed + 10);
             c.SubmitBaseline(2, 2);
-            yield return WaitUntil(() => c.Flow.State == FlowState.CheckIn, c.TaskSeconds + 5);
+            yield return WaitUntil(() => c.Flow.State == FlowState.CheckIn, c.TaskSeconds / c.ReplaySpeed + 10);
             c.SubmitCheckIn(new SelfReport
             {
                 Phase = ReportPhase.PostTask, EyeStrain = 3, MentalFatigue = 3,
@@ -91,10 +93,11 @@ namespace App.Tests
             Assert.AreEqual("cloud use disabled for this check-in", ctx.AnalysisFallbackReason,
                 "must receive the backend's local_only header, rather than a Unity transport fallback");
             Assert.AreEqual(ctx.SessionId, ctx.Analysis.SessionId);
-            Assert.AreEqual(DataSource.Synthetic, ctx.Analysis.DataSource);
-            Assert.AreEqual(StrainLevel.Unavailable, ctx.Summary.StrainIndicator.Level);
+            Assert.AreEqual(DataSource.Replay, ctx.Analysis.DataSource);
+            Assert.AreEqual(ReplayOrigin.Synthetic, ctx.Analysis.ReplayOrigin);
+            Assert.AreNotEqual(StrainLevel.Unavailable, ctx.Summary.StrainIndicator.Level, "the demo replay has probes in both phases");
             var bar = UnityEngine.Object.FindAnyObjectByType<ProvenanceBar>();
-            StringAssert.Contains("SYNTHETIC", bar.DataLabel.text);
+            StringAssert.Contains("REPLAY of synthetic data", bar.DataLabel.text);
             // The backend's rules answered (local_only header above), so the label names the backend, not Unity.
             StringAssert.Contains("FALLBACK from backend rules", bar.AiLabel.text);
             Assert.IsFalse(ctx.Analysis.SceneConfig.AnimalsEnabled);
@@ -178,6 +181,7 @@ namespace App.Tests
             yield return SceneManager.LoadSceneAsync("Assessment");
             var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
             Assert.NotNull(c, "SessionController missing: run App > Build Assessment Scene");
+            c.EyeSource = EyeSourceMode.Synthetic;
             c.BaselineSeconds = 1;
             c.TaskSeconds = 1;
             c.Analysis = AnalysisMode.Http;
@@ -230,6 +234,7 @@ namespace App.Tests
             if (string.IsNullOrEmpty(url)) Assert.Ignore("VR_SMOKE_BACKEND_URL not set (backend not running for this run)");
             yield return SceneManager.LoadSceneAsync("Assessment");
             var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+            c.EyeSource = EyeSourceMode.Synthetic;
             c.BaselineSeconds = 2;
             c.TaskSeconds = 2;
             c.Analysis = AnalysisMode.Http;
@@ -251,6 +256,40 @@ namespace App.Tests
             Assert.AreEqual(AiSource.Fallback, a.AiSource);
             Assert.AreEqual(DataSource.Synthetic, a.DataSource);
             StringAssert.Contains("backend rules", UnityEngine.Object.FindAnyObjectByType<ProvenanceBar>().AiLabel.text);
+
+            c.EnterScene();
+            yield return WaitUntil(() => c.SceneStatus.Contains("brightness"));
+            StringAssert.Contains("Forest scene loaded", c.SceneStatus);
+            c.FinishScene();
+            c.SubmitReRating(3, 3);
+            Assert.AreEqual(FlowState.Done, c.Flow.State);
+        }
+
+        /// <summary>Desktop demo default: the synthetic 130 s replay with probes, played fast, offline, to the forest.</summary>
+        [UnityTest]
+        public IEnumerator DemoReplayShowsDeviationsAndReachesForest()
+        {
+            yield return SceneManager.LoadSceneAsync("Assessment");
+            var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+            Assert.AreEqual(EyeSourceMode.Replay, c.EyeSource, "desktop demo default");
+            c.ReplaySpeed = 40;
+            c.Analysis = AnalysisMode.Local;
+
+            c.AcceptConsent();
+            StringAssert.Contains("REPLAY of synthetic data", UnityEngine.Object.FindAnyObjectByType<ProvenanceBar>().DataLabel.text);
+            yield return WaitUntil(() => c.ProbeRunner.Visible, 5);
+            yield return WaitUntil(() => !c.IsCapturing, 20);
+            c.SubmitBaseline(2, 2);
+            yield return WaitUntil(() => c.Flow.State == FlowState.CheckIn, 20);
+            c.SubmitCheckIn(new SelfReport { Phase = ReportPhase.PostTask, EyeStrain = 5, MentalFatigue = 4, Chips = new List<Chip> { Chip.TiredEyes } }, null);
+            yield return WaitUntil(() => c.Flow.Context.Analysis != null, 20);
+
+            var s = c.Flow.Context.Summary;
+            Assert.AreEqual(ReplayOrigin.Synthetic, s.ReplayOrigin);
+            Assert.IsNotNull(s.Metrics.ProbeLatencyMs);
+            Assert.IsNotNull(s.Deviations.ProbeLatencyMs);
+            Assert.AreNotEqual(StrainLevel.Unavailable, s.StrainIndicator.Level, "the demo must show the experimental indicator");
+            StringAssert.Contains("Probe trials", c.ProbeStatsText);
 
             c.EnterScene();
             yield return WaitUntil(() => c.SceneStatus.Contains("brightness"));

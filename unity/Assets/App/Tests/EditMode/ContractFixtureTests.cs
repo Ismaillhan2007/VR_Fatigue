@@ -65,6 +65,7 @@ namespace App.Tests
 
         [TestCase("analysis_fallback.json")]
         [TestCase("scene_config_calm_forest_sunset.json")]
+        [TestCase("replay/demo_session.json")]
         public void StreamingAssetsCopyMatchesRepoFixture(string file)
         {
             var copy = Path.Combine(Application.streamingAssetsPath, "fixtures", file);

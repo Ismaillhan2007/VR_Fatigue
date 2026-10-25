@@ -40,7 +40,7 @@ namespace App.Capture
         /// synthetic provider; <paramref name="note"/> explains why so the UI can show it.
         /// </summary>
         public static IEyeTrackingProvider CreateAndStart(EyeSourceMode mode, double now, int seed, string replayPath,
-            ReplayOrigin replayOrigin, out string note)
+            ReplayOrigin replayOrigin, out string note, double replaySpeed = 1)
         {
             note = null;
             IEyeTrackingProvider provider;
@@ -50,6 +50,7 @@ namespace App.Capture
                 {
                     case EyeSourceMode.Replay:
                         provider = ReplayEyeProvider.FromFile(replayPath, replayOrigin);
+                        ((ReplayEyeProvider)provider).Speed = replaySpeed;
                         break;
                     case EyeSourceMode.Hardware:
                         provider = new HardwareEyeProvider();
