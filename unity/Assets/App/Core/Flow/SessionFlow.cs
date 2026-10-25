@@ -15,6 +15,7 @@ namespace App.Core.Flow
         ReRating,
         Done,
         Exited,
+        RelaxationOptions,
     }
 
     /// <summary>Everything one session knows. Lives in memory only and is cleared on exit/restart.</summary>
@@ -35,6 +36,7 @@ namespace App.Core.Flow
         public AnalysisResponse Analysis;
         public string AnalysisFallbackReason;
         public SelfReport PostSceneReport;
+        public bool SceneEntered;
 
         public AiSource? AiSource => Analysis?.AiSource;
 
@@ -43,7 +45,7 @@ namespace App.Core.Flow
     }
 
     /// <summary>
-    /// Pure session state machine: Consent -> Baseline -> LoadTask -> CheckIn -> Summary -> Scene -> ReRating -> Done,
+    /// Report-first flow: Summary -> Done, or explicit RelaxationOptions -> Scene -> optional ReRating -> Done,
     /// with pause (blocks transitions) and exit (from anywhere; clears session data). Invalid transitions throw.
     /// Provenance set at consent cannot be relabelled later.
     /// </summary>
@@ -91,13 +93,11 @@ namespace App.Core.Flow
             MoveTo(FlowState.CheckIn);
         }
 
-        public void SubmitCheckIn(SelfReport postTaskReport, Preferences preferences)
+        public void SubmitCheckIn(SelfReport postTaskReport)
         {
             Require(FlowState.CheckIn);
             RequireReport(postTaskReport, ReportPhase.PostTask);
-            if (preferences != null) ThrowIfInvalid(preferences);
             Context.PostTaskReport = postTaskReport.Copy();
-            Context.Preferences = preferences;
             MoveTo(FlowState.Summary);
         }
 
@@ -127,13 +127,43 @@ namespace App.Core.Flow
             ContextChanged?.Invoke();
         }
 
-        public void EnterScene()
+        public void FinishWithReport()
         {
             Require(FlowState.Summary);
             if (Context.Analysis == null) throw new InvalidOperationException("no analysis yet");
+            MoveTo(FlowState.Done);
+        }
+
+        public void ChooseRelaxation()
+        {
+            Require(FlowState.Summary);
+            RequireSceneAllowed();
+            MoveTo(FlowState.RelaxationOptions);
+        }
+
+        public void CancelRelaxation()
+        {
+            Require(FlowState.RelaxationOptions);
+            Context.Preferences = null;
+            MoveTo(FlowState.Summary);
+        }
+
+        public void EnterScene(Preferences preferences = null)
+        {
+            Require(FlowState.RelaxationOptions);
+            RequireSceneAllowed();
+            if (preferences != null) ThrowIfInvalid(preferences);
+            Context.Preferences = preferences == null ? null :
+                ContractJson.Parse<Preferences>(ContractJson.Serialize(preferences));
+            Context.SceneEntered = true;
+            MoveTo(FlowState.Scene);
+        }
+
+        void RequireSceneAllowed()
+        {
+            if (Context.Analysis == null) throw new InvalidOperationException("no analysis yet");
             if (Context.Analysis.SafetyNotice == SafetyNotice.StopSession)
                 throw new InvalidOperationException("stop-session notice requires exiting and resting");
-            MoveTo(FlowState.Scene);
         }
 
         public void FinishScene()
@@ -147,6 +177,12 @@ namespace App.Core.Flow
             Require(FlowState.ReRating);
             RequireReport(postSceneReport, ReportPhase.PostScene);
             Context.PostSceneReport = postSceneReport.Copy();
+            MoveTo(FlowState.Done);
+        }
+
+        public void SkipReRating()
+        {
+            Require(FlowState.ReRating);
             MoveTo(FlowState.Done);
         }
 

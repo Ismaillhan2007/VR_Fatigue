@@ -170,15 +170,15 @@ namespace App.UI
             BeginCapture(_task, TaskSeconds, "l", loaded: true);
         }
 
-        public async void SubmitCheckIn(SelfReport report, Preferences preferences)
+        public async void SubmitCheckIn(SelfReport report)
         {
-            Flow.SubmitCheckIn(report, preferences);
+            Flow.SubmitCheckIn(report);
             var sessionId = Flow.Context.SessionId;
             var succeeded = MetricsEngineFactory.TryCompute(_metrics, _task, _baseline, ContextForMetrics(report), out var summary);
             MetricsFailureMessage = succeeded ? null : "Measurements could not be calculated. Please repeat the session or continue using your check-in.";
             Flow.SetSummary(summary);
 
-            var request = AnalyzeRequest.Create(summary, Flow.Context.BaselineReport, preferences);
+            var request = AnalyzeRequest.Create(summary, Flow.Context.BaselineReport, null);
             AnalysisInProgress = true;
             RefreshVisible();
             AnalysisResult result;
@@ -188,18 +188,22 @@ namespace App.UI
             }
             catch (Exception e)
             {
-                Debug.LogWarning($"[SessionController] analysis client threw: {e.Message}");
+                Debug.LogWarning($"[SessionController] analysis client threw: {e.GetType().Name}");
                 result = new AnalysisResult { Response = LocalFallbackAnalysis.Analyze(request), FallbackReason = "client error" };
             }
-            AnalysisInProgress = false;
             if (this == null || Flow.State != FlowState.Summary || Flow.Context.SessionId != sessionId) return;
+            AnalysisInProgress = false;
             Flow.SetAnalysis(result.Response, result.FallbackReason);
         }
 
-        public void EnterScene()
+        public void FinishWithReport() => Flow.FinishWithReport();
+        public void ChooseRelaxation() => Flow.ChooseRelaxation();
+        public void CancelRelaxation() => Flow.CancelRelaxation();
+
+        public void EnterScene(Preferences preferences = null)
         {
             if (Flow.Context.Analysis?.SafetyNotice == SafetyNotice.StopSession) return;
-            Flow.EnterScene();
+            Flow.EnterScene(preferences);
             var config = Flow.Context.Analysis.SceneConfig;
             SceneStatus = "Loading scene...";
             StartCoroutine(EnterSceneRoutine(config));
@@ -233,6 +237,8 @@ namespace App.UI
         public void SubmitReRating(int eyeStrain, int mentalFatigue) =>
             Flow.SubmitReRating(new SelfReport { Phase = ReportPhase.PostScene, EyeStrain = eyeStrain, MentalFatigue = mentalFatigue });
 
+        public void SkipReRating() => Flow.SkipReRating();
+
         public void TogglePause()
         {
             if (Flow.IsPaused) Flow.Resume();
@@ -257,7 +263,16 @@ namespace App.UI
         public void Restart()
         {
             MetricsFailureMessage = null;
+            _cts.Cancel();
+            _cts.Dispose();
+            _cts = new CancellationTokenSource();
             StopCapture();
+            _baseline.Recording.Clear();
+            _baseline.SelfReport = null;
+            _task.Clear();
+            SceneConfigHandoff.Clear();
+            SceneStatus = "";
+            AnalysisInProgress = false;
             ProviderNote = null;
             Flow.Restart();
         }

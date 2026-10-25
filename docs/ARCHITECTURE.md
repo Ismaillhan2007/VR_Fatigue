@@ -2,7 +2,7 @@
 
 Pure C# (no `UnityEngine`) wherever possible, so the logic is unit-tested in EditMode and shared rules stay deterministic. Each teammate plugs in behind an interface and edits only their own folder.
 
-The product is an **eye-tracking app** whose core outcome is an experimental wellness report. A report-only session must complete successfully; relaxation is an explicitly chosen use case. The diagram and `SessionFlow` description below document the **current implementation**, which still couples normal completion to Scene/ReRating. [OBJECTIVES](OBJECTIVES.md) records the target branches and code-backed gaps.
+The product is an **eye-tracking app** whose core outcome is an experimental wellness report. A report-only session must complete successfully; relaxation is an explicitly chosen use case. The desktop flow supports report-only completion and separate optional relaxation. [REPORT_ONLY_FLOW](REPORT_ONLY_FLOW.md) records the implementation and checks; [OBJECTIVES](OBJECTIVES.md) records remaining hardware gaps.
 
 ## Assemblies
 
@@ -51,9 +51,9 @@ and the native eye adapter. `MetricsEngineFactory` returns `SignalsMetricsEngine
                          SceneConfigHandoff ──▶ ISceneApplier.Apply (ForestDemo or logging stub)
 ```
 
-`SessionFlow` (Core/Flow) owns the order Consent -> Baseline -> LoadTask -> CheckIn -> Summary -> Scene -> ReRating -> Done, plus pause (blocks transitions) and exit (from anywhere, clears data). It rejects summaries/analyses whose session id or data provenance differ from the provider chosen at consent, so nothing can be relabelled as live later.
+`SessionFlow` (Core/Flow) owns Consent -> Baseline -> LoadTask -> CheckIn -> Summary, then either FinishWithReport -> Done or ChooseRelaxation -> RelaxationOptions -> Scene -> ReRating -> Done. ReRating can be skipped. Pause blocks transitions; Exit clears data from anywhere. It rejects summaries/analyses whose session id or data provenance differ from the provider chosen at consent, so nothing can be relabelled as live later.
 
-Required follow-up: add `Summary -> Done` for report-only completion, retaining report review until explicit end/reset; keep `Summary -> Scene` behind a distinct opt-in and make scene feedback optional. Today Summary has only a scene-entry action, the scene settings toggle means preference overrides, and global Exit clears the report. The formatter and v1 response also bundle scene content with the report. An unused v1 config can remain on the wire without loading a scene; any schema change must update both clients and fixtures together. None of these follow-ups is implemented by the objective documentation.
+Report-only completion retains the same report, safety, provenance and limitations on Done until Exit or New session. Scene preferences and preview appear only in RelaxationOptions; entering still requires a second deliberate action. SummaryFormatter omits scene content from the report. The required v1 scene config/rationale stays on the wire and is unused for report-only sessions; no contract change is needed.
 
 ## Seams and owners
 

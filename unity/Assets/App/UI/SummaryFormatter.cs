@@ -51,9 +51,6 @@ namespace App.UI
             b.AppendLine();
             b.AppendLine("Limitations:");
             foreach (var l in a.Limitations) b.AppendLine("  - " + l);
-            b.AppendLine();
-            b.AppendLine("Scene preview: " + SceneLine(a.SceneConfig));
-            b.AppendLine(a.SceneRationale);
             return b.ToString();
         }
 
