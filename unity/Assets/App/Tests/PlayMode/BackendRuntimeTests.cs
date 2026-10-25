@@ -29,6 +29,7 @@ namespace App.Tests
         {
             yield return SceneManager.LoadSceneAsync("Assessment");
             var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+            c.ShowPhaseInstructions = false; // flow and capture tests; PhaseInstructionTests cover the gate
             c.ConfigureBackend("http://100.64.127.140:8147", "invented-operator-token", true, true, true);
             c.Analysis = AnalysisMode.Local;
             c.Flow.AcceptConsent(DataSource.Synthetic, null, new Capabilities(), "invented new session test");
@@ -55,6 +56,7 @@ namespace App.Tests
             if (string.IsNullOrEmpty(url)) Assert.Ignore("Manual budgeted Gemini verification only");
             yield return SceneManager.LoadSceneAsync("Assessment");
             var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+            c.ShowPhaseInstructions = false; // flow and capture tests; PhaseInstructionTests cover the gate
             c.ConfigureBackend(url, Environment.GetEnvironmentVariable("VR_GEMINI_BACKEND_TEST_TOKEN"), true, false, false);
             c.ReplaySpeed = 40;
             c.AcceptConsent();
@@ -62,7 +64,7 @@ namespace App.Tests
             c.SubmitBaseline(2, 2);
             yield return WaitFor(() => c.Flow.State == FlowState.CheckIn);
             var checkIn = c.Panels.OfType<CheckInPanel>().First();
-            checkIn.EyeStrain.Slider.value = 4; checkIn.MentalFatigue.Slider.value = 4;
+            checkIn.EyeStrain.Select(4); checkIn.MentalFatigue.Select(4);
             checkIn.CloudExplanation.isOn = true;
             checkIn.SubmitButton.onClick.Invoke();
             yield return WaitFor(() => !c.AnalysisInProgress);
@@ -86,6 +88,7 @@ namespace App.Tests
             {
                 yield return SceneManager.LoadSceneAsync("Assessment");
                 var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+                c.ShowPhaseInstructions = false; // flow and capture tests; PhaseInstructionTests cover the gate
                 c.Analysis = AnalysisMode.Local;
                 c.ConfigureBackend(receiver.Url, "invented-retry-token", true, false, false);
                 c.Flow.AcceptConsent(DataSource.Synthetic, null, new Capabilities(), "invented retry test");
@@ -143,6 +146,7 @@ namespace App.Tests
             {
                 yield return SceneManager.LoadSceneAsync("Assessment");
                 var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+                c.ShowPhaseInstructions = false; // flow and capture tests; PhaseInstructionTests cover the gate
                 c.ConfigureBackend(receiver.Url, "invented-consent-token", true, false, false);
                 c.Flow.AcceptConsent(DataSource.Synthetic, null, new Capabilities(), "invented policy test");
                 c.Flow.CompleteBaseline(new SelfReport { Phase = ReportPhase.Baseline, EyeStrain = 2, MentalFatigue = 2 });
