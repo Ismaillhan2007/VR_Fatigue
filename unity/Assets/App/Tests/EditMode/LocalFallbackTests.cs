@@ -1,4 +1,6 @@
 using System.Linq;
+using System.Collections.Generic;
+using Newtonsoft.Json.Linq;
 using App.Core.Analysis;
 using App.Core.Contracts;
 using NUnit.Framework;
@@ -7,6 +9,41 @@ namespace App.Tests
 {
     public class LocalFallbackTests
     {
+        static IEnumerable<TestCaseData> SharedCases()
+        {
+            foreach (JObject c in JArray.Parse(TestFixtures.Read("integration/scene_rules.json")))
+                yield return new TestCaseData(c).SetName("SharedSceneRule_" + c["name"]);
+        }
+
+        [TestCaseSource(nameof(SharedCases))]
+        public void SharedSceneRulesMatchBackend(JObject c)
+        {
+            var summary = TestFixtures.Load<SessionSummary>("session_synthetic_usable.json");
+            var report = JObject.Parse(TestFixtures.Read("self_report_post_task.json"));
+            report["chips"] = c["chips"].DeepClone();
+            report["free_text"] = null;
+            summary.SelfReport = ContractJson.Parse<SelfReport>(report.ToString());
+            var preferences = c["preferences"].Type == JTokenType.Null ? null
+                : ContractJson.Parse<Preferences>(c["preferences"].ToString());
+            var request = AnalyzeRequest.Create(summary, null, preferences);
+            if ((string)c["safety_notice"] == "stop_session") request.SafetyNotice = SafetyNotice.StopSession;
+            var actual = JObject.Parse(ContractJson.Serialize(LocalFallbackAnalysis.Analyze(request).SceneConfig));
+            var expected = c["expected_fixture"] != null
+                ? JToken.Parse(TestFixtures.Read((string)c["expected_fixture"])) : c["expected"];
+            AssertSubset(actual, expected);
+        }
+
+        static void AssertSubset(JToken actual, JToken expected)
+        {
+            if (expected is JObject fields)
+            {
+                foreach (var field in fields.Properties()) AssertSubset(actual[field.Name], field.Value);
+            }
+            else if (expected.Type == JTokenType.Integer || expected.Type == JTokenType.Float)
+                Assert.AreEqual(expected.Value<double>(), actual.Value<double>(), 1e-9);
+            else Assert.IsTrue(JToken.DeepEquals(expected, actual), "Expected " + expected + ", got " + actual);
+        }
+
         static AnalyzeRequest Request(Preferences prefs = null)
         {
             var s = TestFixtures.Load<SessionSummary>("session_synthetic_usable.json");
@@ -35,6 +72,30 @@ namespace App.Tests
         {
             var c = LocalFallbackAnalysis.SceneFor(TestFixtures.Load<SelfReport>("self_report_baseline.json"), null);
             Assert.AreEqual(ContractJson.Serialize(SceneConfigPresets.CalmForestSunset()), ContractJson.Serialize(c));
+        }
+
+        [Test]
+        public void StopSessionConfigCannotBeReenabledByPreferencesOrResponseGuard()
+        {
+            var request = Request(new Preferences { AnimalsEnabled = true, Motion = MotionMode.Gentle });
+            request.SafetyNotice = SafetyNotice.StopSession;
+            var response = AnalysisResponseGuard.Accept(request, LocalFallbackAnalysis.Analyze(request));
+            Assert.IsFalse(response.SceneConfig.AnimalsEnabled);
+            Assert.AreEqual(MotionMode.None, response.SceneConfig.Motion);
+            Assert.AreEqual(0, response.SceneConfig.MotionSpeed);
+            Assert.IsFalse(response.SceneConfig.Orb.Enabled);
+            CollectionAssert.IsEmpty(response.SceneConfig.Particles);
+        }
+
+        [Test]
+        public void MissingMeasurementsNeverMeanWithinBaseline()
+        {
+            var s = TestFixtures.Load<SessionSummary>("session_synthetic_usable.json");
+            s.Metrics = new MetricValues();
+            Assert.AreEqual(ObservationCode.DataQualityLimited, LocalFallbackAnalysis.Observations(s).Single().Code);
+            s.Metrics.ProbeRmsErrorDeg = 1.9;
+            var observations = LocalFallbackAnalysis.Observations(s);
+            Assert.AreEqual(ObservationCode.ProbeLessAccurate, observations.Single().Code);
         }
 
         [Test]
@@ -112,6 +173,8 @@ namespace App.Tests
             summary.SelfReport.FreeText = "I feel dizzy";
             var prefs = new Preferences { Text = "something personal" };
             var request = AnalyzeRequest.Create(summary, null, prefs);
+            Assert.AreEqual(CloudPolicy.LocalOnly, request.CloudPolicy,
+                "a human check-in stays local even when the eye source is synthetic");
             Assert.IsNull(request.SessionSummary.SelfReport.FreeText);
             Assert.IsNull(request.Preferences.Text);
             Assert.AreEqual(SafetyNotice.TakeBreak, request.SafetyNotice, "safety rules still see the local text");

@@ -77,6 +77,12 @@ Changes to `Core/Contracts` or `contracts/v1` go through a contract PR that upda
 - For standalone testing read `SceneConfigHandoff.Current` in `Start` (it defaults to the offline preset).
 - Only prebuilt assets; fades instead of steps; no camera motion; `sound = silent` means all layers off.
 
+### Shared rules
+
+- `duration_ms` is the quality-covered duration; rounded valid + gap milliseconds sum exactly to it.
+- Null preferences mean no explicit overrides; request free-text fields must be null (safety and reconciliation are computed locally first).
+- All three local scene mappings (Unity `LocalFallbackAnalysis`, backend `local_scene`, forest `SceneConfigMapper`) are tested against `fixtures/integration/scene_rules.json`: preset, chip rows in CONCEPT 7.3 order (a later row wins), then explicit preferences; `want_quiet` caps volume at 0.2, explicit silence zeros every layer, `stop_session` constraints run last (Unity and backend).
+
 ### Backend contract
 
 - Request: `analyze_request.schema.json`. Response: `analysis_response.schema.json`.

@@ -8,7 +8,7 @@ using App.Core.Metrics;
 namespace App.Metrics
 {
     /// <summary>
-    /// FALLBACK only (used if SignalsMetricsEngine throws). Real quality bookkeeping (coverage, repeated timestamps, gaps),
+    /// PLACEHOLDER until feat/replay-metrics lands. Real quality bookkeeping (coverage, repeated timestamps, gaps),
     /// but metrics/deviations are the fixed values of fixtures/session_synthetic_usable.json. Never use it for live data
     /// claims: the metric_version says "stub".
     /// </summary>
@@ -38,6 +38,7 @@ namespace App.Metrics
                 SessionId = context.SessionId,
                 DataSource = context.DataSource,
                 ReplayOrigin = context.ReplayOrigin,
+                // Quality describes the task; baseline duration is already reported separately.
                 DurationMs = q.ValidDurationMs + q.GapDurationMs,
                 MetricVersion = Version,
                 Capabilities = context.Capabilities,
@@ -88,13 +89,15 @@ namespace App.Metrics
             }
             valid = Math.Min(valid, duration);
             var coverage = duration > 0 ? Math.Min(1, valid / duration) : 0;
+            var durationMs = (long)Math.Round(duration * 1000);
+            var validMs = (long)Math.Round(valid * 1000);
             dts.Sort();
             return new Quality
             {
                 Status = coverage >= MinValidCoverage ? QualityStatus.Usable : QualityStatus.InsufficientData,
                 ValidCoverage = Math.Round(coverage, 4),
-                ValidDurationMs = (long)Math.Round(valid * 1000),
-                GapDurationMs = Math.Max(0, (long)Math.Round(duration * 1000) - (long)Math.Round(valid * 1000)),
+                ValidDurationMs = validMs,
+                GapDurationMs = Math.Max(0, durationMs - validMs),
                 MaxGapMs = (long)Math.Round(maxGap * 1000),
                 RepeatedSampleFraction = samples.Count > 0 ? Math.Round((double)repeated / samples.Count, 4) : 0,
                 MedianDtMs = dts.Count > 0 ? Math.Round(dts[dts.Count / 2] * 1000, 2) : (double?)null,
