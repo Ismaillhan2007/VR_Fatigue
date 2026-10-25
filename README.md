@@ -1,5 +1,7 @@
 # VR_Fatigue
 
+Current optional cloud path: [explicit participant consent for aggregate measurements/ratings and immediate local reports](docs/CONSENTED_GEMINI_REPORT.md) supersedes the earlier synthetic-only Gemini restriction when enabled on both client and server.
+
 HackTX 2026 **eye-tracking app** prototype for the **Meta Quest Pro**: a short eye-movement check against your own baseline, a check-in where you say how you feel, and a health/fatigue report presented as an **experimental wellness summary**. A personalized calming forest is one optional use case that the participant can choose after the report. Experimental wellness prototype: **not a medical device, not a diagnosis, not validated fatigue detection.**
 
 ## The idea in one minute

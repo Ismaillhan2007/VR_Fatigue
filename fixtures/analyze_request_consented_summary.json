@@ -1,0 +1,97 @@
+{
+  "schema_version": "1.0",
+  "session_summary": {
+    "schema_version": "1.0",
+    "session_id": "00000000-0000-4000-8000-000000000001",
+    "data_source": "synthetic",
+    "replay_origin": null,
+    "duration_ms": 300000,
+    "metric_version": "metrics-0.1",
+    "capabilities": {
+      "gaze_pose": true,
+      "native_eye_gaze": false,
+      "openness": false,
+      "pupil": false,
+      "confidence_informative": false
+    },
+    "quality": {
+      "status": "usable",
+      "valid_coverage": 0.93,
+      "valid_duration_ms": 279000,
+      "gap_duration_ms": 21000,
+      "max_gap_ms": 640,
+      "repeated_sample_fraction": 0.021,
+      "median_dt_ms": 11.1,
+      "unavailable": [
+        {
+          "signal": "openness",
+          "reason": "not_exposed_by_runtime"
+        },
+        {
+          "signal": "pupil",
+          "reason": "not_exposed_by_runtime"
+        },
+        {
+          "signal": "blink",
+          "reason": "not_exposed_by_runtime"
+        }
+      ],
+      "policy_version": "quality-0.1"
+    },
+    "baseline": {
+      "state": "present",
+      "duration_ms": 120000,
+      "windows": 6,
+      "low_confidence": false,
+      "low_confidence_reason": null
+    },
+    "metrics": {
+      "gaze_speed_median_deg_s": 18.4,
+      "gaze_speed_p95_deg_s": 212.0,
+      "gaze_dispersion_deg": 6.1,
+      "probe_latency_ms": 285.0,
+      "probe_rms_error_deg": 1.9,
+      "probe_miss_fraction": 0.08,
+      "head_speed_deg_s": 9.7
+    },
+    "deviations": {
+      "gaze_speed_median_deg_s": -0.4,
+      "gaze_speed_p95_deg_s": -0.9,
+      "gaze_dispersion_deg": 0.3,
+      "probe_latency_ms": 1.6,
+      "probe_rms_error_deg": 1.1,
+      "probe_miss_fraction": 1.4,
+      "head_speed_deg_s": 0.6
+    },
+    "strain_indicator": {
+      "kind": "experimental_baseline_deviation",
+      "level": "moderate",
+      "value": 0.52,
+      "method_version": "strain-0.1"
+    },
+    "self_report": {
+      "schema_version": "1.0",
+      "phase": "post_task",
+      "eye_strain": 5,
+      "mental_fatigue": 5,
+      "chips": [
+        "tired_eyes",
+        "overstimulated",
+        "want_quiet"
+      ],
+      "free_text": null
+    }
+  },
+  "preferences": {
+    "schema_version": "1.0",
+    "theme": "forest",
+    "animals_enabled": true,
+    "time_of_day": "sunset",
+    "sound": "forest",
+    "motion": "gentle",
+    "text": null
+  },
+  "reconciliation": "agree_high",
+  "safety_notice": "none",
+  "cloud_policy": "consented_summary"
+}

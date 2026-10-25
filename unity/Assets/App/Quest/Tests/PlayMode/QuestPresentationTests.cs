@@ -149,7 +149,7 @@ public class QuestPresentationTests
         _controller.SubmitCheckIn(new SelfReport { Phase = ReportPhase.PostTask, EyeStrain = 2, MentalFatigue = 2 }, null);
         _controller.Flow.Pause();
         var deadline = Time.realtimeSinceStartup + 5;
-        while (_controller.Flow.Context.Analysis == null && Time.realtimeSinceStartup < deadline) yield return null;
+        while ((_controller.Flow.Context.Analysis == null || _controller.AnalysisInProgress) && Time.realtimeSinceStartup < deadline) yield return null;
         Assert.NotNull(_controller.Flow.Context.Analysis);
         Assert.IsFalse(_controller.AnalysisInProgress);
         Assert.IsTrue(_controller.Flow.IsPaused);

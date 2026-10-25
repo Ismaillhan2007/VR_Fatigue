@@ -203,8 +203,12 @@ namespace App.UI.Editor
             Body(words.transform, "Point at the box and press the trigger: the headset keyboard opens. "
                 + "Press its microphone key to dictate, or type.", 100).fontSize = SmallSize + 2;
             p.FreeText = MakeInput(words.transform, "For example: my eyes feel dry and I want somewhere quiet");
-            p.FreeText.GetComponent<LayoutElement>().preferredHeight = 170;
-            p.Hint = Small(words.transform, "", 80);
+            p.FreeText.GetComponent<LayoutElement>().preferredHeight = 140;
+            p.Hint = Small(words.transform, "", 44);
+            p.CloudExplanation = Pill(words.transform, "Optional: also send aggregate eye measurements and ratings to the configured "
+                + "backend and Google Gemini for an experimental explanation (Google's Gemini terms apply). "
+                + "Raw gaze and your words stay here.", 26, 0, 110, alignment: TextAnchor.MiddleLeft);
+            p.CloudExplanation.gameObject.name = "Optional Gemini summary consent";
             p.Steps.Add(words);
 
             Spacer(root.transform);

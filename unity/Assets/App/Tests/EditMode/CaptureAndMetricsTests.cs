@@ -12,6 +12,31 @@ namespace App.Tests
 {
     public class CaptureAndMetricsTests
     {
+        sealed class InvalidEngine : IMetricsEngine
+        {
+            public string MetricVersion => "invalid-test";
+            public SessionSummary Compute(PhaseRecording task, BaselineData baseline, MetricsContext context)
+                => new SessionSummary { SessionId = context.SessionId, DurationMs = -1 };
+        }
+
+        [Test]
+        public void InvalidMetricsResultStillProducesValidInsufficientReportWithOriginalProvenance()
+        {
+            var context = new MetricsContext
+            {
+                SessionId = SessionContext.NewSessionId(), DataSource = DataSource.Live,
+                Capabilities = new Capabilities { NativeEyeGaze = true, GazePose = true },
+                PostTaskReport = new SelfReport { Phase = ReportPhase.PostTask, EyeStrain = 3, MentalFatigue = 4 },
+            };
+            Assert.IsFalse(MetricsEngineFactory.TryCompute(new InvalidEngine(), new PhaseRecording(),
+                new BaselineData(), context, out var summary));
+            CollectionAssert.IsEmpty(summary.Validate());
+            Assert.AreEqual(DataSource.Live, summary.DataSource);
+            Assert.AreEqual(context.SessionId, summary.SessionId);
+            Assert.AreEqual(QualityStatus.InsufficientData, summary.Quality.Status);
+            Assert.IsNull(summary.Metrics.GazeSpeedMedianDegS);
+        }
+
         static List<GazeSample> Run(IEyeTrackingProvider p, double seconds)
         {
             var buffer = new List<GazeSample>();

@@ -21,6 +21,8 @@ namespace App.UI.Panels
         public Button BackButton;
         public Button NextButton;
         public Button SubmitButton;
+        /// <summary>Opt-in: aggregate measurements and ratings (never raw gaze or own words) go to the backend and Gemini.</summary>
+        public Toggle CloudExplanation;
 
         public const int MaxChips = 6;
         int _step;
@@ -45,6 +47,7 @@ namespace App.UI.Panels
             MentalFatigue.ResetValue();
             foreach (var t in ChipToggles) t.isOn = false;
             FreeText.text = "";
+            CloudExplanation.SetIsOnWithoutNotify(false);
             ShowStep(0);
         }
 
@@ -65,9 +68,7 @@ namespace App.UI.Panels
             NextButton.gameObject.SetActive(!last);
             NextButton.interactable = _step > 0 || (EyeStrain.HasValue && MentalFatigue.HasValue);
             SubmitButton.gameObject.SetActive(last);
-            Hint.text = Controller.CheckInLeavesDevice
-                ? "Your words are sent with your check-in to the configured analysis server."
-                : "Analysis runs on this headset: your words stay here.";
+            Hint.text = "Your words stay on this headset for the local report. They are never sent to the backend or Gemini.";
         }
 
         void EnforceChipLimit()
@@ -89,7 +90,7 @@ namespace App.UI.Panels
                 Chips = chips,
                 FreeText = string.IsNullOrWhiteSpace(FreeText.text) ? null : FreeText.text.Trim(),
             };
-            Controller.SubmitCheckIn(report, null);
+            Controller.SubmitCheckIn(report, null, CloudExplanation.isOn);
         }
     }
 }

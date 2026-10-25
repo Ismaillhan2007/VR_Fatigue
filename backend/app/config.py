@@ -17,6 +17,7 @@ class Settings(BaseSettings):
 
     runtime_mode: Literal["local", "hosted"] = "local"
     gemini_enabled: bool = False
+    allow_participant_cloud: bool = False
     gemini_api_key: SecretStr = Field(default=SecretStr(""), validation_alias="GEMINI_API_KEY")
     gemini_model: str = Field(default="", validation_alias="GEMINI_MODEL")
     input_price_per_million: Decimal | None = Field(default=None, ge=0)

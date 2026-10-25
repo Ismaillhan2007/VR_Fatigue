@@ -234,7 +234,7 @@ class Observation(ContractModel):
 class AnalysisRequest(ContractModel):
     schema_version: Version
     # Legacy and interactive clients stay local, even when eye samples are synthetic.
-    cloud_policy: Literal["local_only", "synthetic_demo"] = "local_only"
+    cloud_policy: Literal["local_only", "synthetic_demo", "consented_summary"] = "local_only"
     session_summary: SessionSummary
     preferences: Preferences | None
     reconciliation: Reconciliation

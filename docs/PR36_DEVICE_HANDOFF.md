@@ -1,5 +1,7 @@
 # PR #36 follow-up and Quest Pro handoff
 
+Updated product target: [immediate reports and consented Gemini summaries](CONSENTED_GEMINI_REPORT.md). The historical offline checks below remain valid; cloud opt-in adds a separate optional path.
+
 ## Fixed integration defect
 
 The combined candidate previously contained Alexander's first #35 commit

@@ -42,10 +42,11 @@
     "cloud_policy": {
       "enum": [
         "local_only",
-        "synthetic_demo"
+        "synthetic_demo",
+        "consented_summary"
       ],
       "default": "local_only",
-      "description": "Optional additive v1 field. Omission and interactive check-ins stay local. synthetic_demo declares that ALL input, including self-report and preferences, is invented test data; never use for participant check-ins."
+      "description": "Omission/local_only never forwards to Gemini. synthetic_demo means every input is invented. consented_summary declares explicit participant consent to send only aggregate measurements and ratings to the backend and Google Gemini; raw samples/free text remain on-device. Server opt-in is also required."
     }
   },
   "required": [

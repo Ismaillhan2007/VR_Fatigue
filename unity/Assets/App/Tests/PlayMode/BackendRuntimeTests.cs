@@ -23,6 +23,66 @@ namespace App.Tests
 {
     public class BackendRuntimeTests
     {
+        [UnityTest]
+        public IEnumerator ExplicitLiveGeminiRoundTripUsesOnlyTheInventedProbe()
+        {
+            var url = Environment.GetEnvironmentVariable("VR_GEMINI_BACKEND_TEST_URL");
+            if (string.IsNullOrEmpty(url)) Assert.Ignore("Manual budgeted Gemini verification only");
+            var request = Request();
+            request.CloudPolicy = CloudPolicy.ConsentedSummary;
+            var work = new HttpAnalysisClient(url, Environment.GetEnvironmentVariable("VR_GEMINI_BACKEND_TEST_TOKEN"))
+                .AnalyzeAsync(request, default);
+            yield return WaitFor(() => work.IsCompleted);
+            Assert.AreEqual(AiSource.Live, work.Result.Response.AiSource, work.Result.FallbackReason);
+            Assert.IsNotEmpty(work.Result.Response.ModelId);
+            Assert.AreEqual(request.SessionSummary.DataSource, work.Result.Response.DataSource);
+            Assert.AreEqual(request.SessionSummary.SessionId, work.Result.Response.SessionId);
+        }
+
+        [UnityTest]
+        public IEnumerator ConsentedCloudRequestNeverBlocksLocalReportAndFinishCancelsPendingWork()
+        {
+            using (var receiver = new Receiver(wait: true))
+            {
+                yield return SceneManager.LoadSceneAsync("Assessment");
+                var c = UnityEngine.Object.FindAnyObjectByType<SessionController>();
+                c.ConfigureBackend(receiver.Url, "invented-consent-token", true, false, false);
+                c.Flow.AcceptConsent(DataSource.Synthetic, null, new Capabilities(), "invented policy test");
+                c.Flow.CompleteBaseline(new SelfReport { Phase = ReportPhase.Baseline, EyeStrain = 2, MentalFatigue = 2 });
+                c.Flow.CompleteLoadTask();
+                var checkIn = c.Panels.Find(p => p is CheckInPanel) as CheckInPanel;
+                Assert.IsFalse(checkIn.CloudExplanation.isOn);
+                checkIn.EyeStrain.Select(3); checkIn.MentalFatigue.Select(4);
+                checkIn.FreeText.text = "invented-private-marker";
+                checkIn.CloudExplanation.isOn = true;
+                yield return AssessmentFlowSmokeTest.CaptureEvidence("gemini-consent");
+                checkIn.SubmitButton.onClick.Invoke();
+                yield return WaitFor(() => receiver.Received.Task.IsCompleted);
+                Assert.IsTrue(c.AnalysisInProgress);
+                Assert.NotNull(c.Flow.Context.Analysis, "report exists before a network response");
+                var request = ContractJson.Parse<AnalyzeRequest>(receiver.Body);
+                Assert.AreEqual(CloudPolicy.ConsentedSummary, request.CloudPolicy);
+                Assert.IsNull(request.SessionSummary.SelfReport.FreeText);
+                var summary = c.Panels.Find(p => p is SummaryPanel) as SummaryPanel;
+                Assert.IsTrue(summary.FinishReportButton.interactable);
+                StringAssert.Contains("Report ready on-device", summary.Body.text);
+                summary.FinishReportButton.onClick.Invoke();
+                Assert.AreEqual(FlowState.Done, c.Flow.State);
+                Assert.IsFalse(c.AnalysisInProgress);
+                Assert.IsFalse(SceneManager.GetSceneByName("ForestDemo").isLoaded);
+                receiver.Release.TrySetResult(true);
+                for (var i = 0; i < 5; i++) yield return null;
+                Assert.AreEqual(FlowState.Done, c.Flow.State);
+                Assert.AreEqual(LocalFallbackAnalysis.PromptVersion, c.Flow.Context.Analysis.PromptVersion);
+                c.Exit(); c.Restart();
+                c.Flow.AcceptConsent(DataSource.Synthetic, null, new Capabilities(), "invented reset test");
+                c.Flow.CompleteBaseline(new SelfReport { Phase = ReportPhase.Baseline, EyeStrain = 2, MentalFatigue = 2 });
+                c.Flow.CompleteLoadTask();
+                Assert.IsFalse(checkIn.CloudExplanation.isOn, "cloud choice is never retained into another session");
+                c.Exit();
+            }
+        }
+
         static AnalyzeRequest Request() => ContractJson.Parse<AnalyzeRequest>(Resources.Load<TextAsset>("backend-connection-probe").text);
         static IEnumerator WaitFor(Func<bool> ready, float seconds = 20)
         {
@@ -188,7 +248,7 @@ namespace App.Tests
             c.AcceptConsent(); c.EndCaptureEarly();
             c.SubmitBaseline(2, 2); c.EndCaptureEarly();
             c.SubmitCheckIn(new SelfReport { Phase = ReportPhase.PostTask, EyeStrain = 3, MentalFatigue = 3 }, null);
-            yield return WaitFor(() => c.Flow.Context.Analysis != null);
+            yield return WaitFor(() => c.Flow.Context.Analysis != null && !c.AnalysisInProgress);
             StringAssert.Contains("upload not permitted", c.Flow.Context.AnalysisFallbackReason);
             StringAssert.Contains("LOCAL FALLBACK", c.ProvenanceBar.AiLabel.text);
             c.FinishWithReport();

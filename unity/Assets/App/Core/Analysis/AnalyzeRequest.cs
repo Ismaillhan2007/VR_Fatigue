@@ -11,7 +11,7 @@ namespace App.Core.Analysis
     public sealed class AnalyzeRequest : IContract
     {
         [JsonProperty("schema_version", Required = Required.Always)] public string SchemaVersion = Problems.SchemaVersion;
-        /// <summary>Interactive check-ins always stay local. SyntheticDemo is only for invented test scenarios.</summary>
+        /// <summary>Default is local-only. ConsentedSummary requires a separate participant choice; SyntheticDemo is invented data only.</summary>
         [JsonProperty("cloud_policy", Required = Required.DisallowNull)] public CloudPolicy CloudPolicy = CloudPolicy.LocalOnly;
         [JsonProperty("session_summary", Required = Required.Always)] public SessionSummary SessionSummary;
         /// <summary>Null when the participant let the app choose.</summary>

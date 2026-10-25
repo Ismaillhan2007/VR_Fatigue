@@ -48,11 +48,9 @@ namespace App.UI.Panels
             Body.text = "An experimental wellness prototype: not a medical device and not a diagnosis.\n\n"
                 + "•  About 4 minutes: a baseline, a short task, then a quick check-in and your summary.\n"
                 + "•  Pause any time with Y or B. Exit is always at the top.\n"
-                + "•  Your report stays in memory until Exit or New session.\n"
-                + (Controller.CheckInLeavesDevice
-                    ? "•  Upload is on: invented eye aggregates, your ratings, chips and words go to the configured server.\n"
-                    : "•  Analysis runs on this headset; nothing is uploaded. Real eye data never leave it.\n")
-                + "\n"
+                + "•  Your report stays in memory until Exit or New session. A local report is always available.\n"
+                + "•  At check-in you may choose to send aggregate measurements and ratings to the configured backend "
+                + "and Google Gemini. Raw gaze and your own words stay on this device.\n\n"
                 + $"Eye data source: {Controller.EyeSourceDescription}"
                 + (Controller.ReplayLoadStatus == null ? "" : "\n\n" + Controller.ReplayLoadStatus)
                 + (Controller.EyeSource == App.Capture.EyeSourceMode.Hardware ? "\n\n" + Controller.HardwareReadinessText : "");
