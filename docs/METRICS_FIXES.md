@@ -89,3 +89,12 @@ Target Unity 6000.6.7f1 is not installed here. Target-editor import, Android/Que
 LAN between laptops and visual/rendering acceptance remain unrun. No screenshot tests
 or paid/live Gemini requests were used. The isolated project uses compatible test
 packages and does not establish the target URP package graph's compatibility.
+
+## Standalone test command compatibility
+
+`tools/check_signals.py` resolves the bundled NUnit assembly from either `net472` or
+`net40` instead of assuming the older directory. The real command compiled and ran
+**136 core tests successfully on both Unity 6000.3.19f1 and 6000.5.2f1**. Each run
+regenerated all 25 C# reports; Python then validated 14 schemas, 35 fixtures and those
+reports, rejecting 30 invalid examples. This helper checks the core signal assembly;
+it does not replace application EditMode/PlayMode or target-editor acceptance.
