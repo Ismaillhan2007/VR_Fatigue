@@ -1,0 +1,12 @@
+# Only dependency metadata and application source enter the build context.
+*
+!Dockerfile
+!.dockerignore
+!pyproject.toml
+!uv.lock
+!app/
+!app/**
+**/.env
+**/.env.*
+**/__pycache__
+**/*.py[cod]
