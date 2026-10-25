@@ -3,7 +3,7 @@
 Read by every person and coding agent before changing anything. Details: [CONTRIBUTING.md](CONTRIBUTING.md) (workflow, ownership, conflicts), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (seams), [docs/SETUP.md](docs/SETUP.md) (run and test).
 
 ## Objective
-Build an eye-tracking app for HackTX: eye-signal capture -> deterministic metrics and personal-baseline comparison -> an experimental health/fatigue wellness report, with local fallback and optional Gemini explanation. A report-only session is a complete success. A personalized, prebuilt relaxation scene is one optional use case, entered only by explicit participant choice; ship one forest for that use case before adding environments. See [product objectives and current implementation gaps](docs/OBJECTIVES.md). The current app still needs a normal report-only completion path; do not claim this documentation implements it.
+Build an eye-tracking app for HackTX: eye-signal capture -> deterministic metrics and personal-baseline comparison -> an experimental health/fatigue wellness report, with local fallback and optional Gemini explanation. A report-only session is a complete success. A personalized, prebuilt relaxation scene is one optional use case, entered only by explicit participant choice; ship one forest for that use case before adding environments. See [product objectives and current implementation gaps](docs/OBJECTIVES.md). The desktop app supports report-only completion and a separately chosen optional forest; see [report-only implementation and verification](docs/REPORT_ONLY_FLOW.md). Hardware acceptance remains separate.
 
 ## Development
 - Use Unity/C# (6000.6.7f1) for VR and Python/FastAPI with the Google Gen AI SDK for the backend. Keep the Gemini key on the backend.

@@ -1,6 +1,6 @@
 # Signals module and Quest Pro bridge
 
-This module serves an **eye-tracking app** whose primary outcome is an experimental health/fatigue wellness report. The forest is a separately chosen relaxation use case; capture, metrics and report completion must not depend on scene participation. The current app still needs normal report-only completion; see [product objectives and implementation gaps](../docs/OBJECTIVES.md).
+This module serves an **eye-tracking app** whose primary outcome is an experimental health/fatigue wellness report. The forest is a separately chosen relaxation use case; capture, metrics and report completion must not depend on scene participation. The desktop app supports normal report-only completion; see [implementation and verification](../docs/REPORT_ONLY_FLOW.md) and [remaining objectives](../docs/OBJECTIVES.md).
 
 Target editor: **Unity 6000.6.7f1** (`ProjectSettings/ProjectVersion.txt`).
 `Packages/manifest.json` pins Meta XR Core SDK **207.0.1**, OpenXR **1.18.0**,
