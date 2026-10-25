@@ -128,6 +128,11 @@ namespace App.UI.Editor
             var buttons = ButtonRow(settings.transform);
             p.CheckConnectionButton = MakeButton(buttons, "Check with invented data");
             p.SaveSettingsButton = MakeButton(buttons, "Save and back");
+            // The optional overlay stays dark while the new theme uses light cards.
+            // Preserve dark input-field text on its light field background.
+            foreach (var text in settings.GetComponentsInChildren<Text>(true))
+                if (text.GetComponentInParent<Button>() == null && text.GetComponentInParent<InputField>() == null)
+                    text.color = UiTheme.Paper;
             settings.SetActive(false);
             return root;
         }

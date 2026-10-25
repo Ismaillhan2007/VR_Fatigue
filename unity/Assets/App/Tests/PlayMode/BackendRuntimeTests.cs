@@ -52,8 +52,11 @@ namespace App.Tests
                 c.Flow.CompleteLoadTask();
                 var checkIn = c.Panels.Find(p => p is CheckInPanel) as CheckInPanel;
                 Assert.IsFalse(checkIn.CloudExplanation.isOn);
-                c.SubmitCheckIn(new SelfReport { Phase = ReportPhase.PostTask, EyeStrain = 3, MentalFatigue = 4,
-                    FreeText = "invented-private-marker" }, null, consentedCloud: true);
+                checkIn.EyeStrain.Slider.value = 3; checkIn.MentalFatigue.Slider.value = 4;
+                checkIn.FreeText.text = "invented-private-marker";
+                checkIn.CloudExplanation.isOn = true;
+                yield return AssessmentFlowSmokeTest.CaptureEvidence("gemini-consent");
+                checkIn.SubmitButton.onClick.Invoke();
                 yield return WaitFor(() => receiver.Received.Task.IsCompleted);
                 Assert.IsTrue(c.AnalysisInProgress);
                 Assert.NotNull(c.Flow.Context.Analysis, "report exists before a network response");

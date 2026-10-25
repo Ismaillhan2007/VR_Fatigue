@@ -101,6 +101,7 @@ MonoBehaviour:
   CanvasRect: {fileID: 8397768194604131012}
   Target: {fileID: 4188245000938971222}
   HeadCamera: {fileID: 0}
+  WorldSpaceHeadRelative: 0
 --- !u!1 &5536704845288239739
 GameObject:
   m_ObjectHideFlags: 0

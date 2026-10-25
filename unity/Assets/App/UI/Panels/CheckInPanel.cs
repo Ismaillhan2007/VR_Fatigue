@@ -32,12 +32,25 @@ namespace App.UI.Panels
             choice.AddComponent<LayoutElement>().preferredHeight = 90;
             CloudExplanation = choice.GetComponent<Toggle>();
             CloudExplanation.isOn = false;
+            if (ChipToggles.Count > 0)
+            {
+                MatchImage(CloudExplanation.targetGraphic, ChipToggles[0].targetGraphic);
+                MatchImage(CloudExplanation.graphic, ChipToggles[0].graphic);
+            }
+            ((UnityEngine.RectTransform)CloudExplanation.targetGraphic.transform).sizeDelta = new UnityEngine.Vector2(36, 36);
             var label = choice.GetComponentInChildren<Text>();
             label.font = UnityEngine.Resources.GetBuiltinResource<UnityEngine.Font>("LegacyRuntime.ttf");
             label.fontSize = 22; label.supportRichText = false; label.color = Hint.color;
+            label.rectTransform.offsetMin = new UnityEngine.Vector2(48, 0);
             label.text = "Optional: send aggregate eye measurements and ratings to the configured backend and Google Gemini for an experimental explanation. Raw gaze and free text stay on-device. Google processes the summary under its Gemini terms. You can finish with a local report.";
             foreach (var node in choice.GetComponentsInChildren<UnityEngine.Transform>(true))
                 node.gameObject.layer = UnityEngine.LayerMask.NameToLayer("UI");
+        }
+
+        static void MatchImage(Graphic target, Graphic source)
+        {
+            if (target is Image destination && source is Image template)
+            { destination.sprite = template.sprite; destination.type = template.type; destination.color = template.color; }
         }
 
         public override void OnShow()
