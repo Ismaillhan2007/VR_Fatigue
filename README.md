@@ -1,21 +1,25 @@
 # VR_Fatigue
 
-HackTX 2026 prototype for the **Meta Quest Pro**: a short eye-movement check against your own baseline, a check-in where you say how you feel, and a personalized calming forest built from what you said. Experimental wellness prototype: **not a medical device, not a diagnosis, not validated fatigue detection.**
+HackTX 2026 **eye-tracking app** prototype for the **Meta Quest Pro**: a short eye-movement check against your own baseline, a check-in where you say how you feel, and a health/fatigue report presented as an **experimental wellness summary**. A personalized calming forest is one optional use case that the participant can choose after the report. Experimental wellness prototype: **not a medical device, not a diagnosis, not validated fatigue detection.**
 
 ## The idea in one minute
 
-Long VR sessions cause gradual strain that people rarely notice. Gaze alone is a weak signal and differs a lot between people, so the app never uses a population threshold. It compares you with **your own baseline from the same session**, puts **your own words first**, and offers a calm break whose settings you can see and change.
+The app helps participants review eye-movement changes and how they feel during VR use. Gaze alone is a weak signal and differs a lot between people, so the app never uses a population threshold. It compares you with **your own baseline from the same session** and puts **your own words first**. The report is the primary outcome; a report-only session must be a complete success. Participants may separately choose a calm break whose settings they can see and change.
 
 ```text
 Consent -> Baseline (probe targets) -> Task (same probes) -> Check-in (2 sliders, chips, optional text)
-        -> Summary (per-metric deviations, experimental indicator, explanation) -> Forest -> Re-rating
+        -> Report (per-metric deviations, experimental indicator, explanation)
+             -> Finish with report -> Done
+             -> Choose optional forest -> Preferences/preview -> Forest -> Optional feedback -> Done
 ```
+
+This is the intended flow. The current demo still routes normal completion through Forest and Re-rating; Exit clears session data. See [objectives and implementation gaps](docs/OBJECTIVES.md) for the changes needed to support successful report-only completion.
 
 1. **Capture.** An eye provider delivers timestamped gaze samples: synthetic generator, replay file, or (later) the Quest Pro. A yellow head-locked target jumps every 2 s (same layout in both phases) to measure latency, accuracy and misses.
 2. **Metrics (deterministic, on device).** Quality checks (repeated timestamps dropped, stalls and gaps handled), gaze/head speed, probe metrics, robust deviation from the baseline, and an **experimental baseline-deviation indicator** (never called a fatigue score).
 3. **Reconciliation and safety (on device).** The app compares words and signals and checks for discomfort. Free text never leaves the device.
 4. **Explanation (backend).** FastAPI validates the summary and returns a short explanation plus a bounded scene configuration. It uses deterministic rules by default; Gemini is optional, only for synthetic input, and only picks approved explanation codes and bounded settings.
-5. **Scene.** Unity re-validates and clamps the configuration, applies the participant's explicit choices (they always win), and the forest fades lighting, fog, sound, particles, a breathing orb and an optional squirrel. The camera never moves; pause, mute and exit are always available.
+5. **Optional scene use case.** When the participant chooses relaxation, Unity re-validates and clamps the configuration, applies their explicit choices (they always win), and the forest fades lighting, fog, sound, particles, a breathing orb and an optional squirrel. The camera never moves; pause, mute and exit are always available. This feature must not gate report access or completion; the current flow does not yet meet that objective.
 
 Every screen shows where the data came from (LIVE / REPLAY / SYNTHETIC) and where the explanation came from (live / cached / fallback AI).
 
@@ -32,6 +36,8 @@ Every screen shows where the data came from (LIVE / REPLAY / SYNTHETIC) and wher
 | Submission | `docs/SUBMISSION.md` | Devpost draft, demo script, AI-use disclosure |
 
 ## Status
+
+**Product alignment gap:** the report is shown before scene entry, but there is no normal "Finish with report" action. The summary offers scene entry, scene preferences appear during the check-in, and v1 responses always include a scene config. Users can exit without entering the forest, but Exit clears the report. These are documented gaps, not evidence of an implemented report-only mode; see [OBJECTIVES](docs/OBJECTIVES.md).
 
 **Current desktop demo:** Unity replays a synthetic session with a 130-second baseline, a 60-second loaded task and target probes. The signals engine calculates gaze/head/probe metrics, baseline deviations and an experimental indicator from that replay. Default replay speed is 4x. Unity sends the aggregate summary to FastAPI and applies the returned, validated settings to a placeholder `ForestDemo` scene. The UI identifies synthetic replay and distinguishes backend rules from Unity's local fallback.
 
@@ -115,6 +121,7 @@ Keep machine-specific URLs and tokens out of committed scenes/prefabs. A develop
 
 ## Project guides
 
+- [Eye-tracking product objectives, optional scene participation, and current implementation gaps](docs/OBJECTIVES.md)
 - [Project objectives, architecture, feature acceptance, and build order](docs/PROJECT_PLAN.md)
 - [Backend setup and Unity/HTTP integration](backend/README.md)
 - [Concept: baseline, check-in agent, indicator maths, and scene parameters](docs/CONCEPT.md)

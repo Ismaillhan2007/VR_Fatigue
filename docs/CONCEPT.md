@@ -1,21 +1,22 @@
-# Concept: from eye-movement signals and self-report to a personal calming scene
+# Concept: eye tracking and wellness reports with optional relaxation
 
 This document explains *what the product is and why each part exists*. Architecture, caps and acceptance criteria stay in [PROJECT_PLAN.md](PROJECT_PLAN.md); hardware facts in [HARDWARE_QUEST_PRO.md](HARDWARE_QUEST_PRO.md); schemas in [../contracts/](../contracts/).
 
-> **Status:** design only. Nothing here has been built or run on a headset. Claims marked *unverified* must be tested before they appear in the pitch.
+> **Status:** product design with a partially implemented desktop prototype; headset acceptance remains unverified. The report-only branch below is a requirement, not implemented behavior. See [objectives and the code-backed gap audit](OBJECTIVES.md) and the [README status](../README.md#status).
 
 ## 1. Idea in one paragraph
 
-People who wear XR headsets for long periods do not notice gradual visual strain. The product has two entry points to the same pipeline. A **background layer** watches eye movement against the person's own baseline and, when it deviates for long enough, offers a break. An **agent** is for the moment the person already knows they feel off: they say or tap how they feel and what they want. Either way the result is the same: a short **personalized calming scene** assembled from a fixed, safe set of parameters.
+This is an **eye-tracking app** that helps people understand eye-movement changes, self-reported eye strain and mental fatigue. Its primary result is a **health/fatigue report presented as an experimental wellness summary**, combining a personal-baseline comparison, the participant's check-in and explicit limitations. Receiving this report is a complete use of the app. The participant may then choose a personalized calming scene; rendering that scene is one optional use case. A future **background layer** could offer a check-in when eye movement changes persist; the current **agent/check-in** path lets people say how they feel. Neither entry point requires participation in a scene.
 
-Hackathon scope: the agent path plus a short, live eye-movement assessment on a Meta Quest Pro, one parametric forest, honest labels. The always-on background layer is the *vision*, shown as a nudge in the demo, not a finished product.
+Hackathon target: a short eye-movement assessment on a Meta Quest Pro (labelled replay until live capture is verified), a check-in and useful report, plus one parametric forest offered separately. Report-only completion is required but still missing from the current demo flow. The always-on background layer is the *vision*, not a finished product.
 
 | Part | Hackathon MVP | Vision (say it, do not claim it) |
 | --- | --- | --- |
 | Eye signals | Short baseline, then a short loaded task with gaze probes | Continuous low-overhead monitoring while using apps |
 | Reference | Personal baseline from the same session | Multi-day personal baseline, stored locally with consent |
 | Agent | Chips, two sliders, optional short text -> structured state | Voice conversation, memory of what helped |
-| Scene | Parametric forest, bounded settings | More biomes, optional generated skyboxes, learned preferences |
+| Report | Core outcome; normal completion without a scene is required | Longer-term comparisons and optional export |
+| Optional scene | Participant opts into a parametric forest with bounded settings | More optional biomes, generated skyboxes, learned preferences |
 | Evidence | Small honest pilot | Proper study |
 
 ## 2. Why eye movement alone is not enough (design consequence)
@@ -24,11 +25,11 @@ Hackathon scope: the agent path plus a short, live eye-movement assessment on a 
 - Quest Pro gaze has person- and condition-dependent accuracy (median about 1 degree, much worse tails; Aziz et al., arXiv 2403.07210). Probes use large targets and tolerant thresholds.
 - Pupil size and eyelid openness are **not available** on Quest Pro through the standard SDK, so blink rate and pupil metrics are out. Do not synthesise them.
 
-Consequence: the eye signal is a *weak, transparent hint*; the person's report is authoritative for what scene they get.
+Consequence: the eye signal is a *weak, transparent hint*. The report distinguishes measured changes from what the person says. Their choice determines whether a scene is used at all and, if chosen, their preferences determine its settings.
 
 ## 3. Session flow
 
-Total live demo: about 8-9 minutes; the pilot protocol uses the longer values.
+The intended report-only path ends at step 4; steps 5-6 apply only to people who choose relaxation. An opt-in scene demo was planned at about 8-9 minutes; report-only sessions omit that time. See [SETUP](SETUP.md) for current replay timing and [OBJECTIVES](OBJECTIVES.md) for missing branching behavior.
 
 | # | Step | Demo / pilot | What happens | Data |
 | --- | --- | --- | --- | --- |
@@ -36,9 +37,9 @@ Total live demo: about 8-9 minutes; the pilot protocol uses the longer values.
 | 1 | Baseline | 120 s minimum / 2 min minimum | Standardised gaze task (see 5.1) in a calm neutral scene. Extend if needed to collect six complete usable windows. Then sliders `eye_strain`, `mental_fatigue` (1-7). | metrics windows + `SelfReport(baseline)` |
 | 2 | Load task | 2 min / 5+ min | Work-like visual task (dense reading plus visual search) with the same probes embedded. | metrics windows |
 | 3 | Check-in | 30 s | Sliders again, chips, optional text. This is the agent entry. A "tired" background trigger would open the same screen. | `SelfReport(post_task)` |
-| 4 | Summary | 20 s | Per-metric deviation from baseline, the experimental indicator, reconciliation with the words, limitations. | `SessionSummary`, `AnalysisResponse` |
-| 5 | Scene | 2-3 min | Calming forest from `SceneConfig`; participant can adjust or exit at any time. | `SceneConfig` |
-| 6 | Re-rating | 20 s | Same sliders again. Compare to step 3 as a small before/after. | `SelfReport(post_scene)` |
+| 4 | Report and completion choice | 20 s | Per-metric deviation from baseline, experimental indicator, reconciliation, limitations and provenance. Finish successfully with the report, or explicitly choose relaxation. | `SessionSummary`, `AnalysisResponse` |
+| 5 | Optional scene | 2-3 min if chosen | Ask for preferences/preview after opt-in, then enter the calming forest. Participant can adjust or exit at any time. | `Preferences`, `SceneConfig` |
+| 6 | Optional scene feedback | 20 s if offered and accepted | Same sliders again only for scene participants. Missing feedback is not a fabricated before/after comparison. | `SelfReport(post_scene)` if collected |
 
 ## 4. Baseline policy (the weak point, handled explicitly)
 
@@ -96,27 +97,29 @@ Not allowed: "fatigue score", "you are fatigued", "detected", "diagnosis", accur
 
 | Words | Signals | `reconciliation` | Behaviour |
 | --- | --- | --- | --- |
-| high | high / moderate | `agree_high` | Offer the calming scene; show both. |
-| high | low | `words_only` | The person's report counts. Scene follows words; say the eye signals did not show a strong change. |
+| high | high / moderate | `agree_high` | Show both in the report; offer a break without requiring scene participation. |
+| high | low | `words_only` | The person's report counts; say the eye signals did not show a strong change. Offer optional relaxation. |
 | low | high | `signals_only` | Gentle offer ("your eye movements changed from your baseline - want a short break?"). Never overrides what they said. |
 | low | low | `agree_low` | No nudge; scene only if they ask. |
 | any | unavailable | `unavailable` | Words only; show "no usable eye data". |
 
+Every row retains report-only completion. An offer is never scene consent; `stop_session` still blocks scene entry.
+
 ### 6.3 What Gemini does
 
-One text-only request per analysis: given the metrics, deviations, reconciliation, bounded self-report and preferences, return (a) a short explanation using only approved observation codes, (b) limitations, (c) a `SceneConfig` plus a one-line rationale. It does not compute measurements, change `reconciliation`, lower a `safety_notice`, or add unmeasured claims. Free text is treated as untrusted data.
+Gemini is an optional explanation adapter; local rules must produce a useful report without it. The current v1 analysis response bundles (a) a short explanation using only approved observation codes, (b) limitations, and (c) a `SceneConfig` plus a one-line rationale. Bundling a config does not mean the participant chose a scene. The intended UI keeps the report independent and only applies scene settings after opt-in; changing the wire shape requires a contract PR. Gemini does not compute measurements, change `reconciliation`, lower a `safety_notice`, or add unmeasured claims.
 
 ### 6.4 Safety and privacy
 
 - Discomfort chips or words (dizziness, nausea, pain) are matched by simple local rules and raise `safety_notice` (`take_break` / `stop_session`): "take the headset off and rest". This is not a medical judgement.
 - This is a wellness demo. No diagnosis, no treatment advice.
-- **Decision D1 (needs a human):** self-report free text describes a person's state. Gemini's free tier says not to submit sensitive or personal data. Default until decided: free text and chips are used only locally (deterministic mapping, section 7.3); the cloud call receives chips, sliders and synthetic or team-volunteer data with explicit opt-in on a plan whose data terms permit it.
+- **Decision D1 (current policy):** free text stays on-device and interactive check-ins use `cloud_policy: local_only`, even with synthetic eye samples. Gemini may receive only wholly invented test requests explicitly marked `synthetic_demo`; see [contracts](../contracts/README.md). Scene opt-in does not authorize cloud processing. Any later participant cloud path needs a separate data-handling decision and consent.
 
 ## 7. Scene engine
 
 ### 7.1 Principle
 
-Scenes are **assembled from a fixed parametric forest**, not generated freely. A model (or the local rules) only chooses values inside bounds. This keeps the demo reliable, comfortable and testable, and satisfies the rule that no model-generated code, URLs or arbitrary assets are executed.
+The scene engine serves an **optional relaxation use case** of the eye-tracking app. It must not be required to obtain a report or finish a session. If the participant chooses it, scenes are **assembled from a fixed parametric forest**, not generated freely. A model (or the local rules) only chooses values inside bounds. This keeps the demo reliable, comfortable and testable, and satisfies the rule that no model-generated code, URLs or arbitrary assets are executed.
 
 ### 7.2 Parameters (`SceneConfig` v1)
 
@@ -160,17 +163,17 @@ Explicit participant choices (Preferences) always win over any AI or rule output
 
 ## 8. Evaluation (small pilot, honestly labelled)
 
-6-10 volunteers, with consent, within-subject. Protocol: baseline ratings -> loaded task -> ratings -> 3 minutes in the scene -> ratings. If time allows, counterbalance with a 3-minute neutral empty room as a control.
+First verify that participants can understand the report and finish without a scene. A separate proposed relaxation pilot involves 6-10 volunteers who explicitly choose to participate, within-subject: baseline ratings -> loaded task -> ratings/report -> 3 minutes in the scene -> ratings. Declining the scene does not block the report or count as failed app use; exclude report-only sessions from scene before/after calculations. If time allows, counterbalance with a 3-minute neutral empty room as a control.
 
 Report only: n, mean change in each slider with a plain range, the correlation between the indicator and the slider change (Pearson r) with the caveat that n is tiny, and MAE of the indicator-implied rating against a mean-rating baseline, in the spirit of Eye Feel You. State that results are not generalisable, not clinical, and the scene was not shown to improve health. A negative result is a valid, reportable finding.
 
 ## 9. Demo script (3 minutes)
 
-1. (20 s) Problem and scope: long XR use, gradual strain, we propose a personal hint plus an agent. Experimental wellness prototype.
+1. (20 s) Problem and scope: an eye-tracking app with a health/fatigue report, presented as an experimental wellness summary. The forest is an optional use case.
 2. (40 s) Show baseline and loaded task on the Quest Pro (or labelled replay) and the per-metric deviations.
 3. (40 s) Agent check-in: sliders, chips, one sentence; show the reconciliation line.
-4. (40 s) The calming scene appears; show the editable preview and the mute/exit control.
-5. (40 s) Before/after ratings, pilot numbers with n, limits, and the vision (background layer, multi-day baseline).
+4. (40 s) Show the report as the primary result. Explain that normal report-only completion is the objective and still missing in this build; choose the forest deliberately to demonstrate the optional use case and mute/exit controls.
+5. (40 s) Show scene feedback only if collected; label any pilot proposal as unrun. Describe limits and the vision (background layer, multi-day baseline).
 
 Say out loud when anything is replay, synthetic, cached or fallback.
 
@@ -181,15 +184,15 @@ Say out loud when anything is replay, synthetic, cached or fallback.
 | Eye data unavailable or unstable on the day | Labelled replay path; hardware adapter is a separate task |
 | Indicator looks random with n small | Show per-metric deviations and words; do not claim accuracy |
 | Baseline taken while tired | Section 4 |
-| Gemini or network down | Local fallback mapping (7.3); saved preset |
+| Gemini or network down | Local report fallback; saved preset/mapping (7.3) for optional scene users |
 | Free-tier data terms vs personal text | Decision D1 |
 | Cybersickness or discomfort | Static camera, no locomotion, short sessions, visible exit, `safety_notice` |
-| Scope creep (voice, skybox, biomes) | Stretch list; forest first |
+| Scene work displaces core eye-tracking/report work | Report-only completion first; one optional forest before any additional biomes |
 | Prior lab code or data pulled in | Code must be written during the event and AI use disclosed; restricted lab recordings must never enter this repo |
 
 ## 11. Open decisions for the team
 
-- **D1** Cloud use of self-report text and the Gemini plan (section 6.4).
+- **D1** Any future expansion beyond the current local-only participant policy (section 6.4).
 - **D2** Meaning of `fatigue score` ban in PROJECT_PLAN: this concept allows an *experimental baseline-deviation indicator* with the labels above; the words "fatigue score" remain forbidden.
 - **D3** Who owns the Quest Pro build and the first-hour eye-data test (see HARDWARE_QUEST_PRO.md).
 - **D4** Whether the volunteer pilot is feasible in the time left; if not, show the protocol and ratings from the team only.

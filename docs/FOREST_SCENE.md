@@ -1,5 +1,9 @@
 # ForestDemo: how it is built, what is verified, what is not
 
+## Role in the product
+
+The forest is **one optional relaxation use case of the eye-tracking app**. The core outcome is an experimental health/fatigue wellness report, and users must be able to complete a report-only session without entering `ForestDemo` or selecting scene settings. Only an explicit participation choice should load/apply this experience; receiving a `SceneConfig` is not that choice. The current app still routes normal completion through Scene/Re-rating; see [objectives and implementation gaps](OBJECTIVES.md). This builder does not implement the report-only completion path.
+
 Owner: environment and experience. The scene is produced by an Editor script rather than by hand, so it is reproducible
 and reviewable. **Nothing here has been run in Unity yet**: the code was written on a machine without the editor
 (Unity 6000.6.7f1 is used by the project). Expect one round of compile/visual fixes on the first run.
