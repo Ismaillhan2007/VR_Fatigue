@@ -94,7 +94,9 @@ namespace App.UI
         public bool AnalysisInProgress { get; private set; }
         public string SceneStatus { get; private set; } = "";
 
-        public string EyeSourceDescription => _provider != null
+        public string EyeSourceDescription => _provider is App.Capture.HardwareEyeProvider native && !native.IsRunning && !native.Completed
+            ? "Native eye capture: preparing (no samples collected)"
+            : _provider != null
             ? $"{_provider.Name} ({_provider.DataSource.ToString().ToLowerInvariant()})"
             : EyeSource == EyeSourceMode.Synthetic ? "synthetic generator (no headset)" : EyeSource.ToString();
 

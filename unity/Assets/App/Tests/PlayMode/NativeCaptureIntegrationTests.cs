@@ -71,6 +71,7 @@ public class NativeCaptureIntegrationTests
         Assert.AreEqual(FlowState.Consent, _controller.Flow.State); Assert.AreEqual(0, _source.Starts);
         _controller.RequestHardwarePermission();
         Assert.AreEqual(1, _source.Requests); Assert.AreEqual(0, _source.Starts);
+        StringAssert.Contains("preparing (no samples collected)", _controller.EyeSourceDescription);
         _controller.SendMessage("OnApplicationFocus", false);
         Assert.AreEqual(FlowState.Consent, _controller.Flow.State, "permission prompt focus loss must not clear preparation");
         Assert.IsTrue(_provider.ConsentGranted);
